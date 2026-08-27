@@ -1,0 +1,28 @@
+services:
+  order-postgres:
+    container_name: order-postgres
+    image: postgres:18
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=orderdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - order-postgres-data:/var/lib/postgresql/18/docker
+
+  user-postgres:
+    container_name: user-postgres
+    image: postgres:18
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=userdb
+    ports:
+      - "5433:5432"
+    volumes:
+      - user-postgres-data:/var/lib/postgresql/18/docker
+
+volumes:
+  order-postgres-data:
+  user-postgres-data:
