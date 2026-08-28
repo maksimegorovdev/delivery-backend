@@ -1,3 +1,3 @@
-module github.com/maksimegorovdev/delivery-platform/services/user
+module github.com/maksimegorovdev/delivery-backend/services/user
 
 go 1.27.0

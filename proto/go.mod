@@ -1,3 +1,3 @@
-module github.com/maksimegorovdev/delivery-platform/proto
+module github.com/maksimegorovdev/delivery-backend/proto
 
 go 1.27.0
