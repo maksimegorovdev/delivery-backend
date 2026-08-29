@@ -6,7 +6,7 @@ import (
 
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
 
-	"github.com/maksimegorovdev/delivery-backend/services/order/internal/config"
+	"github.com/maksimegorovdev/delivery-backend/services/notification/internal/config"
 )
 
 type App struct {

@@ -1,0 +1,23 @@
+# Задачи
+
+- [ ] Пакет httpserver
+- [ ] Middlewares (logger, request_id итд)
+- [ ] Пакет grpcserver
+- [ ] Interceptors для grpc
+- [ ] Пакет для pgxpool
+- [ ] Подготовить таблицы для миграции в Postgres
+- [ ] Clean Architecture для order-service (handler, service, domain, repository)
+- [ ] Clean Architecture для user-service (handler, service, domain, repository)
+- [ ] Для user-service подготовить proto
+- [ ] Swagger для order-service
+- [ ] grpcui для user-service
+- [ ] Пакет для единого ответа json
+- [ ] Пакет для работы с ошибками errors
+- [ ] Пакет kafka
+- [ ] Debezium поднять
+- [ ] Clean Architecture для notification-service (handler, service, domain, repository)
+- [ ] Тесты unit, интеграционные, e2e
+- [ ] Benchmarks, нагрузочные
+- [ ] Observability (трейсы, метрики, логи)
+- [ ] Logger логирование ошибок по стеку
+- [ ] Доработка пакетов http, grpc, pgx, redis, kafka итд насчет кол-ва соединенией, timeout

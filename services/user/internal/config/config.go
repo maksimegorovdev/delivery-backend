@@ -5,12 +5,14 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/go-ozzo/ozzo-validation/v4/is"
 )
 
 type Config struct {
-	App App
-	Log Log
-	PG  PG
+	App        App
+	Log        Log
+	PG         PG
+	GRPCServer GRPCServer
 }
 
 func (c Config) Validate() error {
@@ -52,6 +54,16 @@ func (p PG) Validate() error {
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.DSN, validation.Required),
 		validation.Field(&p.MaxConns, validation.Required),
+	)
+}
+
+type GRPCServer struct {
+	Port int `env:"GRPC_SERVER_PORT,required"`
+}
+
+func (g GRPCServer) Validate() error {
+	return validation.ValidateStruct(&g,
+		validation.Field(&g.Port, validation.Required, is.Port),
 	)
 }
 

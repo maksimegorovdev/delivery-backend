@@ -13,7 +13,7 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatalf("Fatal error: %v", err)
+		log.Fatalf("fatal: %v", err)
 	}
 }
 
@@ -23,11 +23,11 @@ func run() error {
 
 	a, err := app.New(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize app: %w", err)
+		return fmt.Errorf("app init: %w", err)
 	}
 
 	if err = a.Run(ctx); err != nil {
-		return fmt.Errorf("failed to run app: %w", err)
+		return fmt.Errorf("app run: %w", err)
 	}
 
 	return nil

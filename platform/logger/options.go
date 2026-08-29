@@ -6,16 +6,16 @@ import (
 	"strings"
 )
 
-type Option func(*config)
+type Option func(*logger)
 
 func WithWriter(w io.Writer) Option {
-	return func(c *config) {
+	return func(c *logger) {
 		c.writer = w
 	}
 }
 
 func WithLevel(level string) Option {
-	return func(c *config) {
+	return func(c *logger) {
 		switch strings.ToLower(level) {
 		case "debug":
 			c.level = slog.LevelDebug
@@ -30,7 +30,7 @@ func WithLevel(level string) Option {
 }
 
 func WithFormat(format string) Option {
-	return func(c *config) {
+	return func(c *logger) {
 		switch strings.ToLower(format) {
 		case "json":
 			c.format = FormatJSON

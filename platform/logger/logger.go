@@ -18,14 +18,14 @@ const (
 	defaultFormat = FormatText
 )
 
-type config struct {
+type logger struct {
 	writer io.Writer
 	level  slog.Level
 	format Format
 }
 
 func New(opts ...Option) *slog.Logger {
-	cfg := &config{
+	cfg := &logger{
 		writer: os.Stdout,
 		level:  defaultLevel,
 		format: defaultFormat,
