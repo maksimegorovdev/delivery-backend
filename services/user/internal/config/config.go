@@ -5,7 +5,6 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/go-ozzo/ozzo-validation/v4/is"
 )
 
 type Config struct {
@@ -20,6 +19,7 @@ func (c Config) Validate() error {
 		validation.Field(&c.App),
 		validation.Field(&c.Log),
 		validation.Field(&c.PG),
+		validation.Field(&c.GRPCServer),
 	)
 }
 
@@ -63,7 +63,7 @@ type GRPCServer struct {
 
 func (g GRPCServer) Validate() error {
 	return validation.ValidateStruct(&g,
-		validation.Field(&g.Port, validation.Required, is.Port),
+		validation.Field(&g.Port, validation.Required),
 	)
 }
 

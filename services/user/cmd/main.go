@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/maksimegorovdev/delivery-backend/platform/logger"
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/app"
 )
 
@@ -16,7 +17,7 @@ func main() {
 	if err := run(); err != nil {
 		slog.Error(
 			"service stopped with error",
-			slog.Any("error", err),
+			logger.Err(err),
 		)
 		os.Exit(1)
 	}

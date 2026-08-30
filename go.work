@@ -3,6 +3,7 @@ go 1.27.0
 use (
 	./platform
 	./proto
+	./services/gateway
 	./services/notification
 	./services/order
 	./services/user

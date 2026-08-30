@@ -1,6 +1,8 @@
 package grpcserver
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -20,21 +22,21 @@ type Server struct {
 	host            string
 	port            int
 	shutdownTimeout time.Duration
-	notify          chan error
+	serverOpts      []grpc.ServerOption
 }
 
 func New(opts ...Option) *Server {
 	srv := &Server{
-		server:          grpc.NewServer(),
 		host:            defaultHost,
 		port:            defaultPort,
 		shutdownTimeout: defaultShutdownTimeout,
-		notify:          make(chan error, 1),
 	}
 
 	for _, opt := range opts {
 		opt(srv)
 	}
+
+	srv.server = grpc.NewServer(srv.serverOpts...)
 
 	return srv
 }
@@ -43,27 +45,28 @@ func (s *Server) Server() *grpc.Server {
 	return s.server
 }
 
-func (s *Server) Notify() <-chan error {
-	return s.notify
-}
-
-func (s *Server) Start() error {
+func (s *Server) Run(ctx context.Context) error {
 	lis, err := net.Listen("tcp", net.JoinHostPort(s.host, strconv.Itoa(s.port)))
 	if err != nil {
 		return fmt.Errorf("grpcserver: listen: %w", err)
 	}
 
+	serveErr := make(chan error, 1)
 	go func() {
-		if err := s.server.Serve(lis); err != nil {
-			s.notify <- fmt.Errorf("grpcserver: serve: %w", err)
+		if err := s.server.Serve(lis); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			serveErr <- err
 		}
-		close(s.notify)
 	}()
 
-	return nil
+	select {
+	case err := <-serveErr:
+		return fmt.Errorf("grpcserver: serve: %w", err)
+	case <-ctx.Done():
+		return s.graceful()
+	}
 }
 
-func (s *Server) Shutdown() error {
+func (s *Server) graceful() error {
 	done := make(chan struct{})
 	go func() {
 		s.server.GracefulStop()
@@ -79,6 +82,6 @@ func (s *Server) Shutdown() error {
 	case <-timer.C:
 		s.server.Stop()
 		<-done
-		return fmt.Errorf("grpcserver: graceful stop timed out after %s: forced stop", s.shutdownTimeout)
+		return fmt.Errorf("grpcserver: graceful stop timed out after %s", s.shutdownTimeout)
 	}
 }

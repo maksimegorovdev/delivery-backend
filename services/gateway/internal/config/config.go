@@ -8,18 +8,16 @@ import (
 )
 
 type Config struct {
-	App        App
-	Log        Log
-	PG         PG
-	GRPCServer GRPCServer
+	App  App
+	Log  Log
+	HTTP HTTP
 }
 
 func (c Config) Validate() error {
 	return validation.ValidateStruct(&c,
 		validation.Field(&c.App),
 		validation.Field(&c.Log),
-		validation.Field(&c.PG),
-		validation.Field(&c.GRPCServer),
+		validation.Field(&c.HTTP),
 	)
 }
 
@@ -45,28 +43,15 @@ func (l Log) Validate() error {
 	)
 }
 
-type PG struct {
-	DSN      string `env:"PG_DSN,required"`
-	MaxConns int32  `env:"PG_MAX_CONNS,required"`
+type HTTP struct {
+	Port int `env:"HTTP_PORT,required"`
 }
 
-func (p PG) Validate() error {
-	return validation.ValidateStruct(&p,
-		validation.Field(&p.DSN, validation.Required),
-		validation.Field(&p.MaxConns, validation.Required),
+func (h HTTP) Validate() error {
+	return validation.ValidateStruct(&h,
+		validation.Field(&h.Port, validation.Required),
 	)
 }
-
-type GRPCServer struct {
-	Port int `env:"GRPC_SERVER_PORT,required"`
-}
-
-func (g GRPCServer) Validate() error {
-	return validation.ValidateStruct(&g,
-		validation.Field(&g.Port, validation.Required),
-	)
-}
-
 func New() (*Config, error) {
 	var cfg Config
 	if err := env.Parse(&cfg); err != nil {

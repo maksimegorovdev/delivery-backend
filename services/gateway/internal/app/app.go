@@ -4,21 +4,17 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcserver"
+	"github.com/maksimegorovdev/delivery-backend/platform/http/httpserver"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
-	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
-
-	"github.com/maksimegorovdev/delivery-backend/services/user/internal/config"
+	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/config"
 )
 
 type App struct {
 	cfg        *config.Config
 	log        *slog.Logger
-	pgPool     *pgxpool.Pool
-	grpcServer *grpcserver.Server
+	httpServer *httpserver.Server
 }
 
 func New(ctx context.Context) (*App, error) {
@@ -37,26 +33,15 @@ func New(ctx context.Context) (*App, error) {
 	)
 	slog.SetDefault(log)
 
-	// Postgres
-	pgPool, err := postgres.New(
-		ctx,
-		cfg.PG.DSN,
-		postgres.WithMaxConns(cfg.PG.MaxConns),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// gRPC Server
-	grpcServer := grpcserver.New(
-		grpcserver.WithPort(cfg.GRPCServer.Port),
+	// HTTP Server
+	httpServer := httpserver.New(
+		httpserver.WithPort(cfg.HTTP.Port),
 	)
 
 	app := &App{
 		cfg:        cfg,
 		log:        log,
-		pgPool:     pgPool,
-		grpcServer: grpcServer,
+		httpServer: httpServer,
 	}
 
 	return app, nil
@@ -67,20 +52,19 @@ func (a *App) Run(ctx context.Context) error {
 
 	g.Go(func() error {
 		a.log.Info(
-			"grpc server started",
-			slog.Int("port", a.cfg.GRPCServer.Port),
+			"http server started",
+			slog.Int("port", a.cfg.HTTP.Port),
 		)
 		defer a.log.Info(
-			"grpc server stopped",
-			slog.Int("port", a.cfg.GRPCServer.Port),
+			"http server stopped",
+			slog.Int("port", a.cfg.HTTP.Port),
 		)
-		return a.grpcServer.Run(ctx)
+		return a.httpServer.Run(ctx)
 	})
 
 	return g.Wait()
 }
 
 func (a *App) Close() error {
-	a.pgPool.Close()
 	return nil
 }
