@@ -1,13 +1,11 @@
 package grpcserver
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"strconv"
 	"time"
 
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
 
@@ -22,6 +20,7 @@ type Server struct {
 	host            string
 	port            int
 	shutdownTimeout time.Duration
+	notify          chan error
 }
 
 func New(opts ...Option) *Server {
@@ -30,6 +29,7 @@ func New(opts ...Option) *Server {
 		host:            defaultHost,
 		port:            defaultPort,
 		shutdownTimeout: defaultShutdownTimeout,
+		notify:          make(chan error, 1),
 	}
 
 	for _, opt := range opts {
@@ -43,44 +43,42 @@ func (s *Server) Server() *grpc.Server {
 	return s.server
 }
 
-func (s *Server) Run(ctx context.Context) error {
+func (s *Server) Notify() <-chan error {
+	return s.notify
+}
+
+func (s *Server) Start() error {
 	lis, err := net.Listen("tcp", net.JoinHostPort(s.host, strconv.Itoa(s.port)))
 	if err != nil {
 		return fmt.Errorf("grpcserver: listen: %w", err)
 	}
 
-	g, ctx := errgroup.WithContext(ctx)
-
-	g.Go(func() error {
+	go func() {
 		if err := s.server.Serve(lis); err != nil {
-			return fmt.Errorf("grpcserver: serve: %w", err)
+			s.notify <- fmt.Errorf("grpcserver: serve: %w", err)
 		}
-		return nil
-	})
+		close(s.notify)
+	}()
 
-	g.Go(func() error {
-		<-ctx.Done()
-		return s.shutdown()
-	})
-
-	return g.Wait()
+	return nil
 }
 
-func (s *Server) shutdown() error {
-	stopped := make(chan struct{})
+func (s *Server) Shutdown() error {
+	done := make(chan struct{})
 	go func() {
 		s.server.GracefulStop()
-		close(stopped)
+		close(done)
 	}()
 
 	timer := time.NewTimer(s.shutdownTimeout)
 	defer timer.Stop()
 
 	select {
-	case <-stopped:
+	case <-done:
 		return nil
 	case <-timer.C:
 		s.server.Stop()
-		return fmt.Errorf("grpcserver: graceful shutdown timeout after %s: forced stop", s.shutdownTimeout)
+		<-done
+		return fmt.Errorf("grpcserver: graceful stop timed out after %s: forced stop", s.shutdownTimeout)
 	}
 }

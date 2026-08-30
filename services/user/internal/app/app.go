@@ -5,7 +5,6 @@ import (
 	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcserver"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
@@ -63,18 +62,38 @@ func New(ctx context.Context) (*App, error) {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	g, ctx := errgroup.WithContext(ctx)
+	if err := a.grpcServer.Start(); err != nil {
+		return err
+	}
+	a.log.Info(
+		"grpc server started",
+		slog.Int("port", a.cfg.GRPCServer.Port),
+	)
 
-	g.Go(func() error {
-		log := a.log.With(
+	select {
+	case <-ctx.Done():
+		a.log.Info("received signal from OS, starting graceful shutdown")
+	case err := <-a.grpcServer.Notify():
+		a.log.Error(
+			"received error from grpc server",
 			slog.Int("port", a.cfg.GRPCServer.Port),
+			logger.Err(err),
 		)
-		log.Info("grpc server starting")
-		defer log.Info("grpc server stopped")
-		return a.grpcServer.Run(ctx)
-	})
+	}
 
-	return g.Wait()
+	if err := a.grpcServer.Shutdown(); err != nil {
+		a.log.Warn(
+			"grpc graceful shutdown",
+			slog.Int("port", a.cfg.GRPCServer.Port),
+			logger.Err(err),
+		)
+	}
+	a.log.Info(
+		"grpc server stopped",
+		slog.Int("port", a.cfg.GRPCServer.Port),
+	)
+
+	return nil
 }
 
 func (a *App) Close() error {
