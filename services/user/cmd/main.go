@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
+
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/app"
 )
 

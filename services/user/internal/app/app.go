@@ -66,11 +66,11 @@ func (a *App) Run(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		a.log.Info(
+		a.log.InfoContext(ctx,
 			"grpc server started",
 			slog.Int("port", a.cfg.GRPCServer.Port),
 		)
-		defer a.log.Info(
+		defer a.log.InfoContext(ctx,
 			"grpc server stopped",
 			slog.Int("port", a.cfg.GRPCServer.Port),
 		)

@@ -1,0 +1,15 @@
+# For details on buf.yaml configuration, visit https://buf.build/docs/configuration/v2/buf-yaml
+version: v2
+modules:
+  - path: proto
+  - path: third_party/protovalidate
+lint:
+  use:
+    - STANDARD
+  ignore:
+    - third_party/protovalidate
+breaking:
+  use:
+    - FILE
+  ignore:
+    - third_party/protovalidate

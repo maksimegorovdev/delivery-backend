@@ -1,6 +1,7 @@
 LOCALBIN := $(CURDIR)/bin
 
 GOLANGCI_LINT_VERSION := v2.13.1
+
 GOLANGCI_LINT := $(LOCALBIN)/golangci-lint
 
 tools:

@@ -4,6 +4,7 @@ export
 LOCAL_BIN := $(CURDIR)/bin
 
 GOLANGCI_LINT_VERSION := v2.13.1
+
 GOLANGCI_LINT := $(LOCAL_BIN)/golangci-lint
 
 tools:
