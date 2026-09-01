@@ -7,6 +7,24 @@
 `Message` (безопасный текст для клиента) и `Err` (внутренняя цепочка причин, только в логи).
 Весь маппинг между кодами живёт рядом с типом `Code`, транспортные пакеты друг о друге не знают.
 
+**Конвенция именования.** Имена доменных кодов совпадают с каноническими именами gRPC-кодов
+(`google.golang.org/grpc/codes`). Отсюда два следствия:
+
+- `Code ↔ gRPC` — **полная биекция**: у каждого из 16 нестатусных кодов `codes.*` есть
+  тёзка-константа `apperr.Code`, и наоборот. Обратный маппинг в gateway ничего не
+  «схлопывает» и не гадает — `InvalidArgument` всегда даёт `INVALID_ARGUMENT`, и наоборот.
+  `OK` не в счёт — это не ошибка (`nil`).
+- `Code → HTTP` — фиксированная таблица из `google.rpc.Code` (тот же маппинг, что у grpc-gateway).
+
+HTTP-именами (`BAD_REQUEST`, `CONFLICT`, `UNAUTHORIZED`, …) словарь не пользуется: набор
+HTTP-статусов беднее (один `400` на всё, один `409` на два разных случая), а обратного
+маппинга «из HTTP» в системе нет — HTTP это крайний edge к внешнему клиенту.
+
+Более тонкие различия внутри одного кода (не JSON vs плохое значение; один невалидный
+аргумент vs форма целиком; нет токена vs неверный пароль) несёт **опциональная под-причина**
+`Error.Reason` — она не влияет на транспортный маппинг, только помогает клиенту ветвиться
+(см. §1, «Под-причины»).
+
 ---
 
 ## 1. Доменные коды `apperr.Code`
@@ -14,34 +32,63 @@
 | Код | Значение | Когда возвращать | Типичный источник |
 |---|---|---|---|
 | `INTERNAL` | Непредвиденная ошибка сервера. Клиент ничего не может с этим сделать. Наружу — только generic-текст, детали в лог. | Любая незапланированная ошибка, паника, «этого не должно было случиться», неизвестная ошибка от зависимости. | Баг в коде, сбой сериализации, неизвестный SQLSTATE, `nil`-разыменование. |
-| `INVALID_ARGUMENT` | Аргумент запроса не прошёл проверку бизнес-правил. Запрос синтаксически корректен, но семантически неверен. | Значение вне допустимого диапазона, ссылка на несуществующую сущность в поле, нарушение инварианта домена. | Валидация в service-слое, `FOREIGN KEY` / `CHECK` / `NOT NULL` от Postgres. |
-| `INVALID_REQUEST_BODY` | Тело запроса не удалось разобрать: не JSON, не тот тип поля, не распарсился protobuf. Ошибка на уровне формата, не бизнес-логики. | Ошибка `json.Unmarshal`, отсутствует обязательное поле на уровне DTO, неверный `Content-Type`. | HTTP-хендлер (gateway), декодирование запроса. |
-| `VALIDATION_FAILED` | Составная ошибка валидации: несколько полей невалидны одновременно. Несёт список `Violations` (поле → сообщение), безопасный для клиента. | Валидация формы/DTO, где нужно вернуть все ошибки сразу, а не первую. | Валидатор DTO в хендлере или service-слое. |
+| `INVALID_ARGUMENT` | Запрос не прошёл проверку: тело не разобралось (не JSON, не тот тип поля, не распарсился protobuf), значение вне допустимого диапазона, ссылка на несуществующую сущность в поле, нарушение инварианта домена. Составная валидация нескольких полей несёт список `Violations` и под-причину `VALIDATION_FAILED`; неразобранное тело — под-причину `REQUEST_BODY_MALFORMED`. | Декодирование запроса в HTTP-хендлере, валидация DTO/формы, валидация в service-слое, `FOREIGN KEY` / `CHECK` / `NOT NULL` от Postgres. |
 | `NOT_FOUND` | Запрошенная сущность не существует или недоступна текущему пользователю (чтобы не раскрывать существование). | `GetByID` не нашёл строку, переход по несуществующему идентификатору. | `pgx.ErrNoRows` в репозитории. |
 | `ALREADY_EXISTS` | Сущность с такими уникальными атрибутами уже есть. Повторное создание. | Нарушение `UNIQUE`-индекса при вставке, повторная регистрация. | `UNIQUE_VIOLATION` (SQLSTATE `23505`). |
-| `CONFLICT` | Состояние ресурса не позволяет выполнить операцию сейчас; имеет смысл повторить после изменения состояния. Отличается от `ALREADY_EXISTS` тем, что это не про уникальность, а про конкурентный доступ / порядок операций. | Оптимистическая блокировка (версия изменилась), заказ уже оплачен/отменён, race при переходе статуса. | `SERIALIZATION_FAILURE` / `DEADLOCK_DETECTED` (если решено считать их конфликтом, а не `UNAVAILABLE`), проверка версии в service-слое. |
-| `UNAUTHENTICATED` | Запрос без валидных учётных данных: токен отсутствует, истёк, подпись неверна. Клиент не идентифицирован. | Middleware аутентификации, невалидный / отсутствующий `Authorization`. | Auth-middleware gateway. |
-| `INVALID_CREDENTIALS` | Учётные данные предоставлены, но не совпали (неверный логин/пароль). Подвид `UNAUTHENTICATED` с отдельным кодом для логина. | Хендлер логина: пользователь не найден или пароль не сошёлся. Наружу — всегда одинаковый текст, без указания, что именно не так. | Service-слой аутентификации. |
-| `FORBIDDEN` | Клиент идентифицирован, но не имеет прав на операцию/ресурс. | Проверка ролей/владения ресурсом: пользователь пытается прочитать чужой заказ. | Проверка доступа в service-слое. |
-| `TIMEOUT` | Операция не уложилась в дедлайн: истёк `context.Context`, отменён запрос, долгий запрос к БД был прерван. | Дедлайн вызова превышен, `context.DeadlineExceeded`, отменённый пользователем запрос. | `context` отменён, `QUERY_CANCELED` (SQLSTATE `57014`), таймаут вызова зависимости. |
+| `ABORTED` | Операция прервана из-за конфликта конкурентного доступа или состояния ресурса. Клиенту стоит повторить всю последовательность read-modify-write после изменения состояния. В отличие от `ALREADY_EXISTS` — это не про уникальность, а про порядок операций / гонку. | Оптимистическая блокировка (версия изменилась), заказ уже оплачен/отменён, race при переходе статуса. | `SERIALIZATION_FAILURE` / `DEADLOCK_DETECTED` (если решено считать их конфликтом, а не `UNAVAILABLE`), проверка версии в service-слое. |
+| `UNAUTHENTICATED` | Запрос без валидных учётных данных: токен отсутствует, истёк, подпись неверна — либо учётные данные предъявлены, но не совпали (неверный логин/пароль, под-причина `INVALID_CREDENTIALS`). Клиент не идентифицирован. Наружу — generic-текст без указания, что именно не так; для `INVALID_CREDENTIALS` — фиксированный `invalid credentials` (тоже не раскрывает, логин или пароль). `Message` разработчика в этот код не подставляется. | Middleware аутентификации, невалидный / отсутствующий `Authorization`, хендлер логина. | Auth-middleware gateway, service-слой аутентификации. |
+| `PERMISSION_DENIED` | Клиент идентифицирован, но не имеет прав на операцию/ресурс. | Проверка ролей/владения ресурсом: пользователь пытается прочитать чужой заказ. | Проверка доступа в service-слое. |
+| `DEADLINE_EXCEEDED` | Операция не уложилась в дедлайн: истёк таймаут `context.Context`, долгий запрос к БД прерван по времени. Явную отмену вызова / отвал клиента см. `CANCELED`. | Дедлайн вызова превышен, `context.DeadlineExceeded`. | Истёкший по таймауту `context`, `QUERY_CANCELED` (SQLSTATE `57014`), таймаут вызова зависимости. |
 | `UNAVAILABLE` | Зависимость временно недоступна: нет соединения с БД/Kafka/соседним сервисом, пул исчерпан. Операцию имеет смысл повторить с backoff. | Не удалось подключиться к Postgres, gRPC-вызов вернул `Unavailable`, пул соединений пуст. | Ошибка dial/connect, `pgxpool` не выдал соединение, `codes.Unavailable` от апстрима. |
+| `UNKNOWN` | Непрозрачный сбой без доменной классификации: gRPC-статус без кода, код из чужого адресного пространства, ошибка стороннего сервиса/прокси/mesh. Наружу — generic-текст, как у `INTERNAL`. | Только на границе gateway при разборе ответа не-нашего апстрима (нет `ErrorInfo` с точным кодом). Внутри процесса не порождается. | `CodeFromGRPC(codes.Unknown)`, сторонний gRPC. |
+| `CANCELED` | Вызов не завершён, потому что закончился `context` вызывающей стороны: клиент закрыл соединение или явно отменил запрос. Ответ, как правило, отдавать уже некому. | Даунстрим вернул `Canceled` (наш `r.Context()` отменился), `errors.Is(err, context.Canceled)`. | Отвал клиента, отменённый родительский контекст. |
+| `RESOURCE_EXHAUSTED` | Исчерпан лимит или квота: rate limit, слишком большой запрос/страница, нехватка места. Клиенту стоит сбавить темп и повторить с backoff (по возможности учитывая `Retry-After`). | Rate-limiter, проверка размера тела / `page_size`, пользовательская квота. | Middleware лимитера в gateway, service-слой. |
+| `FAILED_PRECONDITION` | Система не в том состоянии для операции, и повтор **без изменения состояния** не поможет (в отличие от `ABORTED` — там это гонка). Пример: удаление непустого ресурса, действие над сущностью в неподходящем статусе. | Проверка бизнес-предусловий в service-слое. | Service-слой, инварианты состояния. |
+| `OUT_OF_RANGE` | Аргумент синтаксически валиден, но вне допустимого диапазона для текущего состояния: страница за последней, смещение за концом, интервал вне границ. В отличие от `INVALID_ARGUMENT`, может стать валидным при изменении состояния. | Пагинация, диапазонные и курсорные запросы. | Service-слой. |
+| `UNIMPLEMENTED` | Метод не реализован или отключён на этом сервере / в этой версии. | Заглушка хендлера; вызов метода, которого нет в развёрнутой версии сервиса. | Stub-хендлер, рассинхрон версий client/server. |
+| `DATA_LOSS` | Невосстановимая потеря или повреждение данных. Наружу — generic-текст. | Payload, целостность которого нельзя восстановить; повреждение в хранилище. | Слой хранилища, десериализация критичных данных. |
 
 ### Свойства кодов
 
-- **Retryable (клиенту можно повторить):** `TIMEOUT`, `UNAVAILABLE`, `CONFLICT` (после изменения состояния).
-- **Не retryable:** `INVALID_ARGUMENT`, `INVALID_REQUEST_BODY`, `VALIDATION_FAILED`, `NOT_FOUND`,
-  `ALREADY_EXISTS`, `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `FORBIDDEN` — повтор того же запроса
-  даст тот же результат.
-- **`INTERNAL`** — retry на усмотрение клиента, обычно с backoff и ограничением попыток.
-- **Наружу без деталей:** `INTERNAL`, `UNAVAILABLE`, `TIMEOUT` — `Public()` всегда отдаёт
-  generic-текст, `Message` игнорируется, чтобы не утекли внутренние подробности.
-  Остальные коды отдают `Message`, заданный разработчиком (он обязан быть безопасным).
+- **Retryable (клиенту можно повторить):** `DEADLINE_EXCEEDED`, `UNAVAILABLE`,
+  `RESOURCE_EXHAUSTED` — с backoff; `ABORTED` — после изменения состояния;
+  `UNAUTHENTICATED` — с валидными учётными данными.
+- **Не retryable:** `INVALID_ARGUMENT`, `NOT_FOUND`, `ALREADY_EXISTS`,
+  `PERMISSION_DENIED`, `FAILED_PRECONDITION`, `OUT_OF_RANGE`, `UNIMPLEMENTED`,
+  `CANCELED` — повтор того же запроса даст тот же результат (либо отвечать уже некому).
+- **`INTERNAL` / `UNKNOWN` / `DATA_LOSS`** — retry на усмотрение клиента, обычно с
+  backoff и ограничением попыток.
+- **Наружу без деталей:** `INTERNAL`, `UNKNOWN`, `DATA_LOSS`, `UNAVAILABLE`,
+  `DEADLINE_EXCEEDED`, `UNAUTHENTICATED` — `Public()` не отдаёт `Message` наружу. Для
+  первых пяти причина — утечка внутренних подробностей; для `UNAUTHENTICATED` — политика
+  «не раскрывать, что именно не так» (anti-enumeration). Текст берётся из `Code.Public()`
+  (generic) либо из таблицы `publicByReason` по под-причине (`INVALID_CREDENTIALS` →
+  `invalid credentials`) — набор закрыт, разработчик свой текст в эти коды не подставляет.
+  У них и конструкторы без сообщения (`apperr.Internal()`, `apperr.Unauthenticated()`, …):
+  диагностику несёт `.Wrap(err)` (в лог полем `cause`), произвольную ошибку в `INTERNAL`
+  нормализует `apperr.From(err)`. Остальные коды отдают `Message`, заданный разработчиком
+  (он обязан быть безопасным).
+
+### Под-причины (`Error.Reason`)
+
+Опциональная строка, уточняющая код для ветвления на клиенте. **Не влияет** на
+`GRPC()` / `HTTP()` / `Level()` — транспортный маппинг идёт только по `Code`.
+
+| Под-причина | Уточняет | Смысл |
+|---|---|---|
+| `REQUEST_BODY_MALFORMED` | `INVALID_ARGUMENT` | Тело запроса не удалось разобрать (не JSON, не тот тип, битый protobuf). Ошибка формата, не бизнес-логики. |
+| `VALIDATION_FAILED` | `INVALID_ARGUMENT` | Составная ошибка валидации: несколько полей невалидны одновременно, несёт `Violations`. |
+| `INVALID_CREDENTIALS` | `UNAUTHENTICATED` | Учётные данные предъявлены, но не совпали. Наружу — фиксированный `invalid credentials` (из `publicByReason`), не раскрывает, логин или пароль неверен. |
+
+Транспорт: gRPC кладёт под-причину в `ErrorInfo.Metadata["reason"]`, HTTP — в поле
+`reason` JSON-ответа. Новые под-причины добавляются здесь без изменения набора кодов.
 
 ---
 
 ## 2. gRPC codes (`google.golang.org/grpc/codes`)
 
-Полный список кодов gRPC и их смысл. Жирным — те, что реально порождает наш маппинг.
+Полный список кодов gRPC и их смысл. У каждого (кроме `OK`) есть тёзка-константа
+`apperr.Code`; жирным — наиболее частые в этом сервисе.
 
 | Код | Число | Значение |
 |---|---|---|
@@ -55,7 +102,7 @@
 | **`PermissionDenied`** | 7 | У вызывающего нет прав на операцию. Не про аутентификацию (для этого `Unauthenticated`) и не про исчерпание квоты (`ResourceExhausted`). Идентичность известна, прав нет. |
 | `ResourceExhausted` | 8 | Исчерпан ресурс: квота, лимит запросов, место на диске. |
 | `FailedPrecondition` | 9 | Операция отклонена, потому что система не в том состоянии. В отличие от `Aborted`, повтор без изменения состояния системы не поможет. Пример: удаление непустой директории. |
-| `Aborted` | 10 | Операция прервана из-за конфликта конкурентного доступа: неудачная транзакция, потеря оптимистической блокировки. Клиенту обычно стоит повторить всю последовательность (read-modify-write). |
+| **`Aborted`** | 10 | Операция прервана из-за конфликта конкурентного доступа: неудачная транзакция, потеря оптимистической блокировки. Клиенту обычно стоит повторить всю последовательность (read-modify-write). |
 | `OutOfRange` | 11 | Операция вышла за допустимый диапазон (например, seek за пределы файла). В отличие от `InvalidArgument`, этот код указывает на проблему, которая пройдёт при изменении состояния системы. |
 | `Unimplemented` | 12 | Операция не реализована / не поддерживается на этом сервере. |
 | **`Internal`** | 13 | Внутренняя ошибка. Сломаны инварианты, на которые рассчитывает система. Зарезервировано под серьёзные ошибки. |
@@ -63,9 +110,9 @@
 | `DataLoss` | 15 | Невосстановимая потеря или повреждение данных. |
 | **`Unauthenticated`** | 16 | Запрос не содержит валидных учётных данных для операции. |
 
-Коды `Unknown`, `ResourceExhausted`, `FailedPrecondition`, `OutOfRange`, `Unimplemented`,
-`DataLoss` наш прямой маппинг не порождает — при необходимости они появятся с новыми
-доменными кодами (например, `RATE_LIMITED → ResourceExhausted`).
+Таблица маппинга полная — «резервных» gRPC-кодов не осталось. Часть доменных кодов
+(`OUT_OF_RANGE`, `DATA_LOSS`, `UNKNOWN`) в этом сервисе почти не порождается вручную и
+держится ради симметрии round-trip'а gateway ↔ сервис.
 
 ---
 
@@ -77,16 +124,20 @@
 |---|---|---|
 | `400` | Bad Request | Сервер не может обработать запрос из-за ошибки клиента: битый синтаксис, невалидное тело, неверные параметры. Повтор без изменений бессмыслен. |
 | `401` | Unauthorized | Точнее — «Unauthenticated». Нет валидной аутентификации. Клиент может повторить с корректными учётными данными. Ответ по спецификации должен нести `WWW-Authenticate`. |
-| `403` | Forbidden | Сервер понял запрос, но отказывает в доступе. Аутентификация не поможет — прав нет. Повтор бессмысленен. |
+| `403` | Forbidden | Сервер понял запрос, но отказывает в доступе. Аутентификация не поможет — прав нет. Повтор бессмыслен. |
 | `404` | Not Found | Ресурс не найден. Также используется, когда сервер не хочет раскрывать существование ресурса (вместо `403`). |
-| `409` | Conflict | Запрос конфликтует с текущим состоянием ресурса: нарушение уникальности, конкурентное изменение, конфликт версий. Клиент может разрешить конфликт и повторить. |
+| `409` | Conflict | Запрос конфликтует с текущим состоянием ресурса: нарушение уникальности (`ALREADY_EXISTS`), конкурентное изменение / конфликт версий (`ABORTED`). Клиент может разрешить конфликт и повторить. |
+| `429` | Too Many Requests | Клиент превысил rate limit или квоту (`RESOURCE_EXHAUSTED`). Повторить позже, в идеале — по `Retry-After`. |
+| `499` | Client Closed Request | Нестандартный код (расширение nginx). Клиент закрыл соединение / отменил запрос до ответа (`CANCELED`); тело ответа обычно уже никто не читает. |
 | `500` | Internal Server Error | Непредвиденная ошибка на сервере. Клиенту не сообщаются детали. |
+| `501` | Not Implemented | Сервер не поддерживает функциональность, нужную для ответа (`UNIMPLEMENTED`). |
 | `503` | Service Unavailable | Сервер временно не может обработать запрос: перегрузка, недоступная зависимость, обслуживание. Можно повторить позже (по возможности с `Retry-After`). |
 | `504` | Gateway Timeout | Сервер, выступая шлюзом/прокси, не дождался ответа от апстрима в отведённый срок. В нашем случае — превышен дедлайн вызова зависимости (БД, соседний сервис). |
 
-Почему `TIMEOUT → 504`, а не `408 Request Timeout`: `408` означает, что *клиент* слишком
-медленно слал запрос и сервер закрыл простаивающее соединение. У нас же дедлайн истекает
-на стороне сервера при обращении к нижестоящей зависимости — это семантика шлюза, `504`.
+Почему `DEADLINE_EXCEEDED → 504`, а не `408 Request Timeout`: `408` означает, что *клиент*
+слишком медленно слал запрос и сервер закрыл простаивающее соединение. У нас же дедлайн
+истекает на стороне сервера при обращении к нижестоящей зависимости — это семантика шлюза,
+`504`. Это же значение даёт официальный маппинг `google.rpc.Code.DEADLINE_EXCEEDED`.
 
 ---
 
@@ -96,41 +147,59 @@
 
 | `apperr.Code` | gRPC code | HTTP | slog level | Retryable |
 |---|---|---|---|---|
-| `INTERNAL` | `Internal` (13) | `500` | `ERROR` | на усмотрение клиента |
+| `CANCELED` | `Canceled` (1) | `499` | `WARN` | нет (отвечать некому) |
+| `UNKNOWN` | `Unknown` (2) | `500` | `ERROR` | на усмотрение клиента |
 | `INVALID_ARGUMENT` | `InvalidArgument` (3) | `400` | `WARN` | нет |
-| `INVALID_REQUEST_BODY` | `InvalidArgument` (3) | `400` | `WARN` | нет |
-| `VALIDATION_FAILED` | `InvalidArgument` (3) | `400` | `WARN` | нет |
+| `DEADLINE_EXCEEDED` | `DeadlineExceeded` (4) | `504` | `ERROR` | да, с backoff |
 | `NOT_FOUND` | `NotFound` (5) | `404` | `WARN` | нет |
 | `ALREADY_EXISTS` | `AlreadyExists` (6) | `409` | `WARN` | нет |
-| `CONFLICT` | `Aborted` (10) | `409` | `WARN` | да, после изменения состояния |
-| `UNAUTHENTICATED` | `Unauthenticated` (16) | `401` | `WARN` | да, с валидными данными |
-| `INVALID_CREDENTIALS` | `Unauthenticated` (16) | `401` | `WARN` | да, с валидными данными |
-| `FORBIDDEN` | `PermissionDenied` (7) | `403` | `WARN` | нет |
-| `TIMEOUT` | `DeadlineExceeded` (4) | `504` | `ERROR` | да, с backoff |
+| `PERMISSION_DENIED` | `PermissionDenied` (7) | `403` | `WARN` | нет |
+| `RESOURCE_EXHAUSTED` | `ResourceExhausted` (8) | `429` | `WARN` | да, с backoff |
+| `FAILED_PRECONDITION` | `FailedPrecondition` (9) | `400` | `WARN` | нет |
+| `ABORTED` | `Aborted` (10) | `409` | `WARN` | да, после изменения состояния |
+| `OUT_OF_RANGE` | `OutOfRange` (11) | `400` | `WARN` | нет (пройдёт при смене состояния) |
+| `UNIMPLEMENTED` | `Unimplemented` (12) | `501` | `ERROR` | нет |
+| `INTERNAL` | `Internal` (13) | `500` | `ERROR` | на усмотрение клиента |
 | `UNAVAILABLE` | `Unavailable` (14) | `503` | `ERROR` | да, с backoff |
-| *(любой неизвестный)* | `Internal` (13) | `500` | `ERROR` | — |
+| `DATA_LOSS` | `DataLoss` (15) | `500` | `ERROR` | нет |
+| `UNAUTHENTICATED` | `Unauthenticated` (16) | `401` | `WARN` | да, с валидными данными |
+| *(гипотетический будущий код)* | `Internal` (13) | `500` | `ERROR` | — |
+
+Под-причина (`Reason`) в этой таблице не участвует — она едет отдельным полем и на статусы
+не влияет.
 
 ---
 
 ## 5. Обратный маппинг: gRPC code → `apperr.Code`
 
 Используется в gateway (`grpcerr.FromStatus`), когда HTTP-слой получает ответ от gRPC-сервиса.
-Маппинг лоссовый: несколько gRPC-кодов схлопываются в один доменный, а часть — в `INTERNAL`.
-Точный доменный код восстанавливается из `errdetails.ErrorInfo.Reason`, если апстрим его положил.
+Имена совпадают, поэтому маппинг **тотально биективен**: каждый из 16 нестатусных gRPC-кодов
+переходит в свою доменную тёзку, и наоборот. `OK` — не ошибка (`nil`). Ничего не «схлопывается»;
+ветка `default → INTERNAL` в коде оставлена только на случай будущих кодов gRPC.
 
 | gRPC code | `apperr.Code` |
 |---|---|
+| `OK` (0) | *(не ошибка, `nil`)* |
+| `Canceled` (1) | `CANCELED` |
+| `Unknown` (2) | `UNKNOWN` |
+| `InvalidArgument` (3) | `INVALID_ARGUMENT` |
+| `DeadlineExceeded` (4) | `DEADLINE_EXCEEDED` |
 | `NotFound` (5) | `NOT_FOUND` |
 | `AlreadyExists` (6) | `ALREADY_EXISTS` |
-| `InvalidArgument` (3) | `INVALID_ARGUMENT` |
-| `Unauthenticated` (16) | `UNAUTHENTICATED` |
-| `PermissionDenied` (7) | `FORBIDDEN` |
-| `Aborted` (10) | `CONFLICT` |
-| `DeadlineExceeded` (4) | `TIMEOUT` |
-| `Canceled` (1) | `TIMEOUT` |
+| `PermissionDenied` (7) | `PERMISSION_DENIED` |
+| `ResourceExhausted` (8) | `RESOURCE_EXHAUSTED` |
+| `FailedPrecondition` (9) | `FAILED_PRECONDITION` |
+| `Aborted` (10) | `ABORTED` |
+| `OutOfRange` (11) | `OUT_OF_RANGE` |
+| `Unimplemented` (12) | `UNIMPLEMENTED` |
+| `Internal` (13) | `INTERNAL` |
 | `Unavailable` (14) | `UNAVAILABLE` |
-| `OK` (0) | *(не ошибка, `nil`)* |
-| всё остальное (`Unknown`, `Internal`, `ResourceExhausted`, `FailedPrecondition`, `OutOfRange`, `Unimplemented`, `DataLoss`) | `INTERNAL` |
+| `DataLoss` (15) | `DATA_LOSS` |
+| `Unauthenticated` (16) | `UNAUTHENTICATED` |
+| *(гипотетический будущий код gRPC)* | `INTERNAL` |
+
+Под-причина (`REQUEST_BODY_MALFORMED`, `VALIDATION_FAILED`, `INVALID_CREDENTIALS`)
+восстанавливается из `ErrorInfo.Metadata["reason"]`, если апстрим её положил.
 
 ---
 
@@ -145,15 +214,20 @@
 | `FOREIGN_KEY_VIOLATION` | `23503` | `INVALID_ARGUMENT` |
 | `CHECK_VIOLATION` | `23514` | `INVALID_ARGUMENT` |
 | `NOT_NULL_VIOLATION` | `23502` | `INVALID_ARGUMENT` |
-| `SERIALIZATION_FAILURE` | `40001` | `UNAVAILABLE` *(или `CONFLICT` — см. ниже)* |
-| `DEADLOCK_DETECTED` | `40P01` | `UNAVAILABLE` *(или `CONFLICT`)* |
-| `QUERY_CANCELED` | `57014` | `TIMEOUT` |
+| `SERIALIZATION_FAILURE` | `40001` | `UNAVAILABLE` *(или `ABORTED` — см. ниже)* |
+| `DEADLOCK_DETECTED` | `40P01` | `UNAVAILABLE` *(или `ABORTED`)* |
+| `QUERY_CANCELED` | `57014` | `DEADLINE_EXCEEDED` |
 | всё остальное | — | `INTERNAL` |
 
 `SERIALIZATION_FAILURE` / `DEADLOCK_DETECTED`: если в сервисе есть внешний retry-цикл
-транзакции — логичнее `CONFLICT` (`Aborted`), сигнализируя «повтори всю транзакцию».
+транзакции — логичнее `ABORTED`, сигнализируя «повтори всю транзакцию».
 Если ретраев нет и клиент просто должен попробовать позже — `UNAVAILABLE`.
 Значение по умолчанию в `pgerr.Map` — `UNAVAILABLE`; переопределяется на уровне сервиса.
+
+`CANCELED`, `FAILED_PRECONDITION`, `RESOURCE_EXHAUSTED`, `OUT_OF_RANGE`, `UNIMPLEMENTED`,
+`DATA_LOSS`, `UNKNOWN` из Postgres напрямую не выводятся — эти коды рождаются в service-слое
+или при round-trip'е через gRPC. `QUERY_CANCELED` (`57014`) остаётся на `DEADLINE_EXCEEDED`;
+если запрос отменён именно из-за `context.Canceled`, service-слой может переопределить на `CANCELED`.
 
 ---
 
@@ -171,12 +245,13 @@ HTTP (`httperr.Write`):
 }
 ```
 
-Для `VALIDATION_FAILED` добавляется `violations`:
+Для составной валидации добавляются `reason` и `violations`:
 
 ```json
 {
   "error": {
-    "code": "VALIDATION_FAILED",
+    "code": "INVALID_ARGUMENT",
+    "reason": "VALIDATION_FAILED",
     "message": "validation failed",
     "violations": [
       { "field": "email", "message": "must be a valid email" },
@@ -187,9 +262,15 @@ HTTP (`httperr.Write`):
 }
 ```
 
-gRPC: `status.New(code.GRPC(), err.Public())` + деталь `errdetails.ErrorInfo{ Reason: "<CODE>", Domain: "delivery" }`.
+Поле `reason` присутствует только когда под-причина задана (`REQUEST_BODY_MALFORMED`,
+`VALIDATION_FAILED`, `INVALID_CREDENTIALS`); `code` при этом остаётся каноничным.
 
-В лог при этом уходит полная цепочка причин (`error.code`, `error.cause`) на уровне `Code.Level()`.
+gRPC: `status.New(code.GRPC(), err.Public())` + деталь
+`errdetails.ErrorInfo{ Reason: "<CODE>", Domain: "delivery", Metadata: {"reason": "<SUB>"} }`
+(ключ `reason` в `Metadata` — только если под-причина задана).
+
+В лог при этом уходит полная цепочка причин (`error.code`, `error.reason`, `error.cause`)
+на уровне `Code.Level()`.
 
 ---
 
@@ -212,79 +293,116 @@ import (
 
 type Code string
 
+// Имена совпадают с каноническими именами gRPC-кодов — Code <-> gRPC биективен по всем 16.
 const (
-	CodeInternal           Code = "INTERNAL"
+	CodeCanceled           Code = "CANCELED"
+	CodeUnknown            Code = "UNKNOWN"
 	CodeInvalidArgument    Code = "INVALID_ARGUMENT"
-	CodeInvalidRequestBody Code = "INVALID_REQUEST_BODY"
-	CodeValidation         Code = "VALIDATION_FAILED"
+	CodeDeadlineExceeded   Code = "DEADLINE_EXCEEDED"
 	CodeNotFound           Code = "NOT_FOUND"
 	CodeAlreadyExists      Code = "ALREADY_EXISTS"
-	CodeConflict           Code = "CONFLICT"
-	CodeUnauthenticated    Code = "UNAUTHENTICATED"
-	CodeInvalidCredentials Code = "INVALID_CREDENTIALS" //nolint:gosec // имя кода, не секрет
-	CodeForbidden          Code = "FORBIDDEN"
-	CodeTimeout            Code = "TIMEOUT"
+	CodePermissionDenied   Code = "PERMISSION_DENIED"
+	CodeResourceExhausted  Code = "RESOURCE_EXHAUSTED"
+	CodeFailedPrecondition Code = "FAILED_PRECONDITION"
+	CodeAborted            Code = "ABORTED"
+	CodeOutOfRange         Code = "OUT_OF_RANGE"
+	CodeUnimplemented      Code = "UNIMPLEMENTED"
+	CodeInternal           Code = "INTERNAL"
 	CodeUnavailable        Code = "UNAVAILABLE"
+	CodeDataLoss           Code = "DATA_LOSS"
+	CodeUnauthenticated    Code = "UNAUTHENTICATED"
+)
+
+// Под-причины: уточняют Code для клиента, на транспортный маппинг не влияют.
+const (
+	ReasonRequestBodyMalformed = "REQUEST_BODY_MALFORMED"
+	ReasonValidationFailed     = "VALIDATION_FAILED"
+	ReasonInvalidCredentials   = "INVALID_CREDENTIALS" //nolint:gosec // имя причины, не секрет
 )
 
 const (
-	MessageInternalServerError = "internal server error"
-	MessageInvalidRequestBody  = "invalid request body"
-	MessageValidationFailed    = "validation failed"
-	MessageNotFound            = "not found"
-	MessageAlreadyExists       = "already exists"
-	MessageConflict            = "conflict"
-	MessageInvalidArgument     = "invalid argument"
-	MessageUnauthenticated     = "unauthenticated"
-	MessageInvalidCredentials  = "invalid credentials" //nolint:gosec // текст ошибки, не секрет
-	MessageForbidden           = "forbidden"
-	MessageTimeout             = "request timeout"
-	MessageUnavailable         = "service unavailable"
+	MessageInternal           = "internal server error"
+	MessageInvalidArgument    = "invalid argument"
+	MessageInvalidRequestBody = "invalid request body"
+	MessageValidationFailed   = "validation failed"
+	MessageNotFound           = "not found"
+	MessageAlreadyExists      = "already exists"
+	MessageAborted            = "operation aborted"
+	MessageResourceExhausted  = "resource exhausted"
+	MessageFailedPrecondition = "failed precondition"
+	MessageOutOfRange         = "out of range"
+	MessageUnimplemented      = "not implemented"
+	MessageCanceled           = "request canceled"
+	MessageUnauthenticated    = "unauthenticated"
+	MessageInvalidCredentials = "invalid credentials" //nolint:gosec // текст ошибки, не секрет
+	MessagePermissionDenied   = "permission denied"
+	MessageDeadlineExceeded   = "deadline exceeded"
+	MessageUnavailable        = "service unavailable"
 )
 
-// GRPC — доменный код -> gRPC-статус. Маппинг живёт рядом с Code,
-// транспортный пакет не знает про доменные коды.
+// GRPC — доменный код -> gRPC-статус. Почти тождество: имена совпадают,
+// решений здесь нет, только таблица.
 func (c Code) GRPC() codes.Code {
 	switch c {
+	case CodeCanceled:
+		return codes.Canceled
+	case CodeUnknown:
+		return codes.Unknown
+	case CodeInvalidArgument:
+		return codes.InvalidArgument
+	case CodeDeadlineExceeded:
+		return codes.DeadlineExceeded
 	case CodeNotFound:
 		return codes.NotFound
 	case CodeAlreadyExists:
 		return codes.AlreadyExists
-	case CodeInvalidArgument, CodeInvalidRequestBody, CodeValidation:
-		return codes.InvalidArgument
-	case CodeConflict:
-		return codes.Aborted
-	case CodeUnauthenticated, CodeInvalidCredentials:
-		return codes.Unauthenticated
-	case CodeForbidden:
+	case CodePermissionDenied:
 		return codes.PermissionDenied
-	case CodeTimeout:
-		return codes.DeadlineExceeded
+	case CodeResourceExhausted:
+		return codes.ResourceExhausted
+	case CodeFailedPrecondition:
+		return codes.FailedPrecondition
+	case CodeAborted:
+		return codes.Aborted
+	case CodeOutOfRange:
+		return codes.OutOfRange
+	case CodeUnimplemented:
+		return codes.Unimplemented
 	case CodeUnavailable:
 		return codes.Unavailable
+	case CodeDataLoss:
+		return codes.DataLoss
+	case CodeUnauthenticated:
+		return codes.Unauthenticated
 	default:
 		return codes.Internal
 	}
 }
 
-// HTTP — доменный код -> HTTP-статус.
+// HTTP — доменный код -> HTTP-статус. Фиксированная таблица google.rpc.Code.
 func (c Code) HTTP() int {
 	switch c {
+	case CodeInvalidArgument, CodeFailedPrecondition, CodeOutOfRange:
+		return http.StatusBadRequest
+	case CodeUnauthenticated:
+		return http.StatusUnauthorized
+	case CodePermissionDenied:
+		return http.StatusForbidden
 	case CodeNotFound:
 		return http.StatusNotFound
-	case CodeAlreadyExists, CodeConflict:
+	case CodeAlreadyExists, CodeAborted:
 		return http.StatusConflict
-	case CodeInvalidArgument, CodeInvalidRequestBody, CodeValidation:
-		return http.StatusBadRequest
-	case CodeUnauthenticated, CodeInvalidCredentials:
-		return http.StatusUnauthorized
-	case CodeForbidden:
-		return http.StatusForbidden
-	case CodeTimeout:
-		return http.StatusGatewayTimeout
+	case CodeResourceExhausted:
+		return http.StatusTooManyRequests
+	case CodeCanceled:
+		return 499 // нет http-константы: "Client Closed Request" (расширение nginx)
+	case CodeUnimplemented:
+		return http.StatusNotImplemented
 	case CodeUnavailable:
 		return http.StatusServiceUnavailable
-	default:
+	case CodeDeadlineExceeded:
+		return http.StatusGatewayTimeout
+	default: // INTERNAL, UNKNOWN, DATA_LOSS
 		return http.StatusInternalServerError
 	}
 }
@@ -293,7 +411,8 @@ func (c Code) HTTP() int {
 // логируют единообразно, не решая уровень на каждом вызове.
 func (c Code) Level() slog.Level {
 	switch c {
-	case CodeInternal, CodeUnavailable, CodeTimeout:
+	case CodeInternal, CodeUnknown, CodeDataLoss,
+		CodeUnavailable, CodeDeadlineExceeded, CodeUnimplemented:
 		return slog.LevelError
 	default:
 		return slog.LevelWarn
@@ -305,52 +424,73 @@ func (c Code) Public() string {
 	switch c {
 	case CodeInvalidArgument:
 		return MessageInvalidArgument
-	case CodeInvalidRequestBody:
-		return MessageInvalidRequestBody
-	case CodeValidation:
-		return MessageValidationFailed
 	case CodeNotFound:
 		return MessageNotFound
 	case CodeAlreadyExists:
 		return MessageAlreadyExists
-	case CodeConflict:
-		return MessageConflict
+	case CodeAborted:
+		return MessageAborted
+	case CodeCanceled:
+		return MessageCanceled
+	case CodeResourceExhausted:
+		return MessageResourceExhausted
+	case CodeFailedPrecondition:
+		return MessageFailedPrecondition
+	case CodeOutOfRange:
+		return MessageOutOfRange
+	case CodeUnimplemented:
+		return MessageUnimplemented
 	case CodeUnauthenticated:
 		return MessageUnauthenticated
-	case CodeInvalidCredentials:
-		return MessageInvalidCredentials
-	case CodeForbidden:
-		return MessageForbidden
-	case CodeTimeout:
-		return MessageTimeout
+	case CodePermissionDenied:
+		return MessagePermissionDenied
+	case CodeDeadlineExceeded:
+		return MessageDeadlineExceeded
 	case CodeUnavailable:
 		return MessageUnavailable
-	default:
-		return MessageInternalServerError
+	default: // INTERNAL, UNKNOWN, DATA_LOSS — generic-текст
+		return MessageInternal
 	}
 }
 
-// CodeFromGRPC — обратный (лоссовый) маппинг для gateway.
+// CodeFromGRPC — обратный маппинг для gateway. Тотальная биекция по всем 16 кодам;
+// default -> INTERNAL оставлен только на случай будущих кодов gRPC.
 func CodeFromGRPC(c codes.Code) Code {
 	switch c {
 	case codes.OK:
 		return ""
+	case codes.Canceled:
+		return CodeCanceled
+	case codes.Unknown:
+		return CodeUnknown
+	case codes.InvalidArgument:
+		return CodeInvalidArgument
+	case codes.DeadlineExceeded:
+		return CodeDeadlineExceeded
 	case codes.NotFound:
 		return CodeNotFound
 	case codes.AlreadyExists:
 		return CodeAlreadyExists
-	case codes.InvalidArgument:
-		return CodeInvalidArgument
-	case codes.Unauthenticated:
-		return CodeUnauthenticated
 	case codes.PermissionDenied:
-		return CodeForbidden
+		return CodePermissionDenied
+	case codes.ResourceExhausted:
+		return CodeResourceExhausted
+	case codes.FailedPrecondition:
+		return CodeFailedPrecondition
 	case codes.Aborted:
-		return CodeConflict
-	case codes.DeadlineExceeded, codes.Canceled:
-		return CodeTimeout
+		return CodeAborted
+	case codes.OutOfRange:
+		return CodeOutOfRange
+	case codes.Unimplemented:
+		return CodeUnimplemented
+	case codes.Internal:
+		return CodeInternal
 	case codes.Unavailable:
 		return CodeUnavailable
+	case codes.DataLoss:
+		return CodeDataLoss
+	case codes.Unauthenticated:
+		return CodeUnauthenticated
 	default:
 		return CodeInternal
 	}
@@ -363,6 +503,7 @@ func CodeFromGRPC(c codes.Code) Code {
 package apperr
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 )
@@ -370,6 +511,7 @@ import (
 // Error — доменная ошибка, единая для всех слоёв.
 type Error struct {
 	Code       Code        // машинный код, драйвит маппинг в транспорт
+	Reason     string      // опциональная под-причина для клиента; транспорт не трогает
 	Message    string      // безопасный текст для клиента
 	Err        error       // внутренняя причина, только в логи
 	Violations []Violation // безопасные детали полей, опционально
@@ -400,11 +542,23 @@ func (e *Error) Is(target error) bool {
 	return ok && t.Code == e.Code
 }
 
+// publicByReason — фиксированный безопасный текст для под-причин у кодов, которые
+// Message наружу не отдают. Точка расширения: новая сабричина со своим текстом —
+// одна строка здесь.
+var publicByReason = map[string]string{
+	ReasonInvalidCredentials: MessageInvalidCredentials,
+}
+
 // Public — текст, который реально уходит клиенту.
-// Для внутренних кодов Message игнорируется, отдаётся generic-текст.
+// «Наружу без деталей» коды Message игнорируют: отдаётся generic-текст кода либо
+// фиксированный текст под-причины из publicByReason.
 func (e *Error) Public() string {
 	switch e.Code {
-	case CodeInternal, CodeUnavailable, CodeTimeout:
+	case CodeInternal, CodeUnknown, CodeDataLoss, CodeUnavailable,
+		CodeDeadlineExceeded, CodeUnauthenticated:
+		if m, ok := publicByReason[e.Reason]; ok { // e.Reason=="" -> ok==false
+			return m
+		}
 		return e.Code.Public()
 	}
 	if e.Message != "" {
@@ -420,6 +574,9 @@ func (e *Error) LogValue() slog.Value {
 		slog.String("code", string(e.Code)),
 		slog.String("public_message", e.Public()),
 	}
+	if e.Reason != "" {
+		attrs = append(attrs, slog.String("reason", e.Reason))
+	}
 	if e.Err != nil {
 		attrs = append(attrs, slog.String("cause", e.Err.Error()))
 	}
@@ -431,15 +588,22 @@ func (e *Error) LogValue() slog.Value {
 
 // Sentinels для errors.Is (сравнение по коду через метод Is).
 var (
-	ErrInternal        = &Error{Code: CodeInternal}
-	ErrInvalidArgument = &Error{Code: CodeInvalidArgument}
-	ErrNotFound        = &Error{Code: CodeNotFound}
-	ErrAlreadyExists   = &Error{Code: CodeAlreadyExists}
-	ErrConflict        = &Error{Code: CodeConflict}
-	ErrUnauthenticated = &Error{Code: CodeUnauthenticated}
-	ErrForbidden       = &Error{Code: CodeForbidden}
-	ErrTimeout         = &Error{Code: CodeTimeout}
-	ErrUnavailable     = &Error{Code: CodeUnavailable}
+	ErrCanceled           = &Error{Code: CodeCanceled}
+	ErrUnknown            = &Error{Code: CodeUnknown}
+	ErrInvalidArgument    = &Error{Code: CodeInvalidArgument}
+	ErrDeadlineExceeded   = &Error{Code: CodeDeadlineExceeded}
+	ErrNotFound           = &Error{Code: CodeNotFound}
+	ErrAlreadyExists      = &Error{Code: CodeAlreadyExists}
+	ErrPermissionDenied   = &Error{Code: CodePermissionDenied}
+	ErrResourceExhausted  = &Error{Code: CodeResourceExhausted}
+	ErrFailedPrecondition = &Error{Code: CodeFailedPrecondition}
+	ErrAborted            = &Error{Code: CodeAborted}
+	ErrOutOfRange         = &Error{Code: CodeOutOfRange}
+	ErrUnimplemented      = &Error{Code: CodeUnimplemented}
+	ErrInternal           = &Error{Code: CodeInternal}
+	ErrUnavailable        = &Error{Code: CodeUnavailable}
+	ErrDataLoss           = &Error{Code: CodeDataLoss}
+	ErrUnauthenticated    = &Error{Code: CodeUnauthenticated}
 )
 
 // As — извлечь *Error из цепочки.
@@ -451,13 +615,20 @@ func As(err error) (*Error, bool) {
 	return nil, false
 }
 
-// From — нормализовать ЛЮБУЮ ошибку в *Error (fallback — INTERNAL).
+// From — нормализовать ЛЮБУЮ ошибку в *Error. Голый context.Canceled /
+// context.DeadlineExceeded не должен становиться INTERNAL; всё прочее — fallback INTERNAL.
 func From(err error) *Error {
 	if err == nil {
 		return nil
 	}
 	if e, ok := As(err); ok {
 		return e
+	}
+	switch {
+	case errors.Is(err, context.Canceled):
+		return &Error{Code: CodeCanceled, Err: err}
+	case errors.Is(err, context.DeadlineExceeded):
+		return &Error{Code: CodeDeadlineExceeded, Err: err}
 	}
 	return &Error{Code: CodeInternal, Err: err}
 }
@@ -480,20 +651,22 @@ func (e *Error) Wrap(err error) *Error {
 	return e
 }
 
+// WithReason — задать под-причину. Чейнится.
+func (e *Error) WithReason(reason string) *Error {
+	e.Reason = reason
+	return e
+}
+
 // WithViolations — добавить детали полей. Чейнится.
 func (e *Error) WithViolations(v ...Violation) *Error {
 	e.Violations = append(e.Violations, v...)
 	return e
 }
 
-// Сахар по кодам: короткая и форматная версии.
-func Internal(msg string) *Error          { return New(CodeInternal, msg) }
-func Internalf(f string, a ...any) *Error { return New(CodeInternal, fmt.Sprintf(f, a...)) }
-
+// Сахар по кодам: короткая и форматная версии. Только для кодов, чей Message
+// реально уходит клиенту (Public() его отдаёт).
 func InvalidArgument(msg string) *Error          { return New(CodeInvalidArgument, msg) }
 func InvalidArgumentf(f string, a ...any) *Error { return New(CodeInvalidArgument, fmt.Sprintf(f, a...)) }
-
-func InvalidRequestBody(msg string) *Error { return New(CodeInvalidRequestBody, msg) }
 
 func NotFound(msg string) *Error          { return New(CodeNotFound, msg) }
 func NotFoundf(f string, a ...any) *Error { return New(CodeNotFound, fmt.Sprintf(f, a...)) }
@@ -501,21 +674,60 @@ func NotFoundf(f string, a ...any) *Error { return New(CodeNotFound, fmt.Sprintf
 func AlreadyExists(msg string) *Error          { return New(CodeAlreadyExists, msg) }
 func AlreadyExistsf(f string, a ...any) *Error { return New(CodeAlreadyExists, fmt.Sprintf(f, a...)) }
 
-func Conflict(msg string) *Error          { return New(CodeConflict, msg) }
-func Conflictf(f string, a ...any) *Error { return New(CodeConflict, fmt.Sprintf(f, a...)) }
+func Aborted(msg string) *Error          { return New(CodeAborted, msg) }
+func Abortedf(f string, a ...any) *Error { return New(CodeAborted, fmt.Sprintf(f, a...)) }
 
-func Unauthenticated(msg string) *Error { return New(CodeUnauthenticated, msg) }
-func InvalidCredentials() *Error        { return New(CodeInvalidCredentials, MessageInvalidCredentials) }
+func PermissionDenied(msg string) *Error          { return New(CodePermissionDenied, msg) }
+func PermissionDeniedf(f string, a ...any) *Error { return New(CodePermissionDenied, fmt.Sprintf(f, a...)) }
 
-func Forbidden(msg string) *Error          { return New(CodeForbidden, msg) }
-func Forbiddenf(f string, a ...any) *Error { return New(CodeForbidden, fmt.Sprintf(f, a...)) }
+func FailedPrecondition(msg string) *Error          { return New(CodeFailedPrecondition, msg) }
+func FailedPreconditionf(f string, a ...any) *Error { return New(CodeFailedPrecondition, fmt.Sprintf(f, a...)) }
 
-func Timeout(msg string) *Error     { return New(CodeTimeout, msg) }
-func Unavailable(msg string) *Error { return New(CodeUnavailable, msg) }
+func ResourceExhausted(msg string) *Error          { return New(CodeResourceExhausted, msg) }
+func ResourceExhaustedf(f string, a ...any) *Error { return New(CodeResourceExhausted, fmt.Sprintf(f, a...)) }
+
+func OutOfRange(msg string) *Error          { return New(CodeOutOfRange, msg) }
+func OutOfRangef(f string, a ...any) *Error { return New(CodeOutOfRange, fmt.Sprintf(f, a...)) }
+
+func Unimplemented(msg string) *Error          { return New(CodeUnimplemented, msg) }
+func Unimplementedf(f string, a ...any) *Error { return New(CodeUnimplemented, fmt.Sprintf(f, a...)) }
+
+// «Наружу без деталей» — INTERNAL, UNKNOWN, DATA_LOSS, UNAVAILABLE, DEADLINE_EXCEEDED,
+// UNAUTHENTICATED: Public() отдаёт generic-текст (либо текст под-причины из
+// publicByReason), клиентского Message у них нет — поэтому и конструкторы без сообщения.
+// Диагностику несёт .Wrap(err) (уходит в лог полем cause); произвольную ошибку в
+// INTERNAL нормализует apperr.From(err). UNKNOWN вручную не конструируют вовсе — только
+// CodeFromGRPC.
+func Internal() *Error         { return &Error{Code: CodeInternal} }
+func Unavailable() *Error      { return &Error{Code: CodeUnavailable} }
+func DeadlineExceeded() *Error { return &Error{Code: CodeDeadlineExceeded} }
+func DataLoss() *Error         { return &Error{Code: CodeDataLoss} }
+
+// Unauthenticated — 401 без под-причины: нет / протух / битый токен.
+func Unauthenticated() *Error { return &Error{Code: CodeUnauthenticated} }
+
+// CANCELED конструктора тоже не имеет: приходит только из context / gRPC через
+// apperr.From и CodeFromGRPC.
+
+// Сахар по под-причинам INVALID_ARGUMENT / UNAUTHENTICATED.
+
+// InvalidRequestBody — тело не удалось разобрать (не JSON, не тот тип, битый protobuf).
+func InvalidRequestBody(msg string) *Error {
+	return New(CodeInvalidArgument, msg).WithReason(ReasonRequestBodyMalformed)
+}
 
 // Validation — составная ошибка валидации со списком полей.
 func Validation(v ...Violation) *Error {
-	return (&Error{Code: CodeValidation, Message: MessageValidationFailed}).WithViolations(v...)
+	return New(CodeInvalidArgument, MessageValidationFailed).
+		WithReason(ReasonValidationFailed).
+		WithViolations(v...)
+}
+
+// InvalidCredentials — учётные данные предъявлены, но не совпали. Наружу — фиксированный
+// "invalid credentials" (из publicByReason по сабричине), не раскрывает логин vs пароль.
+// Message здесь — только для Error()/лога; Public() берёт текст из publicByReason.
+func InvalidCredentials() *Error {
+	return New(CodeUnauthenticated, MessageInvalidCredentials).WithReason(ReasonInvalidCredentials)
 }
 ```
 
@@ -562,12 +774,12 @@ func Map(err error) error {
 			pgerrcode.NotNullViolation:
 			return apperr.InvalidArgument(apperr.MessageInvalidArgument).Wrap(err)
 		case pgerrcode.SerializationFailure, pgerrcode.DeadlockDetected:
-			return apperr.Unavailable(apperr.MessageUnavailable).Wrap(err)
+			return apperr.Unavailable().Wrap(err)
 		case pgerrcode.QueryCanceled:
-			return apperr.Timeout(apperr.MessageTimeout).Wrap(err)
+			return apperr.DeadlineExceeded().Wrap(err)
 		}
 	}
-	return apperr.Internal(apperr.MessageInternalServerError).Wrap(err)
+	return apperr.Internal().Wrap(err)
 }
 ```
 
@@ -624,15 +836,18 @@ func UnaryServerInterceptor(log *slog.Logger) grpc.UnaryServerInterceptor {
 
 		log.LogAttrs(ctx, e.Code.Level(), "grpc handler failed",
 			slog.String("method", info.FullMethod),
-			slog.Any("error", e), // LogValue: code + cause в логах
+			slog.Any("error", e), // LogValue: code + reason + cause в логах
 		)
 
 		st := status.New(e.Code.GRPC(), e.Public()) // в сеть — только Public()
 
-		// protoadapt.MessageV1 == proto.Message; errdetails.* его реализуют.
-		details := []protoadapt.MessageV1{
-			&errdetails.ErrorInfo{Reason: string(e.Code), Domain: domain},
+		errInfo := &errdetails.ErrorInfo{Reason: string(e.Code), Domain: domain}
+		if e.Reason != "" {
+			errInfo.Metadata = map[string]string{"reason": e.Reason}
 		}
+
+		// protoadapt.MessageV1 == proto.Message; errdetails.* его реализуют.
+		details := []protoadapt.MessageV1{errInfo}
 		if len(e.Violations) > 0 {
 			br := &errdetails.BadRequest{}
 			for _, v := range e.Violations {
@@ -655,17 +870,21 @@ func FromStatus(err error) *apperr.Error {
 	}
 	st, ok := status.FromError(err)
 	if !ok {
-		return apperr.Internal(apperr.MessageInternalServerError).Wrap(err)
+		return apperr.Internal().Wrap(err)
 	}
 
 	code := apperr.CodeFromGRPC(st.Code())
+	var reason string
 	var violations []apperr.Violation
 
 	for _, d := range st.Details() {
 		switch t := d.(type) {
 		case *errdetails.ErrorInfo:
-			if t.GetReason() != "" && t.GetDomain() == domain {
-				code = apperr.Code(t.GetReason()) // точный доменный код
+			if t.GetDomain() == domain {
+				if r := t.GetReason(); r != "" {
+					code = apperr.Code(r) // точный доменный код
+				}
+				reason = t.GetMetadata()["reason"]
 			}
 		case *errdetails.BadRequest:
 			for _, fv := range t.GetFieldViolations() {
@@ -676,6 +895,9 @@ func FromStatus(err error) *apperr.Error {
 	}
 
 	out := apperr.New(code, st.Message()).Wrap(err)
+	if reason != "" {
+		out.WithReason(reason)
+	}
 	if len(violations) > 0 {
 		out.WithViolations(violations...)
 	}
@@ -705,6 +927,7 @@ type responseBody struct {
 
 type errorBody struct {
 	Code       string             `json:"code"`
+	Reason     string             `json:"reason,omitempty"`
 	Message    string             `json:"message"`
 	Violations []apperr.Violation `json:"violations,omitempty"`
 	RequestID  string             `json:"request_id,omitempty"`
@@ -724,6 +947,7 @@ func Write(w http.ResponseWriter, r *http.Request, log *slog.Logger, err error) 
 	w.WriteHeader(e.Code.HTTP())
 	_ = json.NewEncoder(w).Encode(responseBody{Error: errorBody{
 		Code:       string(e.Code),
+		Reason:     e.Reason,
 		Message:    e.Public(),
 		Violations: e.Violations,
 		RequestID:  appctx.GetRequestID(r.Context()),
@@ -934,6 +1158,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		httperr.Write(w, r, h.log,
 			apperr.InvalidRequestBody(apperr.MessageInvalidRequestBody).Wrap(err))
+		// -> Code: INVALID_ARGUMENT, Reason: REQUEST_BODY_MALFORMED, HTTP 400
 		return
 	}
 
@@ -969,7 +1194,9 @@ func (uc *UserUseCase) Register(ctx context.Context, in RegisterInput) error {
 		v = append(v, apperr.Violation{Field: "age", Message: "must be >= 18"})
 	}
 	if len(v) > 0 {
-		return apperr.Validation(v...) // HTTP 400 / codes.InvalidArgument + BadRequest details
+		return apperr.Validation(v...)
+		// Code: INVALID_ARGUMENT, Reason: VALIDATION_FAILED
+		// HTTP 400 / codes.InvalidArgument + BadRequest details
 	}
 	// ...
 }
