@@ -13,10 +13,9 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/interceptors"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
 	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
-	userv1 "github.com/maksimegorovdev/delivery-backend/proto/gen/go/user/v1"
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/config"
 	repo "github.com/maksimegorovdev/delivery-backend/services/user/internal/repository/pg"
-	grpchandler "github.com/maksimegorovdev/delivery-backend/services/user/internal/transport/grpc"
+	grpcrouter "github.com/maksimegorovdev/delivery-backend/services/user/internal/transport/grpc"
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/usecase"
 )
 
@@ -73,14 +72,19 @@ func New(ctx context.Context) (*App, error) {
 	)
 
 	// Repository
-	userRepo := repo.NewUserRepository(pgPool)
+	userRepo := repo.NewUserRepo(pgPool)
+	addressRepo := repo.NewAddressRepo(pgPool)
 
 	// Usecase
-	userUC := usecase.NewUserUsecase(userRepo)
+	userUsecase := usecase.NewUserUsecase(userRepo)
+	addressUsecase := usecase.NewAddressUsecase(addressRepo)
 
-	// Handler
-	userHandler := grpchandler.NewUserHandler(userUC)
-	userv1.RegisterUserServiceServer(grpcServer.Server(), userHandler)
+	// Router
+	grpcrouter.NewRouter(&grpcrouter.RouterDeps{
+		Server:         grpcServer.Server(),
+		UserUsecase:    userUsecase,
+		AddressUsecase: addressUsecase,
+	})
 
 	app := &App{
 		cfg:        cfg,

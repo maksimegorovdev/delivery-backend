@@ -6,15 +6,15 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/domain"
 )
 
-type UserRepository interface {
+type UserRepo interface {
 	GetByID(ctx context.Context, id string) (domain.User, error)
 }
 
 type UserUsecase struct {
-	repo UserRepository
+	repo UserRepo
 }
 
-func NewUserUsecase(userRepo UserRepository) *UserUsecase {
+func NewUserUsecase(userRepo UserRepo) *UserUsecase {
 	return &UserUsecase{repo: userRepo}
 }
 

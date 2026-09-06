@@ -32,15 +32,15 @@ func (r userRow) toDomain() domain.User {
 	}
 }
 
-type UserRepository struct {
+type UserRepo struct {
 	pool *pgxpool.Pool
 }
 
-func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
-	return &UserRepository{pool: pool}
+func NewUserRepo(pool *pgxpool.Pool) *UserRepo {
+	return &UserRepo{pool: pool}
 }
 
-func (r *UserRepository) GetByID(ctx context.Context, id string) (domain.User, error) {
+func (r *UserRepo) GetByID(ctx context.Context, id string) (domain.User, error) {
 	rows, err := r.pool.Query(
 		ctx,
 		`SELECT id, email, first_name, last_name, created_at, updated_at, deleted_at

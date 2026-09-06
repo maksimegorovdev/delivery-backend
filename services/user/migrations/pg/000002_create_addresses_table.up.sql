@@ -10,5 +10,6 @@ CREATE TABLE IF NOT EXISTS addresses (
     CONSTRAINT chk_addresses_address CHECK (LENGTH(address) <= 255)
 );
 
-CREATE INDEX IF NOT EXISTS idx_addresses_user_id
-    ON addresses (user_id);
+CREATE INDEX IF NOT EXISTS idx_addresses_user_id_not_deleted
+    ON addresses (user_id)
+    WHERE deleted_at IS NULL;
