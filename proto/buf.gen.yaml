@@ -5,6 +5,8 @@ managed:
   override:
     - file_option: go_package_prefix
       value: github.com/maksimegorovdev/delivery-backend/proto/gen/go
+  disable:
+    - path: buf/validate
 plugins:
   - local: protoc-gen-go
     out: gen/go

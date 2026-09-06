@@ -1,13 +1,13 @@
-LOCALBIN := $(CURDIR)/bin
+LOCAL_BIN := $(CURDIR)/bin
 
-BUF := $(LOCALBIN)/buf
+BUF := $(LOCAL_BIN)/buf
 PROTOC_GEN_GO_VERSION := v1.36.12
 PROTOC_GEN_GO_GRPC_VERSION := v1.6.2
 PROTOVALIDATE_VERSION := v1.2.2
 
 BUF_VERSION := v1.72.0
 
-tools: export GOBIN := $(LOCALBIN)
+tools: export GOBIN := $(LOCAL_BIN)
 tools:
 	go install github.com/bufbuild/buf/cmd/buf@$(BUF_VERSION)
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@$(PROTOC_GEN_GO_VERSION)
@@ -21,7 +21,7 @@ buf-export:
                   -o third_party/protovalidate
 .PHONY: buf-export
 
-generate: export PATH := $(LOCALBIN):$(PATH)
+generate: export PATH := $(LOCAL_BIN):$(PATH)
 generate:
 	$(BUF) generate
 .PHONY: generate

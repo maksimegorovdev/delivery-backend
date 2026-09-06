@@ -4,14 +4,20 @@ import (
 	"context"
 	"log/slog"
 
+	"buf.build/go/protovalidate"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcserver"
+	"github.com/maksimegorovdev/delivery-backend/platform/grpc/interceptors"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
 	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
-
+	userv1 "github.com/maksimegorovdev/delivery-backend/proto/gen/go/user/v1"
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/config"
+	repo "github.com/maksimegorovdev/delivery-backend/services/user/internal/repository/pg"
+	grpchandler "github.com/maksimegorovdev/delivery-backend/services/user/internal/transport/grpc"
+	"github.com/maksimegorovdev/delivery-backend/services/user/internal/usecase"
 )
 
 type App struct {
@@ -47,10 +53,34 @@ func New(ctx context.Context) (*App, error) {
 		return nil, err
 	}
 
+	// Proto Validator
+	validator, err := protovalidate.New()
+	if err != nil {
+		return nil, err
+	}
+
 	// gRPC Server
 	grpcServer := grpcserver.New(
 		grpcserver.WithPort(cfg.GRPCServer.Port),
+		grpcserver.WithReflection(cfg.GRPCServer.Reflection),
+		grpcserver.WithServerOptions(
+			grpc.ChainUnaryInterceptor(
+				interceptors.Error(),
+				interceptors.Logger(log),
+				interceptors.Validation(validator),
+			),
+		),
 	)
+
+	// Repository
+	userRepo := repo.NewUserRepository(pgPool)
+
+	// Usecase
+	userUC := usecase.NewUserUsecase(userRepo)
+
+	// Handler
+	userHandler := grpchandler.NewUserHandler(userUC)
+	userv1.RegisterUserServiceServer(grpcServer.Server(), userHandler)
 
 	app := &App{
 		cfg:        cfg,

@@ -32,11 +32,11 @@ migrate-create:
 .PHONY: migrate-create
 
 migrate-up:
-	$(MIGRATE) -database '$(PG_URL)' -path $(MIGRATIONS_DIR) up
+	$(MIGRATE) -database '$(PG_DSN)' -path $(MIGRATIONS_DIR) up
 .PHONY: migrate-up
 
 migrate-down:
-	$(MIGRATE) -database '$(PG_URL)' -path $(MIGRATIONS_DIR) down
+	$(MIGRATE) -database '$(PG_DSN)' -path $(MIGRATIONS_DIR) down
 .PHONY: migrate-up
 
 run:

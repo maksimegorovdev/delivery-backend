@@ -12,9 +12,7 @@ type CtxHandler struct {
 }
 
 func NewCtxHandler(h slog.Handler) *CtxHandler {
-	return &CtxHandler{
-		handler: h,
-	}
+	return &CtxHandler{handler: h}
 }
 
 func (h *CtxHandler) Enabled(ctx context.Context, l slog.Level) bool {

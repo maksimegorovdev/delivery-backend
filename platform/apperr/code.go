@@ -29,16 +29,8 @@ const (
 )
 
 const (
-	ReasonInvalidRequestBody = "INVALID_REQUEST_BODY"
-	ReasonValidationFailed   = "VALIDATION_FAILED"
-	ReasonInvalidCredentials = "INVALID_CREDENTIALS"
-)
-
-const (
 	MessageInternal           = "internal server error"
 	MessageInvalidArgument    = "invalid argument"
-	MessageInvalidRequestBody = "invalid request body"
-	MessageValidationFailed   = "validation failed"
 	MessageNotFound           = "not found"
 	MessageAlreadyExists      = "already exists"
 	MessageAborted            = "aborted"
@@ -48,11 +40,14 @@ const (
 	MessageUnimplemented      = "unimplemented"
 	MessageCanceled           = "canceled"
 	MessageUnauthenticated    = "unauthenticated"
-	MessageInvalidCredentials = "invalid credentials"
 	MessagePermissionDenied   = "permission denied"
 	MessageDeadlineExceeded   = "deadline exceeded"
 	MessageUnavailable        = "unavailable"
 )
+
+func (c Code) String() string {
+	return string(c)
+}
 
 func (c Code) GRPC() codes.Code {
 	switch c {

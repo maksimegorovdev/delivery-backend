@@ -267,10 +267,13 @@ HTTP (`httperr.Write`):
 
 gRPC: `status.New(code.GRPC(), err.Public())` + деталь
 `errdetails.ErrorInfo{ Reason: "<CODE>", Domain: "delivery", Metadata: {"reason": "<SUB>"} }`
-(ключ `reason` в `Metadata` — только если под-причина задана).
+(ключ `reason` в `Metadata` — только если под-причина задана). Строит это
+`interceptors.Error()` (§9.3) — сам он ничего не логирует.
 
 В лог при этом уходит полная цепочка причин (`error.code`, `error.reason`, `error.cause`)
-на уровне `Code.Level()`.
+на уровне `Code.Level()` — это делает соседний, но отдельный `interceptors.Logger()` (§9.3):
+перевод в транспорт и логирование — разные интерсепторы, каждый видит исходную ошибку
+независимо.
 
 ---
 
@@ -799,69 +802,26 @@ func (r *OrderRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Order, e
 
 ### 9.2 `platform/apperr/grpcerr/grpcerr.go`
 
-Импортирует `status` и `errdetails`.
+Импортирует `status` и `errdetails`. Держит только доменную константу `Domain`
+(нужна и на сервере, в `interceptors.Error()`, §9.3 — импортирует её отсюда, а не
+дублирует) и обратный перевод `FromStatus` на стороне клиента (gateway). Прямого
+перевода `*apperr.Error -> status` здесь больше нет — это `interceptors.Error()`,
+у него другая зона ответственности (сервер, не gateway) и он не должен тянуть
+`apperr/grpcerr` только ради константы domain уровня протокола.
 
 ```go
 package grpcerr
 
 import (
-	"context"
-	"log/slog"
-
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/protoadapt"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr"
 )
 
-const domain = "delivery"
-
-// UnaryServerInterceptor — единая точка перевода доменной ошибки в gRPC-статус
-// на стороне сервиса (user, order). Ставится через grpc.ChainUnaryInterceptor.
-func UnaryServerInterceptor(log *slog.Logger) grpc.UnaryServerInterceptor {
-	return func(
-		ctx context.Context,
-		req any,
-		info *grpc.UnaryServerInfo,
-		handler grpc.UnaryHandler,
-	) (any, error) {
-		resp, err := handler(ctx, req)
-		if err == nil {
-			return resp, nil
-		}
-
-		e := apperr.From(err)
-
-		log.LogAttrs(ctx, e.Code.Level(), "grpc handler failed",
-			slog.String("method", info.FullMethod),
-			slog.Any("error", e), // LogValue: code + reason + cause в логах
-		)
-
-		st := status.New(e.Code.GRPC(), e.Public()) // в сеть — только Public()
-
-		errInfo := &errdetails.ErrorInfo{Reason: string(e.Code), Domain: domain}
-		if e.Reason != "" {
-			errInfo.Metadata = map[string]string{"reason": e.Reason}
-		}
-
-		// protoadapt.MessageV1 == proto.Message; errdetails.* его реализуют.
-		details := []protoadapt.MessageV1{errInfo}
-		if len(e.Violations) > 0 {
-			br := &errdetails.BadRequest{}
-			for _, v := range e.Violations {
-				br.FieldViolations = append(br.FieldViolations,
-					&errdetails.BadRequest_FieldViolation{Field: v.Field, Description: v.Message})
-			}
-			details = append(details, br)
-		}
-		if enriched, derr := st.WithDetails(details...); derr == nil {
-			st = enriched
-		}
-		return nil, st.Err()
-	}
-}
+// Domain — значение errdetails.ErrorInfo.Domain на обеих сторонах (сервер и
+// gateway). Экспортирован, чтобы interceptors.Error() не дублировал константу.
+const Domain = "delivery"
 
 // FromStatus — обратный перевод на стороне клиента (gateway).
 func FromStatus(err error) *apperr.Error {
@@ -880,7 +840,7 @@ func FromStatus(err error) *apperr.Error {
 	for _, d := range st.Details() {
 		switch t := d.(type) {
 		case *errdetails.ErrorInfo:
-			if t.GetDomain() == domain {
+			if t.GetDomain() == Domain {
 				if r := t.GetReason(); r != "" {
 					code = apperr.Code(r) // точный доменный код
 				}
@@ -905,7 +865,215 @@ func FromStatus(err error) *apperr.Error {
 }
 ```
 
-### 9.3 `platform/apperr/httperr/httperr.go`
+### 9.3 `platform/grpc/interceptors/` — три серверных интерсептора
+
+Раньше здесь стоял один `grpcerr.UnaryServerInterceptor`, который одновременно
+логировал ошибку хендлера и переводил её в gRPC-статус. Это две разные
+ответственности (плюс третья — валидация входящего сообщения), поэтому вместо
+одного интерсептора — три, каждый со своим файлом в `platform/grpc/interceptors/`
+(сосед `grpcserver`, а не под-пакет `apperr` — интерсепторам нужны `slog.Logger`
+и `protovalidate.Validator`, которые ядру ошибок ни к чему):
+
+- **`Error()`** (`error.go`) — только перевод. Ничего не логирует. `e := apperr.From(err)`,
+  `status.New(e.Code.GRPC(), e.Public())`, деталь `errdetails.ErrorInfo{Reason: string(e.Code),
+  Domain: grpcerr.Domain}` (+ `Metadata: {"reason": e.Reason}`, если задан) и
+  `errdetails.BadRequest` из `e.Violations`, если есть. Возвращает `st.Err()`.
+- **`Logger(log *slog.Logger)`** (`logger.go`) — только логирование. Замеряет
+  длительность, вызывает `handler`, при `err != nil` — `log.LogAttrs(ctx, e.Code.Level(),
+  "grpc request failed", method, duration, slog.Any("error", e))` (`e.LogValue()`
+  уже даёт `code`/`reason`/`cause`), при успехе — `DEBUG` с методом и длительностью.
+  **Возвращает исходный `err` без изменений** — не переводит его в статус, это
+  дело `Error()`.
+- **`Validation(v protovalidate.Validator)`** (`validation.go`) — только валидация
+  входящего сообщения по правилам `(buf.validate.field)` из `.proto`. Кастует `req`
+  к `proto.Message`, зовёт `v.Validate(msg)`. При успехе — вызывает `handler` дальше.
+  При ошибке — **не вызывает `handler`**, а возвращает `apperr.Validation(violations...)`,
+  собрав `violations` из `*protovalidate.ValidationError.Violations` (путь поля —
+  `protovalidate.FieldPathString(v.Proto.GetField())`, сообщение — `v.Proto.GetMessage()`).
+  Ошибку компиляции/выполнения правил (`*protovalidate.CompilationError`,
+  `*protovalidate.RuntimeError` — `errors.As` не даёт `*ValidationError`) — в
+  `apperr.Internal().Wrap(err)`, это баг конфигурации правил, а не запрос клиента.
+  `protovalidate.Validator` — интерфейс (не указатель), создаётся один раз при
+  старте сервиса через `protovalidate.New()` и не привязан к конкретному типу
+  сообщения — один экземпляр валиден для всех методов сервиса.
+
+```go
+// platform/grpc/interceptors/error.go
+package interceptors
+
+import (
+	"context"
+
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/protoadapt"
+
+	"github.com/maksimegorovdev/delivery-backend/platform/apperr"
+	"github.com/maksimegorovdev/delivery-backend/platform/apperr/grpcerr"
+)
+
+// Error — единственная точка перевода доменной ошибки в gRPC-статус.
+// Ничего не логирует (см. Logger) — только перевод *apperr.Error -> status.
+func Error() grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req any,
+		_ *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (any, error) {
+		resp, err := handler(ctx, req)
+		if err == nil {
+			return resp, nil
+		}
+
+		e := apperr.From(err)
+
+		st := status.New(e.Code.GRPC(), e.Public()) // в сеть — только Public()
+
+		errInfo := &errdetails.ErrorInfo{Reason: string(e.Code), Domain: grpcerr.Domain}
+		if e.Reason != "" {
+			errInfo.Metadata = map[string]string{"reason": e.Reason}
+		}
+
+		// protoadapt.MessageV1 == proto.Message; errdetails.* его реализуют.
+		details := []protoadapt.MessageV1{errInfo}
+		if len(e.Violations) > 0 {
+			br := &errdetails.BadRequest{}
+			for _, v := range e.Violations {
+				br.FieldViolations = append(br.FieldViolations,
+					&errdetails.BadRequest_FieldViolation{Field: v.Field, Description: v.Message})
+			}
+			details = append(details, br)
+		}
+		if enriched, derr := st.WithDetails(details...); derr == nil {
+			st = enriched
+		}
+		return nil, st.Err()
+	}
+}
+```
+
+```go
+// platform/grpc/interceptors/logger.go
+package interceptors
+
+import (
+	"context"
+	"log/slog"
+	"time"
+
+	"google.golang.org/grpc"
+
+	"github.com/maksimegorovdev/delivery-backend/platform/apperr"
+)
+
+// Logger — единственная точка логирования gRPC-вызова. Перевод в транспорт
+// не делает (см. Error) — возвращает err как есть, чтобы внешний Error
+// увидел исходную ошибку и перевёл её в статус.
+func Logger(log *slog.Logger) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req any,
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (any, error) {
+		start := time.Now()
+		resp, err := handler(ctx, req)
+		dur := time.Since(start)
+
+		if err != nil {
+			e := apperr.From(err)
+			log.LogAttrs(ctx, e.Code.Level(), "grpc request failed",
+				slog.String("method", info.FullMethod),
+				slog.Duration("duration", dur),
+				slog.Any("error", e), // LogValue: code + reason + cause
+			)
+			return resp, err
+		}
+
+		log.LogAttrs(ctx, slog.LevelDebug, "grpc request handled",
+			slog.String("method", info.FullMethod),
+			slog.Duration("duration", dur),
+		)
+		return resp, nil
+	}
+}
+```
+
+```go
+// platform/grpc/interceptors/validation.go
+package interceptors
+
+import (
+	"context"
+	"errors"
+
+	"buf.build/go/protovalidate"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/maksimegorovdev/delivery-backend/platform/apperr"
+)
+
+// Validation — единственная точка проверки входящего запроса против правил
+// (buf.validate.field) в .proto. Не логирует и не переводит в транспорт
+// (см. Logger, Error) — при нарушении просто не вызывает handler дальше.
+func Validation(v protovalidate.Validator) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req any,
+		_ *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (any, error) {
+		msg, ok := req.(proto.Message)
+		if !ok {
+			return handler(ctx, req)
+		}
+
+		if err := v.Validate(msg); err != nil {
+			var ve *protovalidate.ValidationError
+			if errors.As(err, &ve) {
+				violations := make([]apperr.Violation, 0, len(ve.Violations))
+				for _, viol := range ve.Violations {
+					violations = append(violations, apperr.Violation{
+						Field:   protovalidate.FieldPathString(viol.Proto.GetField()),
+						Message: viol.Proto.GetMessage(),
+					})
+				}
+				return nil, apperr.Validation(violations...)
+			}
+			// CompilationError / RuntimeError — баг конфигурации правил, не запроса клиента.
+			return nil, apperr.Internal().Wrap(err)
+		}
+
+		return handler(ctx, req)
+	}
+}
+```
+
+#### Порядок в цепочке — ключевое решение
+
+`grpc.ChainUnaryInterceptor(a, b, c)` выполняет `a` снаружи, `c` — ближе всего
+к хендлеру (`a` вызывает `b`, `b` вызывает `c`, `c` вызывает `handler`). Чтобы
+`Logger` видел исходную доменную ошибку с полной цепочкой `Err` (а не непрозрачный
+`*status.Error`, из которого её не достать) — и чтобы он же видел ошибки
+валидации, а не только ошибки хендлера — порядок такой:
+
+```go
+grpc.ChainUnaryInterceptor(
+	interceptors.Error(),               // снаружи: переводит финальный err (включая ошибку валидации) в gRPC status
+	interceptors.Logger(log),           // середина: видит сырой err (от validation ИЛИ от handler), логирует, пробрасывает как есть
+	interceptors.Validation(validator), // ближе всего к handler: не пускает невалидный запрос дальше
+)
+```
+
+Если поменять `Error`/`Logger` местами, `Logger` получит уже `*status.Error` без
+`Err`, и `slog.Any("error", e)` в логе потеряет главное — внутреннюю причину.
+Если `Validation` вынести наружу `Logger`, ошибки валидации перестанут
+логироваться единообразно с ошибками хендлера.
+
+### 9.4 `platform/apperr/httperr/httperr.go`
 
 Импортирует `net/http` + `logger`/`appctx`.
 
@@ -964,8 +1132,8 @@ func Write(w http.ResponseWriter, r *http.Request, log *slog.Logger, err error) 
 
 Правило: `*apperr.Error` создаётся один раз (в репозитории через `pgerr.Map`),
 по пути обрастает понятным сообщением, а переводится в транспорт и логируется
-ровно один раз — на внешней границе (interceptor в сервисе, `httperr.Write` в gateway).
-Внутренние слои не логируют.
+ровно один раз — на внешней границе (`interceptors.Error()` + `interceptors.Logger()`
+в сервисе, `httperr.Write` в gateway). Внутренние слои не логируют.
 
 ### 10.1 `domain/errors.go`
 
@@ -1080,24 +1248,36 @@ func (uc *UserUseCase) Register(ctx context.Context, email string) (*domain.User
 
 usecase тоже **не** логирует — иначе одна ошибка попадёт в лог дважды.
 
-### 10.5 `transport/grpc` — interceptor (перевод + единственный лог) и чистый handler
+### 10.5 `transport/grpc` — три interceptor'а (валидация, лог, перевод) и чистый handler
 
-Тело interceptor — в §9.2 (`grpcerr.UnaryServerInterceptor`). Подключение в `grpcserver`
-(нужна опция `WithServerOptions` — поле `serverOpts` в `grpcserver.Server` уже есть,
-осталось добавить сеттер):
+Тела interceptor'ов — в §9.3 (`interceptors.Error()`, `interceptors.Logger()`,
+`interceptors.Validation()`). Подключение в `grpcserver` через `WithServerOptions`
+(поле `serverOpts` в `grpcserver.Server` уже есть, сеттер тоже):
 
 ```go
 // services/user/internal/app/app.go
+validator, err := protovalidate.New() // один валидатор на всё приложение
+if err != nil {
+	return nil, err
+}
+
 grpcSrv := grpcserver.New(
 	grpcserver.WithPort(cfg.GRPC.Port),
 	grpcserver.WithServerOptions(
 		grpc.ChainUnaryInterceptor(
-			requestid.UnaryServerInterceptor(),   // кладёт request_id в ctx
-			grpcerr.UnaryServerInterceptor(log),  // последним: ловит ошибку хендлера
+			interceptors.Error(),               // снаружи: переводит финальный err в gRPC status
+			interceptors.Logger(log),           // видит сырой err (от validation или handler), логирует
+			interceptors.Validation(validator), // ближе всего к handler: не пускает невалидный запрос дальше
 		),
 	),
 )
 ```
+
+Про порядок — см. «Порядок в цепочке» в §9.3: `Logger` должен быть между `Error`
+и `Validation`, иначе он либо теряет `Err` (если снаружи `Error`), либо не видит
+ошибки валидации (если `Validation` снаружи него). `request_id` в контекст здесь
+пока не кладётся — интерсептора для этого в кодовой базе ещё нет (`Logger` готов
+подхватить `appctx.GetRequestID(ctx)`, когда он появится).
 
 ```go
 // services/user/internal/delivery/grpc/user.go
@@ -1117,20 +1297,22 @@ func (h *UserHandler) GetUser(
 }
 ```
 
-При отсутствии пользователя interceptor даёт:
+При отсутствии пользователя цепочка `interceptors.Logger` → `interceptors.Error`
+(в порядке выполнения: `Logger` видит raw err первым, `Error` переводит его в
+статус последним) даёт:
 
-- **лог user-сервиса:**
+- **лог user-сервиса** (пишет `Logger`, `Error` в лог не пишет ничего):
   ```
-  level=WARN msg="grpc handler failed"
-    method=/user.v1.UserService/GetUser request_id=0f9b7c2e-…
+  level=WARN msg="grpc request failed"
+    method=/user.v1.UserService/GetUser duration=1.2ms
     error.code=NOT_FOUND
     error.public_message="user 42 not found"
     error.cause="user 42 not found: no rows in result set"
   ```
-- **в сеть:** `status.Code = NotFound`, `message = "user 42 not found"`,
-  деталь `ErrorInfo{ Reason: "NOT_FOUND", Domain: "delivery" }`.
+- **в сеть** (пишет `Error`, лог не трогает): `status.Code = NotFound`,
+  `message = "user 42 not found"`, деталь `ErrorInfo{ Reason: "NOT_FOUND", Domain: "delivery" }`.
 
-### 10.6 `transport/http` — writer (§9.3) и handler gateway
+### 10.6 `transport/http` — writer (§9.4) и handler gateway
 
 `grpcerr.FromStatus` разворачивает ответ gRPC обратно в `*apperr.Error`,
 `httperr.Write` отдаёт статус + JSON и делает единственный лог на стороне gateway.

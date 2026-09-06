@@ -20,16 +20,14 @@ type Violation struct {
 }
 
 func (e *Error) Error() string {
-	switch {
-	case e.Cause != nil && e.Message != "":
-		return e.Message + ": " + e.Cause.Error()
-	case e.Cause != nil:
-		return e.Cause.Error()
-	case e.Message != "":
-		return e.Message
-	default:
-		return e.Code.Public()
+	msg := e.Message
+	if msg == "" {
+		msg = e.Code.Public()
 	}
+	if e.Cause != nil {
+		msg += ": " + e.Cause.Error()
+	}
+	return msg
 }
 
 func (e *Error) Unwrap() error {
@@ -42,18 +40,7 @@ func (e *Error) Is(target error) bool {
 	return ok && t.Code == e.Code
 }
 
-var publicByReason = map[string]string{
-	ReasonInvalidCredentials: MessageInvalidCredentials,
-}
-
 func (e *Error) Public() string {
-	switch e.Code {
-	case CodeInternal, CodeUnknown, CodeDataLoss, CodeUnavailable, CodeDeadlineExceeded, CodeUnauthenticated:
-		if msg, ok := publicByReason[e.Reason]; ok {
-			return msg
-		}
-		return e.Code.Public()
-	}
 	if e.Message != "" {
 		return e.Message
 	}
@@ -62,7 +49,7 @@ func (e *Error) Public() string {
 
 func (e *Error) LogValue() slog.Value {
 	attrs := []slog.Attr{
-		slog.String("code", string(e.Code)),
+		slog.String("code", e.Code.String()),
 		slog.String("public_message", e.Public()),
 	}
 	if e.Reason != "" {
@@ -72,7 +59,7 @@ func (e *Error) LogValue() slog.Value {
 		attrs = append(attrs, slog.String("cause", e.Cause.Error()))
 	}
 	if len(e.Violations) > 0 {
-		attrs = append(attrs, slog.Int("violations", len(e.Violations)))
+		attrs = append(attrs, slog.Any("violations", e.Violations))
 	}
 	return slog.GroupValue(attrs...)
 }
@@ -112,9 +99,9 @@ func From(err error) *Error {
 	}
 	switch {
 	case errors.Is(err, context.Canceled):
-		return &Error{Code: CodeCanceled, Cause: err}
+		return Canceled().Wrap(err)
 	case errors.Is(err, context.DeadlineExceeded):
-		return &Error{Code: CodeDeadlineExceeded, Cause: err}
+		return DeadlineExceeded().Wrap(err)
 	}
-	return &Error{Code: CodeInternal, Cause: err}
+	return Internal().Wrap(err)
 }

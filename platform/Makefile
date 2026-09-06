@@ -1,11 +1,11 @@
-LOCALBIN := $(CURDIR)/bin
+LOCAL_BIN := $(CURDIR)/bin
 
 GOLANGCI_LINT_VERSION := v2.13.1
 
-GOLANGCI_LINT := $(LOCALBIN)/golangci-lint
+GOLANGCI_LINT := $(LOCAL_BIN)/golangci-lint
 
 tools:
-	curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(LOCALBIN) $(GOLANGCI_LINT_VERSION)
+	curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(LOCAL_BIN) $(GOLANGCI_LINT_VERSION)
 .PHONY: tools
 
 lint:

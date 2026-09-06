@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 const (
@@ -21,8 +22,9 @@ type Server struct {
 	server          *grpc.Server
 	host            string
 	port            int
-	shutdownTimeout time.Duration
 	serverOpts      []grpc.ServerOption
+	shutdownTimeout time.Duration
+	reflection      bool
 }
 
 func New(opts ...Option) *Server {
@@ -37,6 +39,10 @@ func New(opts ...Option) *Server {
 	}
 
 	srv.server = grpc.NewServer(srv.serverOpts...)
+
+	if srv.reflection {
+		reflection.Register(srv.server)
+	}
 
 	return srv
 }

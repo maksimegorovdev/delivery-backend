@@ -11,7 +11,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr"
 )
 
-func Map(ctx context.Context, err error) error {
+func Map(err error) error {
 	if err == nil {
 		return nil
 	}
@@ -20,13 +20,11 @@ func Map(ctx context.Context, err error) error {
 	}
 
 	switch {
-	case errors.Is(ctx.Err(), context.Canceled):
+	case errors.Is(err, context.Canceled):
 		return apperr.Canceled().Wrap(err)
-	case errors.Is(ctx.Err(), context.DeadlineExceeded):
+	case errors.Is(err, context.DeadlineExceeded):
 		return apperr.DeadlineExceeded().Wrap(err)
-	}
-
-	if errors.Is(err, pgx.ErrNoRows) {
+	case errors.Is(err, pgx.ErrNoRows):
 		return apperr.NotFound().Wrap(err)
 	}
 
