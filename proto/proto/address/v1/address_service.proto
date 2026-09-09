@@ -10,10 +10,7 @@ service AddressService {
 }
 
 message GetAddressRequest {
-  string id = 1 [
-    (buf.validate.field).required = true,
-    (buf.validate.field).string.uuid = true
-  ];
+  string id = 1 [(buf.validate.field).string.uuid = true];
 }
 
 message GetAddressResponse {

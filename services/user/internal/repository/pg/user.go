@@ -12,13 +12,12 @@ import (
 )
 
 type userRow struct {
-	ID        string     `db:"id"`
-	Email     string     `db:"email"`
-	FirstName string     `db:"first_name"`
-	LastName  string     `db:"last_name"`
-	CreatedAt time.Time  `db:"created_at"`
-	UpdatedAt time.Time  `db:"updated_at"`
-	DeletedAt *time.Time `db:"deleted_at"`
+	ID        string    `db:"id"`
+	Email     string    `db:"email"`
+	FirstName string    `db:"first_name"`
+	LastName  string    `db:"last_name"`
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
 }
 
 func (r userRow) toDomain() domain.User {
@@ -43,8 +42,8 @@ func NewUserRepo(pool *pgxpool.Pool) *UserRepo {
 func (r *UserRepo) GetByID(ctx context.Context, id string) (domain.User, error) {
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT id, email, first_name, last_name, created_at, updated_at, deleted_at
-		FROM users WHERE id = $1 AND deleted_at IS NULL`,
+		`SELECT id, email, first_name, last_name, created_at, updated_at
+		FROM users WHERE id = $1`,
 		id,
 	)
 	if err != nil {

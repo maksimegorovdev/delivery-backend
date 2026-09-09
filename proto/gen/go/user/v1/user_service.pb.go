@@ -114,9 +114,9 @@ var File_user_v1_user_service_proto protoreflect.FileDescriptor
 
 const file_user_v1_user_service_proto_rawDesc = "" +
 	"\n" +
-	"\x1auser/v1/user_service.proto\x12\auser.v1\x1a\x1bbuf/validate/validate.proto\x1a\x12user/v1/user.proto\"-\n" +
-	"\x0eGetUserRequest\x12\x1b\n" +
-	"\x02id\x18\x01 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\x02id\"4\n" +
+	"\x1auser/v1/user_service.proto\x12\auser.v1\x1a\x1bbuf/validate/validate.proto\x1a\x12user/v1/user.proto\"*\n" +
+	"\x0eGetUserRequest\x12\x18\n" +
+	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"4\n" +
 	"\x0fGetUserResponse\x12!\n" +
 	"\x04user\x18\x01 \x01(\v2\r.user.v1.UserR\x04user2K\n" +
 	"\vUserService\x12<\n" +

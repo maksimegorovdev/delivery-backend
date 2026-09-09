@@ -58,12 +58,14 @@ func (p PG) Validate() error {
 }
 
 type GRPCServer struct {
-	Port int `env:"GRPC_SERVER_PORT,required"`
+	Port       int  `env:"GRPC_SERVER_PORT,required"`
+	Reflection bool `env:"GRPC_SERVER_REFLECTION,required"`
 }
 
 func (g GRPCServer) Validate() error {
 	return validation.ValidateStruct(&g,
 		validation.Field(&g.Port, validation.Required),
+		validation.Field(&g.Reflection, validation.Required),
 	)
 }
 

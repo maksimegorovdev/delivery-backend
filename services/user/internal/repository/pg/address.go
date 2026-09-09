@@ -12,12 +12,11 @@ import (
 )
 
 type addressRow struct {
-	ID        string     `db:"id"`
-	UserID    string     `db:"user_id"`
-	Address   string     `db:"address"`
-	CreatedAt time.Time  `db:"created_at"`
-	UpdatedAt time.Time  `db:"updated_at"`
-	DeletedAt *time.Time `db:"deleted_at"`
+	ID        string    `db:"id"`
+	UserID    string    `db:"user_id"`
+	Address   string    `db:"address"`
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
 }
 
 func (r addressRow) toDomain() domain.Address {
@@ -41,8 +40,8 @@ func NewAddressRepo(pool *pgxpool.Pool) *AddressRepo {
 func (r *AddressRepo) GetByID(ctx context.Context, id string) (domain.Address, error) {
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT id, user_id, address, created_at, updated_at, deleted_at
-		FROM addresses WHERE id = $1 AND deleted_at IS NULL`,
+		`SELECT id, user_id, address, created_at, updated_at
+		FROM addresses WHERE id = $1`,
 		id,
 	)
 	if err != nil {

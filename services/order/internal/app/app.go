@@ -4,10 +4,13 @@ import (
 	"context"
 	"log/slog"
 
+	"buf.build/go/protovalidate"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcserver"
+	"github.com/maksimegorovdev/delivery-backend/platform/grpc/interceptors"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
 	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
 
@@ -47,9 +50,23 @@ func New(ctx context.Context) (*App, error) {
 		return nil, err
 	}
 
+	// Proto Validator
+	validator, err := protovalidate.New()
+	if err != nil {
+		return nil, err
+	}
+
 	// gRPC Server
 	grpcServer := grpcserver.New(
 		grpcserver.WithPort(cfg.GRPCServer.Port),
+		grpcserver.WithReflection(cfg.GRPCServer.Reflection),
+		grpcserver.WithServerOptions(
+			grpc.ChainUnaryInterceptor(
+				interceptors.Error(),
+				interceptors.Logger(log),
+				interceptors.Validation(validator),
+			),
+		),
 	)
 
 	app := &App{

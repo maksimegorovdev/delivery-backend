@@ -115,9 +115,9 @@ var File_address_v1_address_service_proto protoreflect.FileDescriptor
 const file_address_v1_address_service_proto_rawDesc = "" +
 	"\n" +
 	" address/v1/address_service.proto\x12\n" +
-	"address.v1\x1a\x18address/v1/address.proto\x1a\x1bbuf/validate/validate.proto\"0\n" +
-	"\x11GetAddressRequest\x12\x1b\n" +
-	"\x02id\x18\x01 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\x02id\"C\n" +
+	"address.v1\x1a\x18address/v1/address.proto\x1a\x1bbuf/validate/validate.proto\"-\n" +
+	"\x11GetAddressRequest\x12\x18\n" +
+	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"C\n" +
 	"\x12GetAddressResponse\x12-\n" +
 	"\aaddress\x18\x01 \x01(\v2\x13.address.v1.AddressR\aaddress2]\n" +
 	"\x0eAddressService\x12K\n" +
