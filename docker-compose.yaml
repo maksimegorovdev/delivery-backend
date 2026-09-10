@@ -23,6 +23,19 @@ services:
     volumes:
       - user-postgres-data:/var/lib/postgresql/18/docker
 
+  product-postgres:
+    container_name: product-postgres
+    image: postgres:18
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=productdb
+    ports:
+      - "5434:5432"
+    volumes:
+      - product-postgres-data:/var/lib/postgresql/18/docker
+
 volumes:
   order-postgres-data:
   user-postgres-data:
+  product-postgres-data:

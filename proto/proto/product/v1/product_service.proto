@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package product.v1;
+
+import "buf/validate/validate.proto";
+import "product/v1/product.proto";
+
+service ProductService {
+  rpc GetProducts(GetProductsRequest) returns (GetProductsResponse);
+}
+
+message GetProductsRequest {
+  repeated string ids = 1 [
+    (buf.validate.field).repeated.min_items = 1,
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string.uuid = true
+  ];
+}
+
+message GetProductsResponse {
+  repeated Product products = 1;
+}

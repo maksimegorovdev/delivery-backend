@@ -1,19 +1,20 @@
 # Задачи
 
 - [x] Пакет httpserver
-- [ ] Middlewares (logger, request_id итд)
 - [x] Пакет grpcserver
-- [ ] Interceptors для grpc
 - [x] Пакет для pgxpool
+- [x] Пакет для работы с ошибками errors (Доработка по мере необходимости)
+- [x] Подумать над доработкой пакетов grpc, http, чтобы логировать запуск серверов
+- [x] Clean Architecture для user-service (handler, service, domain, repository)
+- [x] grpcui для user-service
+- [x] grpcui для order-service
+- [x] Сделать минимальный сервис product service для выдачи информации по id продуктов
+- [ ] Middlewares (logger, request_id итд)
+- [ ] Interceptors для grpc
 - [ ] Подготовить таблицы для миграции в Postgres
 - [ ] Clean Architecture для order-service (handler, service, domain, repository)
-- [x] Clean Architecture для user-service (handler, service, domain, repository)
-- [x] Для user-service подготовить proto
 - [ ] Swagger для order-service
-- [x] grpcui для user-service
-- [ ] grpcui для order-service
 - [ ] Пакет для единого ответа json
-- [x] Пакет для работы с ошибками errors (Доработка по мере необходимости)
 - [ ] Пакет kafka
 - [ ] Debezium поднять
 - [ ] Clean Architecture для notification-service (handler, service, domain, repository)
@@ -22,5 +23,6 @@
 - [ ] Observability (трейсы, метрики, логи)
 - [ ] Logger логирование ошибок по стеку
 - [ ] Доработка пакетов http, grpc, pgx, redis, kafka итд насчет кол-ва соединенией, timeout
-- [x] Подумать над доработкой пакетов grpc, http, чтобы логировать запуск серверов
-- [ ] CHECK в миграциях БД до конца проставить, разобраться с этим
+- [ ] CHECK в миграциях БД до конца проставить, разобраться с этим (пока делаю минимально)
+- [ ] Внедрить идемпотентность
+- [ ] Redis для быстрой выдачи информации по продуктам

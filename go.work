@@ -6,5 +6,6 @@ use (
 	./services/gateway
 	./services/notification
 	./services/order
+	./services/product
 	./services/user
 )

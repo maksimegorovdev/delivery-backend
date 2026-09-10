@@ -1,6 +1,7 @@
 WITH ins_user AS (
     INSERT INTO users (email, first_name, last_name)
-    VALUES ('demo@example.com', 'Demo', 'User')
+    VALUES
+        ('demo@example.com', 'Demo', 'User')
     ON CONFLICT (email)
     DO NOTHING
     RETURNING id
