@@ -1,13 +1,16 @@
 CREATE TABLE orders (
     id               UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id          UUID NOT NULL,
-    status           TEXT NOT NULL DEFAULT 'pending',
+    status           TEXT NOT NULL DEFAULT 'created',
     total_amount     BIGINT NOT NULL,
     delivery_address TEXT NOT NULL,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT chk_orders_status CHECK (status IN ('pending', 'confirmed', 'cancelled')),
+    CONSTRAINT chk_orders_status CHECK (
+        status IN ('created', 'paid', 'confirmed', 'assembling',
+                   'assembled', 'courier_assigned', 'delivering', 'delivered', 'canceled')
+    ),
     CONSTRAINT chk_orders_total_amount CHECK (total_amount >= 0)
 );
 

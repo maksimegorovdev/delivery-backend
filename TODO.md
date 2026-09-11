@@ -13,7 +13,7 @@
 - [ ] Interceptors для grpc
 - [ ] Подготовить таблицы для миграции в Postgres
 - [ ] Clean Architecture для order-service (handler, service, domain, repository)
-- [ ] Swagger для order-service
+- [ ] Swagger для gateway-service
 - [ ] Пакет для единого ответа json
 - [ ] Пакет kafka
 - [ ] Debezium поднять
@@ -25,4 +25,5 @@
 - [ ] Доработка пакетов http, grpc, pgx, redis, kafka итд насчет кол-ва соединенией, timeout
 - [ ] CHECK в миграциях БД до конца проставить, разобраться с этим (пока делаю минимально)
 - [ ] Внедрить идемпотентность
-- [ ] Redis для быстрой выдачи информации по продуктам
+- [ ] Redis для быстрой выдачи информации по продуктам (Redis, Singleflight)
+- [ ] Попробовать внедрить Taskfile вместо Makefile

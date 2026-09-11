@@ -25,25 +25,43 @@ const (
 type OrderStatus int32
 
 const (
-	OrderStatus_ORDER_STATUS_UNSPECIFIED OrderStatus = 0
-	OrderStatus_ORDER_STATUS_PENDING     OrderStatus = 1
-	OrderStatus_ORDER_STATUS_CONFIRMED   OrderStatus = 2
-	OrderStatus_ORDER_STATUS_CANCELLED   OrderStatus = 3
+	OrderStatus_ORDER_STATUS_UNSPECIFIED      OrderStatus = 0
+	OrderStatus_ORDER_STATUS_CREATED          OrderStatus = 1
+	OrderStatus_ORDER_STATUS_PAID             OrderStatus = 2
+	OrderStatus_ORDER_STATUS_CONFIRMED        OrderStatus = 3
+	OrderStatus_ORDER_STATUS_ASSEMBLING       OrderStatus = 4
+	OrderStatus_ORDER_STATUS_ASSEMBLED        OrderStatus = 5
+	OrderStatus_ORDER_STATUS_COURIER_ASSIGNED OrderStatus = 6
+	OrderStatus_ORDER_STATUS_DELIVERING       OrderStatus = 7
+	OrderStatus_ORDER_STATUS_DELIVERED        OrderStatus = 8
+	OrderStatus_ORDER_STATUS_CANCELED         OrderStatus = 9
 )
 
 // Enum value maps for OrderStatus.
 var (
 	OrderStatus_name = map[int32]string{
 		0: "ORDER_STATUS_UNSPECIFIED",
-		1: "ORDER_STATUS_PENDING",
-		2: "ORDER_STATUS_CONFIRMED",
-		3: "ORDER_STATUS_CANCELLED",
+		1: "ORDER_STATUS_CREATED",
+		2: "ORDER_STATUS_PAID",
+		3: "ORDER_STATUS_CONFIRMED",
+		4: "ORDER_STATUS_ASSEMBLING",
+		5: "ORDER_STATUS_ASSEMBLED",
+		6: "ORDER_STATUS_COURIER_ASSIGNED",
+		7: "ORDER_STATUS_DELIVERING",
+		8: "ORDER_STATUS_DELIVERED",
+		9: "ORDER_STATUS_CANCELED",
 	}
 	OrderStatus_value = map[string]int32{
-		"ORDER_STATUS_UNSPECIFIED": 0,
-		"ORDER_STATUS_PENDING":     1,
-		"ORDER_STATUS_CONFIRMED":   2,
-		"ORDER_STATUS_CANCELLED":   3,
+		"ORDER_STATUS_UNSPECIFIED":      0,
+		"ORDER_STATUS_CREATED":          1,
+		"ORDER_STATUS_PAID":             2,
+		"ORDER_STATUS_CONFIRMED":        3,
+		"ORDER_STATUS_ASSEMBLING":       4,
+		"ORDER_STATUS_ASSEMBLED":        5,
+		"ORDER_STATUS_COURIER_ASSIGNED": 6,
+		"ORDER_STATUS_DELIVERING":       7,
+		"ORDER_STATUS_DELIVERED":        8,
+		"ORDER_STATUS_CANCELED":         9,
 	}
 )
 
@@ -76,10 +94,13 @@ func (OrderStatus) EnumDescriptor() ([]byte, []int) {
 
 type OrderItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
-	ProductName   string                 `protobuf:"bytes,2,opt,name=product_name,json=productName,proto3" json:"product_name,omitempty"`
-	Quantity      int32                  `protobuf:"varint,3,opt,name=quantity,proto3" json:"quantity,omitempty"`
-	UnitPrice     int64                  `protobuf:"varint,4,opt,name=unit_price,json=unitPrice,proto3" json:"unit_price,omitempty"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ProductId     string                 `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	ProductName   string                 `protobuf:"bytes,3,opt,name=product_name,json=productName,proto3" json:"product_name,omitempty"`
+	Quantity      int32                  `protobuf:"varint,4,opt,name=quantity,proto3" json:"quantity,omitempty"`
+	UnitPrice     int64                  `protobuf:"varint,5,opt,name=unit_price,json=unitPrice,proto3" json:"unit_price,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -114,6 +135,13 @@ func (*OrderItem) Descriptor() ([]byte, []int) {
 	return file_order_v1_order_proto_rawDescGZIP(), []int{0}
 }
 
+func (x *OrderItem) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 func (x *OrderItem) GetProductId() string {
 	if x != nil {
 		return x.ProductId
@@ -140,6 +168,20 @@ func (x *OrderItem) GetUnitPrice() int64 {
 		return x.UnitPrice
 	}
 	return 0
+}
+
+func (x *OrderItem) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *OrderItem) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
 }
 
 type Order struct {
@@ -246,14 +288,19 @@ var File_order_v1_order_proto protoreflect.FileDescriptor
 
 const file_order_v1_order_proto_rawDesc = "" +
 	"\n" +
-	"\x14order/v1/order.proto\x12\border.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x88\x01\n" +
-	"\tOrderItem\x12\x1d\n" +
+	"\x14order/v1/order.proto\x12\border.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x8e\x02\n" +
+	"\tOrderItem\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
-	"product_id\x18\x01 \x01(\tR\tproductId\x12!\n" +
-	"\fproduct_name\x18\x02 \x01(\tR\vproductName\x12\x1a\n" +
-	"\bquantity\x18\x03 \x01(\x05R\bquantity\x12\x1d\n" +
+	"product_id\x18\x02 \x01(\tR\tproductId\x12!\n" +
+	"\fproduct_name\x18\x03 \x01(\tR\vproductName\x12\x1a\n" +
+	"\bquantity\x18\x04 \x01(\x05R\bquantity\x12\x1d\n" +
 	"\n" +
-	"unit_price\x18\x04 \x01(\x03R\tunitPrice\"\xce\x02\n" +
+	"unit_price\x18\x05 \x01(\x03R\tunitPrice\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xce\x02\n" +
 	"\x05Order\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12-\n" +
@@ -264,12 +311,18 @@ const file_order_v1_order_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt*}\n" +
+	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt*\xa8\x02\n" +
 	"\vOrderStatus\x12\x1c\n" +
 	"\x18ORDER_STATUS_UNSPECIFIED\x10\x00\x12\x18\n" +
-	"\x14ORDER_STATUS_PENDING\x10\x01\x12\x1a\n" +
-	"\x16ORDER_STATUS_CONFIRMED\x10\x02\x12\x1a\n" +
-	"\x16ORDER_STATUS_CANCELLED\x10\x03B\xa6\x01\n" +
+	"\x14ORDER_STATUS_CREATED\x10\x01\x12\x15\n" +
+	"\x11ORDER_STATUS_PAID\x10\x02\x12\x1a\n" +
+	"\x16ORDER_STATUS_CONFIRMED\x10\x03\x12\x1b\n" +
+	"\x17ORDER_STATUS_ASSEMBLING\x10\x04\x12\x1a\n" +
+	"\x16ORDER_STATUS_ASSEMBLED\x10\x05\x12!\n" +
+	"\x1dORDER_STATUS_COURIER_ASSIGNED\x10\x06\x12\x1b\n" +
+	"\x17ORDER_STATUS_DELIVERING\x10\a\x12\x1a\n" +
+	"\x16ORDER_STATUS_DELIVERED\x10\b\x12\x19\n" +
+	"\x15ORDER_STATUS_CANCELED\x10\tB\xa6\x01\n" +
 	"\fcom.order.v1B\n" +
 	"OrderProtoP\x01ZIgithub.com/maksimegorovdev/delivery-backend/proto/gen/go/order/v1;orderv1\xa2\x02\x03OXX\xaa\x02\bOrder.V1\xca\x02\bOrder\\V1\xe2\x02\x14Order\\V1\\GPBMetadata\xea\x02\tOrder::V1b\x06proto3"
 
@@ -294,15 +347,17 @@ var file_order_v1_order_proto_goTypes = []any{
 	(*timestamppb.Timestamp)(nil), // 3: google.protobuf.Timestamp
 }
 var file_order_v1_order_proto_depIdxs = []int32{
-	0, // 0: order.v1.Order.status:type_name -> order.v1.OrderStatus
-	1, // 1: order.v1.Order.items:type_name -> order.v1.OrderItem
-	3, // 2: order.v1.Order.created_at:type_name -> google.protobuf.Timestamp
-	3, // 3: order.v1.Order.updated_at:type_name -> google.protobuf.Timestamp
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	3, // 0: order.v1.OrderItem.created_at:type_name -> google.protobuf.Timestamp
+	3, // 1: order.v1.OrderItem.updated_at:type_name -> google.protobuf.Timestamp
+	0, // 2: order.v1.Order.status:type_name -> order.v1.OrderStatus
+	1, // 3: order.v1.Order.items:type_name -> order.v1.OrderItem
+	3, // 4: order.v1.Order.created_at:type_name -> google.protobuf.Timestamp
+	3, // 5: order.v1.Order.updated_at:type_name -> google.protobuf.Timestamp
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_order_v1_order_proto_init() }

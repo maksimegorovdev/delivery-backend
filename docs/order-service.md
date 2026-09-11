@@ -49,14 +49,24 @@ grpc.CreateOrder(proto)
 ```go
 package domain
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid" // go get github.com/google/uuid — добавить в services/order/go.mod
+)
 
 type OrderStatus string
 
 const (
-	OrderStatusPending   OrderStatus = "pending"
-	OrderStatusConfirmed OrderStatus = "confirmed"
-	OrderStatusCancelled OrderStatus = "cancelled"
+	OrderStatusCreated         OrderStatus = "created"
+	OrderStatusPaid            OrderStatus = "paid"
+	OrderStatusConfirmed       OrderStatus = "confirmed"
+	OrderStatusAssembling      OrderStatus = "assembling"
+	OrderStatusAssembled       OrderStatus = "assembled"
+	OrderStatusCourierAssigned OrderStatus = "courier_assigned"
+	OrderStatusDelivering      OrderStatus = "delivering"
+	OrderStatusDelivered       OrderStatus = "delivered"
+	OrderStatusCanceled        OrderStatus = "canceled"
 )
 
 type OrderItem struct {
@@ -66,6 +76,8 @@ type OrderItem struct {
 	ProductName string
 	Quantity    int32
 	UnitPrice   int64 // копейки
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 func (i OrderItem) Subtotal() int64 { return i.UnitPrice * int64(i.Quantity) }
@@ -83,7 +95,8 @@ type Order struct {
 ```
 
 Фабрика в домене держит инварианты (непустой список, стартовый статус, расчёт суммы) —
-usecase не должен считать `total` руками:
+usecase не должен считать `total` руками. Она же генерирует `id` (`uuidv7`, time-ordered)
+и `created_at`/`updated_at` для агрегата и для каждой позиции — **до** похода в БД:
 
 ```go
 // internal/domain/order.go
@@ -91,19 +104,52 @@ func NewOrder(userID, deliveryAddress string, items []OrderItem) (Order, error) 
 	if len(items) == 0 {
 		return Order{}, ErrOrderNoItems
 	}
-	var total int64
-	for _, it := range items {
-		total += it.Subtotal()
+
+	id, err := uuid.NewV7()
+	if err != nil {
+		return Order{}, err
 	}
+
+	now := time.Now().UTC()
+	var total int64
+	for i := range items {
+		itemID, err := uuid.NewV7()
+		if err != nil {
+			return Order{}, err
+		}
+		items[i].ID = itemID.String()
+		items[i].OrderID = id.String()
+		items[i].CreatedAt = now
+		items[i].UpdatedAt = now
+		total += items[i].Subtotal()
+	}
+
 	return Order{
+		ID:              id.String(),
 		UserID:          userID,
-		Status:          OrderStatusPending,
+		Status:          OrderStatusCreated,
 		Items:           items,
 		TotalAmount:     total,
 		DeliveryAddress: deliveryAddress,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}, nil
 }
 ```
+
+**Почему генерируем в Go, а не оставляем `DEFAULT uuidv7()`/`DEFAULT NOW()` в БД:**
+`id` нужен ДО commit'а транзакции — он пойдёт в outbox-событие (`order.created`),
+которое пишется в той же транзакции, что и `orders`/`order_items` (см. roadmap outbox
+в `architecture.md`). Если ждать `id` из `RETURNING`, событие в outbox можно вставить
+только после `insertOrder`, но до `insertItems` — а order_items его тоже используют,
+получается лишняя завязка на порядок. Когда id известен заранее, `orders`, `order_items`
+и `outbox` вставляются в любом порядке одной транзакцией, без зависимости друг от друга.
+`created_at`/`updated_at` генерируем там же — иначе `occurred_at` в outbox-событии
+разъедется с `created_at` строки заказа на несколько миллисекунд, что мешает при дебаге.
+
+Важно: это **не** про экономию round-trip'а — `RETURNING` не стоит отдельного похода
+к БД, он возвращается в том же ответе, что и сам `INSERT`. Выигрыш тут только в том,
+что id доступен раньше по времени выполнения (для outbox), а не в задержке запроса.
 
 Доменные ошибки рядом (`internal/domain/errors.go`) — отдельными значениями, без импорта
 transport/pg. Маппинг в gRPC-код делает `interceptors.Error()` через `apperr`:
@@ -161,9 +207,11 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/domain"
 )
 
-// запись агрегата
+// запись агрегата. o уже полностью собран в domain.NewOrder (id, таймстемпы,
+// статус, total — всё выставлено ДО вызова), Create только пишет и ничего
+// не вычитывает обратно из БД (нет RETURNING/generated-полей) — поэтому error-only.
 type OrderRepo interface {
-	Create(ctx context.Context, o domain.Order) (domain.Order, error)
+	Create(ctx context.Context, o domain.Order) error
 }
 
 // всё, что order-у нужно от user-сервиса.
@@ -263,14 +311,19 @@ func (uc *OrderUsecase) CreateOrder(ctx context.Context, in CreateOrderInput) (d
 		})
 	}
 
-	// 3. агрегат: инварианты + расчёт суммы внутри домена
+	// 3. агрегат: инварианты + расчёт суммы + id/таймстемпы внутри домена
 	order, err := domain.NewOrder(in.UserID, addr.Address, items)
 	if err != nil {
 		return domain.Order{}, apperr.InvalidArgument().Wrap(err)
 	}
 
-	// 4. запись (транзакция внутри репозитория)
-	return uc.orders.Create(ctx, order)
+	// 4. запись (транзакция внутри репозитория). order уже полностью собран —
+	// Create ничего в него не добавляет, поэтому ответ клиенту строим из order,
+	// а не из возврата Create (его и нет, там error-only).
+	if err := uc.orders.Create(ctx, order); err != nil {
+		return domain.Order{}, err
+	}
+	return order, nil
 }
 ```
 
@@ -282,28 +335,17 @@ func (uc *OrderUsecase) CreateOrder(ctx context.Context, in CreateOrderInput) (d
 
 ## 5. repository/pg — один репозиторий, две таблицы, транзакция
 
-### 5.1 Абстракция над pool и tx
+### 5.1 insertOrder/insertItems принимают pgx.Tx напрямую
 
-Чтобы приватные методы работали и на `*pgxpool.Pool`, и на `pgx.Tx`.
-`internal/repository/pg/db.go`:
+`db.go` с абстракцией над `pool`/`tx` (`querier`) сейчас не заводим: `insertOrder` и
+`insertItems` вызываются только из `Create` и всегда с уже открытой транзакцией — второго
+потребителя, которому нужен был бы `pool` напрямую, пока нет. Заводить общий интерфейс
+без второго потребителя — абстракция ради абстракции.
 
-```go
-package pg
-
-import (
-	"context"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-)
-
-type querier interface {
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-}
-```
-
-И `*pgxpool.Pool`, и `pgx.Tx` этот интерфейс уже удовлетворяют.
+Если позже появится метод, которому транзакция не нужна (например `GetByID`), для него
+это будет просто `func (r *OrderRepo) GetByID(ctx context.Context, id string) (...)`,
+работающий с `r.pool` напрямую — общий интерфейс над `pool`/`tx` заводить только тогда,
+когда появится метод, которому реально нужно принимать и то, и другое.
 
 ### 5.2 Публичный метод открывает транзакцию
 
@@ -328,117 +370,81 @@ type OrderRepo struct {
 
 func NewOrderRepo(pool *pgxpool.Pool) *OrderRepo { return &OrderRepo{pool: pool} }
 
-func (r *OrderRepo) Create(ctx context.Context, o domain.Order) (domain.Order, error) {
+func (r *OrderRepo) Create(ctx context.Context, o domain.Order) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
-		return domain.Order{}, pgerr.Map(err)
+		return pgerr.Map(err)
 	}
 	defer tx.Rollback(ctx) // no-op после Commit
 
-	created, err := r.insertOrder(ctx, tx, o)
-	if err != nil {
-		return domain.Order{}, err
+	if err := r.insertOrder(ctx, tx, o); err != nil {
+		return err
 	}
-
-	created.Items, err = r.insertItems(ctx, tx, created.ID, o.Items)
-	if err != nil {
-		return domain.Order{}, err
+	if err := r.insertItems(ctx, tx, o.Items); err != nil {
+		return err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return domain.Order{}, pgerr.Map(err)
+		return pgerr.Map(err)
 	}
-	return created, nil
+	return nil
 }
 ```
 
-### 5.3 Строки и мапперы — как userRow/addressRow
+### 5.3 insertOrder — без RETURNING, error-only
 
-Тот же стиль: `db:"..."` теги + `pgx.RowToStructByName` + `toDomain()`.
-Генерённые поля (`id`, `created_at`, `status default`) забираем через `RETURNING`:
+`id`, `status`, `created_at`, `updated_at` пришли готовыми из `domain.NewOrder` — читать
+их обратно из БД незачем, `orderRow`/`toDomain()` не нужны. Раз метод ничего не
+вычитывает и не меняет в `o`, возвращать сам `o` тоже незачем — сигнатура `error`:
 
 ```go
-type orderRow struct {
-	ID              string    `db:"id"`
-	UserID          string    `db:"user_id"`
-	Status          string    `db:"status"`
-	TotalAmount     int64     `db:"total_amount"`
-	DeliveryAddress string    `db:"delivery_address"`
-	CreatedAt       time.Time `db:"created_at"`
-	UpdatedAt       time.Time `db:"updated_at"`
-}
-
-func (r orderRow) toDomain() domain.Order {
-	return domain.Order{
-		ID:              r.ID,
-		UserID:          r.UserID,
-		Status:          domain.OrderStatus(r.Status), // строка БД → доменный enum
-		TotalAmount:     r.TotalAmount,
-		DeliveryAddress: r.DeliveryAddress,
-		CreatedAt:       r.CreatedAt,
-		UpdatedAt:       r.UpdatedAt,
-	}
-}
-
-func (r *OrderRepo) insertOrder(ctx context.Context, q querier, o domain.Order) (domain.Order, error) {
-	rows, err := q.Query(ctx,
-		`INSERT INTO orders (user_id, status, total_amount, delivery_address)
-		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, user_id, status, total_amount, delivery_address, created_at, updated_at`,
-		o.UserID, string(o.Status), o.TotalAmount, o.DeliveryAddress,
+func (r *OrderRepo) insertOrder(ctx context.Context, tx pgx.Tx, o domain.Order) error {
+	_, err := tx.Exec(ctx,
+		`INSERT INTO orders (id, user_id, status, total_amount, delivery_address, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		o.ID, o.UserID, string(o.Status), o.TotalAmount, o.DeliveryAddress, o.CreatedAt, o.UpdatedAt,
 	)
 	if err != nil {
-		return domain.Order{}, pgerr.Map(err)
+		return pgerr.Map(err)
 	}
-	row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[orderRow])
-	if err != nil {
-		return domain.Order{}, pgerr.Map(err)
-	}
-	return row.toDomain(), nil
+	return nil
 }
 ```
 
-### 5.4 Позиции: цикл или батч
+### 5.4 Позиции: батч без RETURNING (1 round-trip, error-only)
 
-`internal/repository/pg/order_item.go` — `orderItemRow` + `toDomain()` аналогично.
-Вставка — простой цикл `Query` (читается легко):
+`internal/repository/pg/order_item.go`. `id`/`order_id`/`created_at`/`updated_at` у
+каждой позиции уже проставлены в домене — `orderItemRow`/`toDomain()` не нужны, как и
+возврат самих `items`. `pgx.Batch` оставляем как способ уложить N `INSERT`'ов в один
+round-trip, `br.Exec()` вместо `br.Query()`. Ошибку `Close()` намеренно не обрабатываем —
+`defer br.Close()`, тот же подход, что и `defer tx.Rollback(ctx)` в `Create`: любой
+реальный сбой уже будет пойман через `br.Exec()` в цикле:
 
 ```go
-func (r *OrderRepo) insertItems(ctx context.Context, q querier, orderID string, items []domain.OrderItem) ([]domain.OrderItem, error) {
-	out := make([]domain.OrderItem, 0, len(items))
+func (r *OrderRepo) insertItems(ctx context.Context, tx pgx.Tx, items []domain.OrderItem) error {
+	b := &pgx.Batch{}
 	for _, it := range items {
-		rows, err := q.Query(ctx,
-			`INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price)
-			 VALUES ($1, $2, $3, $4, $5)
-			 RETURNING id, order_id, product_id, product_name, quantity, unit_price`,
-			orderID, it.ProductID, it.ProductName, it.Quantity, it.UnitPrice,
+		b.Queue(
+			`INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price, created_at, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+			it.ID, it.OrderID, it.ProductID, it.ProductName, it.Quantity, it.UnitPrice, it.CreatedAt, it.UpdatedAt,
 		)
-		if err != nil {
-			return nil, pgerr.Map(err)
-		}
-		row, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[orderItemRow])
-		if err != nil {
-			return nil, pgerr.Map(err)
-		}
-		out = append(out, row.toDomain())
 	}
-	return out, nil
+
+	br := tx.SendBatch(ctx, b)
+	defer br.Close()
+
+	for range items {
+		if _, err := br.Exec(); err != nil {
+			return pgerr.Map(err)
+		}
+	}
+	return nil
 }
 ```
 
-Оптимизация на потом — один `pgx.Batch` (1 round-trip вместо N):
-
-```go
-b := &pgx.Batch{}
-for _, it := range items {
-	b.Queue(`INSERT INTO order_items (...) VALUES ($1,$2,$3,$4,$5) RETURNING ...`, ...)
-}
-br := q.(interface{ SendBatch(context.Context, *pgx.Batch) pgx.BatchResults }).SendBatch(ctx, b)
-defer br.Close()
-// для каждой позиции: br.Query() → CollectExactlyOneRow
-```
-
-(если пойдёшь этим путём — добавь `SendBatch` в интерфейс `querier`, оба типа его имеют.)
+`orderID` не нужен параметром `insertItems` — он уже сидит в каждом `it.OrderID`
+(см. вызов в 5.2, `r.insertItems(ctx, tx, o.Items)`).
 
 ### 5.5 Где держать транзакцию — решение
 
@@ -526,12 +532,24 @@ enum статуса:
 ```go
 func statusToProto(s domain.OrderStatus) orderv1.OrderStatus {
 	switch s {
-	case domain.OrderStatusPending:
-		return orderv1.OrderStatus_ORDER_STATUS_PENDING
+	case domain.OrderStatusCreated:
+		return orderv1.OrderStatus_ORDER_STATUS_CREATED
+	case domain.OrderStatusPaid:
+		return orderv1.OrderStatus_ORDER_STATUS_PAID
 	case domain.OrderStatusConfirmed:
 		return orderv1.OrderStatus_ORDER_STATUS_CONFIRMED
-	case domain.OrderStatusCancelled:
-		return orderv1.OrderStatus_ORDER_STATUS_CANCELLED
+	case domain.OrderStatusAssembling:
+		return orderv1.OrderStatus_ORDER_STATUS_ASSEMBLING
+	case domain.OrderStatusAssembled:
+		return orderv1.OrderStatus_ORDER_STATUS_ASSEMBLED
+	case domain.OrderStatusCourierAssigned:
+		return orderv1.OrderStatus_ORDER_STATUS_COURIER_ASSIGNED
+	case domain.OrderStatusDelivering:
+		return orderv1.OrderStatus_ORDER_STATUS_DELIVERING
+	case domain.OrderStatusDelivered:
+		return orderv1.OrderStatus_ORDER_STATUS_DELIVERED
+	case domain.OrderStatusCanceled:
+		return orderv1.OrderStatus_ORDER_STATUS_CANCELED
 	default:
 		return orderv1.OrderStatus_ORDER_STATUS_UNSPECIFIED
 	}
@@ -541,10 +559,13 @@ func orderToProto(o domain.Order) *orderv1.Order {
 	items := make([]*orderv1.OrderItem, 0, len(o.Items))
 	for _, it := range o.Items {
 		items = append(items, &orderv1.OrderItem{
+			Id:          it.ID,
 			ProductId:   it.ProductID,
 			ProductName: it.ProductName,
 			Quantity:    it.Quantity,
 			UnitPrice:   it.UnitPrice,
+			CreatedAt:   timestamppb.New(it.CreatedAt),
+			UpdatedAt:   timestamppb.New(it.UpdatedAt),
 		})
 	}
 	return &orderv1.Order{
@@ -718,16 +739,15 @@ services/order/internal/
                                 #   +usecase +router +userConn (закрыть в Close)
   config/config.go              # +UserService.Addr
   domain/
-    order.go                    # Order, OrderItem, OrderStatus, NewOrder (инварианты + total)
+    order.go                    # Order, OrderItem, OrderStatus, NewOrder (инварианты + total + uuidv7)
     user.go  address.go  product.go   # маленькие структуры для портов
     errors.go                   # ErrOrderNoItems, ErrProductNotFound
   usecase/
     order.go                    # OrderUsecase + порты OrderRepo/UserProvider/ProductProvider
                                 #   + CreateOrderInput / CreateOrderItemInput
   repository/pg/
-    db.go                       # querier (pool | tx)
-    order.go                    # OrderRepo.Create (BEGIN/COMMIT) + orderRow + insertOrder
-    order_item.go               # orderItemRow + insertItems
+    order.go                    # OrderRepo.Create (BEGIN/COMMIT) + insertOrder (без RETURNING)
+    order_item.go               # insertItems (pgx.Batch, без RETURNING)
   transport/grpc/
     router.go                   # RouterDeps + NewRouter
     order.go                    # OrderRouter + OrderUsecase iface + orderToProto/statusToProto
