@@ -35,7 +35,7 @@ func New(ctx context.Context) (*App, error) {
 
 	// HTTP Server
 	httpServer := httpserver.New(
-		httpserver.WithPort(cfg.HTTP.Port),
+		cfg.HTTP.Addr,
 	)
 
 	app := &App{
@@ -53,11 +53,11 @@ func (a *App) Run(ctx context.Context) error {
 	g.Go(func() error {
 		a.log.Info(
 			"http server started",
-			slog.Int("port", a.cfg.HTTP.Port),
+			slog.String("addr", a.cfg.HTTP.Addr),
 		)
 		defer a.log.Info(
 			"http server stopped",
-			slog.Int("port", a.cfg.HTTP.Port),
+			slog.String("addr", a.cfg.HTTP.Addr),
 		)
 		return a.httpServer.Run(ctx)
 	})

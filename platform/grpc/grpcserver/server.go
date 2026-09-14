@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strconv"
 	"time"
 
 	"google.golang.org/grpc"
@@ -13,24 +12,20 @@ import (
 )
 
 const (
-	defaultHost            = ""
-	defaultPort            = 8090
 	defaultShutdownTimeout = 10 * time.Second
 )
 
 type Server struct {
 	server          *grpc.Server
-	host            string
-	port            int
+	addr            string
 	serverOpts      []grpc.ServerOption
 	shutdownTimeout time.Duration
 	reflection      bool
 }
 
-func New(opts ...Option) *Server {
+func New(addr string, opts ...Option) *Server {
 	srv := &Server{
-		host:            defaultHost,
-		port:            defaultPort,
+		addr:            addr,
 		shutdownTimeout: defaultShutdownTimeout,
 	}
 
@@ -52,7 +47,7 @@ func (s *Server) Server() *grpc.Server {
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	lis, err := net.Listen("tcp", net.JoinHostPort(s.host, strconv.Itoa(s.port)))
+	lis, err := net.Listen("tcp", s.addr)
 	if err != nil {
 		return fmt.Errorf("grpcserver: listen: %w", err)
 	}

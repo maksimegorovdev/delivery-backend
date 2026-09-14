@@ -10,7 +10,7 @@ type RouterDeps struct {
 	AddressUsecase AddressUsecase
 }
 
-func NewRouter(deps *RouterDeps) {
-	NewUserRoutes(deps.Server, deps.UserUsecase)
-	NewAddressRoutes(deps.Server, deps.AddressUsecase)
+func NewRouter(deps RouterDeps) {
+	NewUserRouter(deps.Server, deps.UserUsecase)
+	NewAddressRouter(deps.Server, deps.AddressUsecase)
 }

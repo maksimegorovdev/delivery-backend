@@ -15,9 +15,9 @@ type Config struct {
 
 func (c Config) Validate() error {
 	return validation.ValidateStruct(&c,
-		validation.Field(&c.App),
-		validation.Field(&c.Log),
-		validation.Field(&c.HTTP),
+		validation.Field(&c.App, validation.Required),
+		validation.Field(&c.Log, validation.Required),
+		validation.Field(&c.HTTP, validation.Required),
 	)
 }
 
@@ -44,12 +44,12 @@ func (l Log) Validate() error {
 }
 
 type HTTP struct {
-	Port int `env:"HTTP_PORT,required"`
+	Addr string `env:"HTTP_ADDR,required"`
 }
 
 func (h HTTP) Validate() error {
 	return validation.ValidateStruct(&h,
-		validation.Field(&h.Port, validation.Required),
+		validation.Field(&h.Addr, validation.Required),
 	)
 }
 func New() (*Config, error) {

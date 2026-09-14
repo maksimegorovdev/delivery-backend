@@ -60,7 +60,7 @@ func New(ctx context.Context) (*App, error) {
 
 	// gRPC Server
 	grpcServer := grpcserver.New(
-		grpcserver.WithPort(cfg.GRPCServer.Port),
+		cfg.GRPCServer.Addr,
 		grpcserver.WithReflection(cfg.GRPCServer.Reflection),
 		grpcserver.WithServerOptions(
 			grpc.ChainUnaryInterceptor(
@@ -80,7 +80,7 @@ func New(ctx context.Context) (*App, error) {
 	addressUsecase := usecase.NewAddressUsecase(addressRepo)
 
 	// Router
-	grpcrouter.NewRouter(&grpcrouter.RouterDeps{
+	grpcrouter.NewRouter(grpcrouter.RouterDeps{
 		Server:         grpcServer.Server(),
 		UserUsecase:    userUsecase,
 		AddressUsecase: addressUsecase,
@@ -102,11 +102,11 @@ func (a *App) Run(ctx context.Context) error {
 	g.Go(func() error {
 		a.log.InfoContext(ctx,
 			"grpc server started",
-			slog.Int("port", a.cfg.GRPCServer.Port),
+			slog.String("addr", a.cfg.GRPCServer.Addr),
 		)
 		defer a.log.InfoContext(ctx,
 			"grpc server stopped",
-			slog.Int("port", a.cfg.GRPCServer.Port),
+			slog.String("addr", a.cfg.GRPCServer.Addr),
 		)
 		return a.grpcServer.Run(ctx)
 	})

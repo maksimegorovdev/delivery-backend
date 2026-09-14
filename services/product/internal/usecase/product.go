@@ -11,13 +11,13 @@ type ProductRepo interface {
 }
 
 type ProductUsecase struct {
-	repo ProductRepo
+	products ProductRepo
 }
 
-func NewProductUsecase(productRepo ProductRepo) *ProductUsecase {
-	return &ProductUsecase{repo: productRepo}
+func NewProductUsecase(products ProductRepo) *ProductUsecase {
+	return &ProductUsecase{products: products}
 }
 
 func (uc *ProductUsecase) GetProducts(ctx context.Context, ids []string) ([]domain.Product, error) {
-	return uc.repo.GetByIDs(ctx, ids)
+	return uc.products.GetByIDs(ctx, ids)
 }

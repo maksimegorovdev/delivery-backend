@@ -4,11 +4,6 @@ func New(code Code) *Error {
 	return &Error{Code: code}
 }
 
-func (e *Error) Wrap(err error) *Error {
-	e.Cause = err
-	return e
-}
-
 func (e *Error) WithReason(reason string) *Error {
 	e.Reason = reason
 	return e
@@ -16,6 +11,11 @@ func (e *Error) WithReason(reason string) *Error {
 
 func (e *Error) WithMessage(msg string) *Error {
 	e.Message = msg
+	return e
+}
+
+func (e *Error) Wrap(err error) *Error {
+	e.Cause = err
 	return e
 }
 

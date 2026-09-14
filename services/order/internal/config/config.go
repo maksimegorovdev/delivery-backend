@@ -8,18 +8,22 @@ import (
 )
 
 type Config struct {
-	App        App
-	Log        Log
-	PG         PG
-	GRPCServer GRPCServer
+	App            App
+	Log            Log
+	PG             PG
+	GRPCServer     GRPCServer
+	UserService    UserService
+	ProductService ProductService
 }
 
 func (c Config) Validate() error {
 	return validation.ValidateStruct(&c,
-		validation.Field(&c.App),
-		validation.Field(&c.Log),
-		validation.Field(&c.PG),
-		validation.Field(&c.GRPCServer),
+		validation.Field(&c.App, validation.Required),
+		validation.Field(&c.Log, validation.Required),
+		validation.Field(&c.PG, validation.Required),
+		validation.Field(&c.GRPCServer, validation.Required),
+		validation.Field(&c.UserService, validation.Required),
+		validation.Field(&c.ProductService, validation.Required),
 	)
 }
 
@@ -58,14 +62,34 @@ func (p PG) Validate() error {
 }
 
 type GRPCServer struct {
-	Port       int  `env:"GRPC_SERVER_PORT,required"`
-	Reflection bool `env:"GRPC_SERVER_REFLECTION,required"`
+	Addr       string `env:"GRPC_SERVER_ADDR,required"`
+	Reflection bool   `env:"GRPC_SERVER_REFLECTION,required"`
 }
 
 func (g GRPCServer) Validate() error {
 	return validation.ValidateStruct(&g,
-		validation.Field(&g.Port, validation.Required),
+		validation.Field(&g.Addr, validation.Required),
 		validation.Field(&g.Reflection, validation.Required),
+	)
+}
+
+type UserService struct {
+	Addr string `env:"USER_SERVICE_GRPC_ADDR,required"`
+}
+
+func (u UserService) Validate() error {
+	return validation.ValidateStruct(&u,
+		validation.Field(&u.Addr, validation.Required),
+	)
+}
+
+type ProductService struct {
+	Addr string `env:"PRODUCT_SERVICE_GRPC_ADDR,required"`
+}
+
+func (p ProductService) Validate() error {
+	return validation.ValidateStruct(&p,
+		validation.Field(&p.Addr, validation.Required),
 	)
 }
 

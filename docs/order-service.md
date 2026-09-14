@@ -23,8 +23,8 @@
    `product_id`+`quantity`, а в БД лежат `delivery_address TEXT`,
    `order_items.product_name`, `order_items.unit_price`. Их надо откуда-то взять:
    пользователь и адрес — из `user`-сервиса (`UserService.GetUser`,
-   `AddressService.GetAddress`), товары — из каталога (сервиса пока нет).
-   Это порты, которые объявляет usecase.
+   `AddressService.GetAddress`), товары — из `product`-сервиса
+   (`ProductService.GetProducts`). Это порты, которые объявляет usecase.
 
 Поток:
 
@@ -170,24 +170,38 @@ var (
 ```go
 // internal/domain/user.go — то, что order-у нужно от user-сервиса
 type User struct {
-	ID    string
-	Email string
+	ID        string
+	Email     string
+	FirstName string
+	LastName  string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // internal/domain/address.go
 type Address struct {
-	ID      string
-	UserID  string
-	Address string
+	ID        string
+	UserID    string
+	Address   string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // internal/domain/product.go
 type Product struct {
-	ID    string
-	Name  string
-	Price int64 // копейки
+	ID        string
+	Name      string
+	Price     int64 // копейки
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 ```
+
+Поля 1-в-1 повторяют то, что отдают чужие proto-контракты (`user.v1.User`, `address.v1.Address`,
+`product.v1.Product`) — клиенты (`client/user.go`, `client/product.go`) просто копируют их через
+`protoToXxx`, ничего не отбрасывая. Строго под нужды `CreateOrder` из них реально нужны только
+`Email`/`Address`/`Name`+`Price`, но раз клиент уже мапит остальное однa к одному — держим доменные
+структуры зеркальными к proto, а не урезанными до текущего употребления.
 
 Домен не импортирует `proto`, `pgx`, `grpc`. Только stdlib и `apperr` (как в `platform`).
 
@@ -222,11 +236,10 @@ type UserProvider interface {
 	GetAddress(ctx context.Context, id string) (domain.Address, error)
 }
 
-// каталог товаров: сервиса пока нет.
-// Реализация — статическая заглушка; интерфейс уже правильный,
-// потом подменяешь на gRPC-клиент, usecase не меняется.
+// каталог товаров — GetProducts отдаёт только то, что реально нашлось
+// (slice может быть короче ids), lookup по ProductID собирает usecase.
 type ProductProvider interface {
-	GetProducts(ctx context.Context, ids []string) (map[string]domain.Product, error)
+	GetProducts(ctx context.Context, ids []string) ([]domain.Product, error)
 }
 ```
 
@@ -263,14 +276,26 @@ type CreateOrderItemInput struct {
 	Quantity  int32
 }
 
+// Deps передаём структурой, а не позиционными аргументами — уже 3 порта,
+// дальше будет больше. Значением (не *OrderUsecaseDeps): это просто набор
+// интерфейсов (сами по себе reference types), копировать дёшево, а указатель
+// добавил бы лишнее разыменование и риск nil-panic при OrderUsecaseDeps(nil).
+// В NewOrderUsecase раскладываем Deps в собственные поля структуры — сама
+// OrderUsecase про Deps как тип не знает, снаружи это деталь конструктора.
+type OrderUsecaseDeps struct {
+	Orders   OrderRepo
+	Users    UserProvider
+	Products ProductProvider
+}
+
 type OrderUsecase struct {
 	orders   OrderRepo
 	users    UserProvider
 	products ProductProvider
 }
 
-func NewOrderUsecase(orders OrderRepo, users UserProvider, products ProductProvider) *OrderUsecase {
-	return &OrderUsecase{orders: orders, users: users, products: products}
+func NewOrderUsecase(deps OrderUsecaseDeps) *OrderUsecase {
+	return &OrderUsecase{orders: deps.Orders, users: deps.Users, products: deps.Products}
 }
 
 func (uc *OrderUsecase) CreateOrder(ctx context.Context, in CreateOrderInput) (domain.Order, error) {
@@ -296,10 +321,18 @@ func (uc *OrderUsecase) CreateOrder(ctx context.Context, in CreateOrderInput) (d
 		return domain.Order{}, err
 	}
 
-	// 2. обогащаем позиции данными каталога
+	// 2. обогащаем позиции данными каталога.
+	// GetProducts возвращает slice (см. порт выше) — если продукта нет в базе,
+	// его просто не будет в ответе, поэтому lookup строим через map по ProductID,
+	// а не индексируем catalog по позиции.
+	byID := make(map[string]domain.Product, len(catalog))
+	for _, p := range catalog {
+		byID[p.ID] = p
+	}
+
 	items := make([]domain.OrderItem, 0, len(in.Items))
 	for _, it := range in.Items {
-		p, ok := catalog[it.ProductID]
+		p, ok := byID[it.ProductID]
 		if !ok {
 			return domain.Order{}, apperr.NotFound().Wrap(domain.ErrProductNotFound)
 		}
@@ -659,34 +692,68 @@ func (u *UserClient) GetAddress(ctx context.Context, id string) (domain.Address,
 перевод `status.Error → apperr` — в одном месте, домен получает только нужные поля,
 тесты мокают `UserProvider` (2 метода), а не весь сгенерированный клиент.
 
-`ProductProvider` пока — статическая заглушка, `internal/client/product.go`:
+`product`-сервис уже есть, поэтому `ProductProvider` реализует такой же тонкий gRPC-адаптер,
+как `UserClient` — `internal/client/product.go`:
 
 ```go
-type StaticProductProvider struct {
-	items map[string]domain.Product // из конфига или прямо в коде
+package client
+
+import (
+	"context"
+
+	"google.golang.org/grpc"
+
+	"github.com/maksimegorovdev/delivery-backend/platform/apperr/grpcerr"
+	productv1 "github.com/maksimegorovdev/delivery-backend/proto/gen/go/product/v1"
+	"github.com/maksimegorovdev/delivery-backend/services/order/internal/domain"
+)
+
+func protoToProduct(p *productv1.Product) domain.Product {
+	return domain.Product{
+		ID:        p.GetId(),
+		Name:      p.GetName(),
+		Price:     p.GetPrice(),
+		CreatedAt: p.GetCreatedAt().AsTime(),
+		UpdatedAt: p.GetUpdatedAt().AsTime(),
+	}
 }
 
-func (p *StaticProductProvider) GetProducts(ctx context.Context, ids []string) (map[string]domain.Product, error) {
-	out := make(map[string]domain.Product, len(ids))
-	for _, id := range ids {
-		pr, ok := p.items[id]
-		if !ok {
-			return nil, apperr.NotFound().Wrap(domain.ErrProductNotFound)
-		}
-		out[id] = pr
+type ProductClient struct {
+	products productv1.ProductServiceClient
+}
+
+func NewProductClient(conn *grpc.ClientConn) *ProductClient {
+	return &ProductClient{
+		products: productv1.NewProductServiceClient(conn),
 	}
-	return out, nil
+}
+
+func (c *ProductClient) GetProducts(ctx context.Context, ids []string) ([]domain.Product, error) {
+	resp, err := c.products.GetProducts(ctx, &productv1.GetProductsRequest{
+		Ids: ids,
+	})
+	if err != nil {
+		return nil, grpcerr.Map(err)
+	}
+	products := make([]domain.Product, 0, len(resp.GetProducts()))
+	for _, product := range resp.GetProducts() {
+		products = append(products, protoToProduct(product))
+	}
+	return products, nil
 }
 ```
 
-Появится product-сервис — заменишь на `ProductClient` по образцу `UserClient`.
+Ошибку "не все id нашлись" `ProductClient` не генерирует — сервис просто не возвращает
+отсутствующие товары. Это ответственность usecase: строить `byID`-карту и явно проверять
+каждый запрошенный `ProductID` (см. §4).
 
 ---
 
 ## 9. app.go — проводка
 
 Сейчас `order/internal/app/app.go` не создаёт ни репозиториев, ни usecase, ни роутера.
-Добавляешь по образцу `user/internal/app/app.go`, плюс одно gRPC-соединение к user-сервису:
+Добавляешь по образцу `user/internal/app/app.go`, плюс два gRPC-соединения — к user-сервису
+и к product-сервису:
 
 ```go
 // ... после создания pgPool и grpcServer ...
@@ -700,15 +767,28 @@ if err != nil {
 	return nil, err
 }
 
+// gRPC client → product service
+productConn, err := grpc.NewClient(
+	cfg.ProductService.Addr,
+	grpc.WithTransportCredentials(insecure.NewCredentials()),
+)
+if err != nil {
+	return nil, err
+}
+
 // Repository
 orderRepo := repo.NewOrderRepo(pgPool)
 
 // Providers
-userClient      := client.NewUserClient(userConn)
-productProvider := client.NewStaticProductProvider(cfg.Catalog) // заглушка
+userClient    := client.NewUserClient(userConn)
+productClient := client.NewProductClient(productConn)
 
 // Usecase
-orderUsecase := usecase.NewOrderUsecase(orderRepo, userClient, productProvider)
+orderUsecase := usecase.NewOrderUsecase(usecase.OrderUsecaseDeps{
+	Orders:   orderRepo,
+	Users:    userClient,
+	Products: productClient,
+})
 
 // Router
 grpcrouter.NewRouter(&grpcrouter.RouterDeps{
@@ -717,17 +797,18 @@ grpcrouter.NewRouter(&grpcrouter.RouterDeps{
 })
 
 app := &App{
-	cfg:        cfg,
-	log:        log,
-	pgPool:     pgPool,
-	grpcServer: grpcServer,
-	userConn:   userConn, // закрыть в Close()
+	cfg:         cfg,
+	log:         log,
+	pgPool:      pgPool,
+	grpcServer:  grpcServer,
+	userConn:    userConn,    // закрыть в Close()
+	productConn: productConn, // закрыть в Close()
 }
 ```
 
 `userClient` передаётся в usecase **один раз** — один порт `UserProvider`.
-В `App.Close()` добавить `a.userConn.Close()` перед `a.pgPool.Close()`.
-В `config.Config` добавить `UserService.Addr` (и данные каталога, пока заглушка).
+В `App.Close()` добавить `a.userConn.Close()` и `a.productConn.Close()` перед `a.pgPool.Close()`.
+В `config.Config` добавить `UserService.Addr` и `ProductService.Addr`.
 
 ---
 
@@ -735,16 +816,16 @@ app := &App{
 
 ```
 services/order/internal/
-  app/app.go                    # composition root: +orderRepo +userClient +productProvider
-                                #   +usecase +router +userConn (закрыть в Close)
-  config/config.go              # +UserService.Addr
+  app/app.go                    # composition root: +orderRepo +userClient +productClient
+                                #   +usecase +router +userConn +productConn (закрыть в Close)
+  config/config.go              # +UserService.Addr +ProductService.Addr
   domain/
     order.go                    # Order, OrderItem, OrderStatus, NewOrder (инварианты + total + uuidv7)
-    user.go  address.go  product.go   # маленькие структуры для портов
+    user.go  address.go  product.go   # структуры для портов, зеркальные чужим proto
     errors.go                   # ErrOrderNoItems, ErrProductNotFound
   usecase/
     order.go                    # OrderUsecase + порты OrderRepo/UserProvider/ProductProvider
-                                #   + CreateOrderInput / CreateOrderItemInput
+                                #   + OrderUsecaseDeps + CreateOrderInput / CreateOrderItemInput
   repository/pg/
     order.go                    # OrderRepo.Create (BEGIN/COMMIT) + insertOrder (без RETURNING)
     order_item.go               # insertItems (pgx.Batch, без RETURNING)
@@ -753,7 +834,7 @@ services/order/internal/
     order.go                    # OrderRouter + OrderUsecase iface + orderToProto/statusToProto
   client/
     user.go                     # UserClient (userv1 + addressv1 → domain) реализует UserProvider
-    product.go                  # StaticProductProvider (заглушка) → позже ProductClient
+    product.go                  # ProductClient (productv1 → domain) реализует ProductProvider
 ```
 
 Отличие от `architecture.md`: там `ports/` отдельным пакетом и `adapters/inbound|outbound`.
@@ -784,9 +865,9 @@ services/order/internal/
    (пока с заглушками провайдеров — компилируется и тестируется на моках).
 3. `repository/pg`: `db.go`, `order.go`, `order_item.go`. Проверить `Create` на живой БД.
 4. `client/user.go`: `UserClient` над `userv1` + `addressv1`.
-   `client/product.go`: статическая заглушка.
+   `client/product.go`: `ProductClient` над `productv1`.
 5. `transport/grpc`: `router.go`, `order.go` + мапперы.
-6. `app/app.go` + `config`: проводка, `userConn`, закрытие в `Close()`.
+6. `app/app.go` + `config`: проводка, `userConn` + `productConn`, закрытие в `Close()`.
 7. Проверить сквозь `grpcurl` / gateway: `CreateOrder` → строки в `orders` + `order_items`.
 
 ---

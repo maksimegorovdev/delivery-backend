@@ -9,6 +9,6 @@ type RouterDeps struct {
 	ProductUsecase ProductUsecase
 }
 
-func NewRouter(deps *RouterDeps) {
-	NewProductRoutes(deps.Server, deps.ProductUsecase)
+func NewRouter(deps RouterDeps) {
+	NewProductRouter(deps.Server, deps.ProductUsecase)
 }

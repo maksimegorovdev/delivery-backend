@@ -61,7 +61,7 @@ func New(ctx context.Context) (*App, error) {
 
 	// gRPC Server
 	grpcServer := grpcserver.New(
-		grpcserver.WithPort(cfg.GRPCServer.Port),
+		cfg.GRPCServer.Addr,
 		grpcserver.WithReflection(cfg.GRPCServer.Reflection),
 		grpcserver.WithServerOptions(
 			grpc.ChainUnaryInterceptor(
@@ -79,7 +79,7 @@ func New(ctx context.Context) (*App, error) {
 	productUsecase := usecase.NewProductUsecase(productRepo)
 
 	// Router
-	grpcrouter.NewRouter(&grpcrouter.RouterDeps{
+	grpcrouter.NewRouter(grpcrouter.RouterDeps{
 		Server:         grpcServer.Server(),
 		ProductUsecase: productUsecase,
 	})
@@ -100,11 +100,11 @@ func (a *App) Run(ctx context.Context) error {
 	g.Go(func() error {
 		a.log.Info(
 			"grpc server started",
-			slog.Int("port", a.cfg.GRPCServer.Port),
+			slog.String("addr", a.cfg.GRPCServer.Addr),
 		)
 		defer a.log.Info(
 			"grpc server stopped",
-			slog.Int("port", a.cfg.GRPCServer.Port),
+			slog.String("addr", a.cfg.GRPCServer.Addr),
 		)
 		return a.grpcServer.Run(ctx)
 	})

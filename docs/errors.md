@@ -854,7 +854,7 @@ func FromStatus(err error) *apperr.Error {
 		}
 	}
 
-	out := apperr.New(code, st.Message()).Wrap(err)
+  out := apperr.New(code).WithMessage(st.Message()).Wrap(err)
 	if reason != "" {
 		out.WithReason(reason)
 	}

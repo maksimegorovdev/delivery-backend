@@ -29,7 +29,7 @@ type ProductRouter struct {
 	uc ProductUsecase
 }
 
-func NewProductRoutes(server *grpc.Server, uc ProductUsecase) {
+func NewProductRouter(server *grpc.Server, uc ProductUsecase) {
 	productv1.RegisterProductServiceServer(server, &ProductRouter{uc: uc})
 }
 

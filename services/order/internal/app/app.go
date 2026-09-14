@@ -9,19 +9,26 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 
+	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcclient"
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcserver"
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/interceptors"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
 	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
+	"github.com/maksimegorovdev/delivery-backend/services/order/internal/client"
+	repo "github.com/maksimegorovdev/delivery-backend/services/order/internal/repository/pg"
+	grpcrouter "github.com/maksimegorovdev/delivery-backend/services/order/internal/transport/grpc"
+	"github.com/maksimegorovdev/delivery-backend/services/order/internal/usecase"
 
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/config"
 )
 
 type App struct {
-	cfg        *config.Config
-	log        *slog.Logger
-	pgPool     *pgxpool.Pool
-	grpcServer *grpcserver.Server
+	cfg         *config.Config
+	log         *slog.Logger
+	pgPool      *pgxpool.Pool
+	grpcServer  *grpcserver.Server
+	userConn    *grpc.ClientConn
+	productConn *grpc.ClientConn
 }
 
 func New(ctx context.Context) (*App, error) {
@@ -58,7 +65,7 @@ func New(ctx context.Context) (*App, error) {
 
 	// gRPC Server
 	grpcServer := grpcserver.New(
-		grpcserver.WithPort(cfg.GRPCServer.Port),
+		cfg.GRPCServer.Addr,
 		grpcserver.WithReflection(cfg.GRPCServer.Reflection),
 		grpcserver.WithServerOptions(
 			grpc.ChainUnaryInterceptor(
@@ -69,11 +76,44 @@ func New(ctx context.Context) (*App, error) {
 		),
 	)
 
+	// gRPC Client
+	userConn, err := grpcclient.New(cfg.UserService.Addr)
+	if err != nil {
+		return nil, err
+	}
+
+	productConn, err := grpcclient.New(cfg.ProductService.Addr)
+	if err != nil {
+		return nil, err
+	}
+
+	// Repository
+	orderRepo := repo.NewOrderRepo(pgPool)
+
+	// Provider
+	userClient := client.NewUserClient(userConn)
+	productClient := client.NewProductClient(productConn)
+
+	// Usecase
+	orderUsecase := usecase.NewOrderUsecase(usecase.OrderUsecaseDeps{
+		Orders:   orderRepo,
+		Users:    userClient,
+		Products: productClient,
+	})
+
+	// Router
+	grpcrouter.NewRouter(grpcrouter.RouterDeps{
+		Server:       grpcServer.Server(),
+		OrderUsecase: orderUsecase,
+	})
+
 	app := &App{
-		cfg:        cfg,
-		log:        log,
-		pgPool:     pgPool,
-		grpcServer: grpcServer,
+		cfg:         cfg,
+		log:         log,
+		pgPool:      pgPool,
+		grpcServer:  grpcServer,
+		userConn:    userConn,
+		productConn: productConn,
 	}
 
 	return app, nil
@@ -85,11 +125,11 @@ func (a *App) Run(ctx context.Context) error {
 	g.Go(func() error {
 		a.log.Info(
 			"grpc server started",
-			slog.Int("port", a.cfg.GRPCServer.Port),
+			slog.String("addr", a.cfg.GRPCServer.Addr),
 		)
 		defer a.log.Info(
 			"grpc server stopped",
-			slog.Int("port", a.cfg.GRPCServer.Port),
+			slog.String("addr", a.cfg.GRPCServer.Addr),
 		)
 		return a.grpcServer.Run(ctx)
 	})
@@ -98,6 +138,8 @@ func (a *App) Run(ctx context.Context) error {
 }
 
 func (a *App) Close() error {
+	a.productConn.Close()
+	a.userConn.Close()
 	a.pgPool.Close()
 	return nil
 }

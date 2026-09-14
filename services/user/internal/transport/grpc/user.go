@@ -30,7 +30,7 @@ type UserRouter struct {
 	uc UserUsecase
 }
 
-func NewUserRoutes(server *grpc.Server, uc UserUsecase) {
+func NewUserRouter(server *grpc.Server, uc UserUsecase) {
 	userv1.RegisterUserServiceServer(server, &UserRouter{uc: uc})
 }
 

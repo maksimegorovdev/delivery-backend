@@ -11,13 +11,13 @@ type AddressRepo interface {
 }
 
 type AddressUsecase struct {
-	repo AddressRepo
+	addresses AddressRepo
 }
 
-func NewAddressUsecase(addressRepo AddressRepo) *AddressUsecase {
-	return &AddressUsecase{repo: addressRepo}
+func NewAddressUsecase(addresses AddressRepo) *AddressUsecase {
+	return &AddressUsecase{addresses: addresses}
 }
 
 func (uc *AddressUsecase) GetAddress(ctx context.Context, id string) (domain.Address, error) {
-	return uc.repo.GetByID(ctx, id)
+	return uc.addresses.GetByID(ctx, id)
 }

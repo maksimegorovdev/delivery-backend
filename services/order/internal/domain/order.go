@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"time"
+	"uuid"
+)
 
 type OrderStatus string
 
@@ -40,4 +43,32 @@ type Order struct {
 	DeliveryAddress string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+}
+
+func NewOrder(userID string, deliveryAddress string, items []OrderItem) (Order, error) {
+	if len(items) == 0 {
+		return Order{}, ErrOrderNoItems
+	}
+
+	id := uuid.NewV7().String()
+	now := time.Now().UTC()
+	var total int64
+	for i := range items {
+		items[i].ID = uuid.NewV7().String()
+		items[i].OrderID = id
+		items[i].CreatedAt = now
+		items[i].UpdatedAt = now
+		total += items[i].Subtotal()
+	}
+
+	return Order{
+		ID:              id,
+		UserID:          userID,
+		Status:          OrderStatusCreated,
+		Items:           items,
+		TotalAmount:     total,
+		DeliveryAddress: deliveryAddress,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}, nil
 }

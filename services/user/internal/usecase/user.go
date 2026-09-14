@@ -11,13 +11,13 @@ type UserRepo interface {
 }
 
 type UserUsecase struct {
-	repo UserRepo
+	users UserRepo
 }
 
-func NewUserUsecase(userRepo UserRepo) *UserUsecase {
-	return &UserUsecase{repo: userRepo}
+func NewUserUsecase(users UserRepo) *UserUsecase {
+	return &UserUsecase{users: users}
 }
 
 func (uc *UserUsecase) GetUser(ctx context.Context, id string) (domain.User, error) {
-	return uc.repo.GetByID(ctx, id)
+	return uc.users.GetByID(ctx, id)
 }

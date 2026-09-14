@@ -29,7 +29,7 @@ type AddressRouter struct {
 	uc AddressUsecase
 }
 
-func NewAddressRoutes(server *grpc.Server, uc AddressUsecase) {
+func NewAddressRouter(server *grpc.Server, uc AddressUsecase) {
 	addressv1.RegisterAddressServiceServer(server, &AddressRouter{uc: uc})
 }
 

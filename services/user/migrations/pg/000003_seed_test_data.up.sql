@@ -13,7 +13,7 @@ demo_user AS (
     FROM users
     WHERE email = 'demo@example.com'
     LIMIT 1
-);
+)
 
 INSERT INTO addresses (user_id, address)
 SELECT

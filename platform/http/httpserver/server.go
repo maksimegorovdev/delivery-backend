@@ -6,31 +6,26 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 )
 
 const (
-	defaultHost            = ""
-	defaultPort            = 8080
 	defaultShutdownTimeout = 10 * time.Second
 )
 
 type Server struct {
 	server          *http.Server
 	router          *chi.Mux
-	host            string
-	port            int
+	addr            string
 	shutdownTimeout time.Duration
 }
 
-func New(opts ...Option) *Server {
+func New(addr string, opts ...Option) *Server {
 	srv := &Server{
 		router:          chi.NewRouter(),
-		host:            defaultHost,
-		port:            defaultPort,
+		addr:            addr,
 		shutdownTimeout: defaultShutdownTimeout,
 	}
 
@@ -50,7 +45,7 @@ func (s *Server) Router() *chi.Mux {
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	lis, err := net.Listen("tcp", net.JoinHostPort(s.host, strconv.Itoa(s.port)))
+	lis, err := net.Listen("tcp", s.addr)
 	if err != nil {
 		return fmt.Errorf("httpserver: listen: %w", err)
 	}
