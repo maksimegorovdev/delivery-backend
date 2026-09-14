@@ -43,7 +43,7 @@ migrate-down:
 .PHONY: migrate-up
 
 grpcui:
-	$(GRPCUI) -plaintext 'localhost:$(GRPC_SERVER_PORT)'
+	$(GRPCUI) -plaintext '$(GRPC_SERVER_ADDR)'
 .PHONY: grpcui
 
 run:

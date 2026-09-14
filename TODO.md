@@ -9,10 +9,12 @@
 - [x] grpcui для user-service
 - [x] grpcui для order-service
 - [x] Сделать минимальный сервис product service для выдачи информации по id продуктов
+- [x] Clean Architecture для order-service (handler, service, domain, repository)
+- [x] Подготовить таблицы для миграции в Postgres
+- [ ] В order service улучшить описания ошибок типа Not found user, not found product итд (сейчас просто not found общий приходит)
+- [ ] Попробовать внедрить Taskfile вместо Makefile
 - [ ] Middlewares (logger, request_id итд)
 - [ ] Interceptors для grpc
-- [ ] Подготовить таблицы для миграции в Postgres
-- [ ] Clean Architecture для order-service (handler, service, domain, repository)
 - [ ] Swagger для gateway-service
 - [ ] Пакет для единого ответа json
 - [ ] Пакет kafka
@@ -26,4 +28,3 @@
 - [ ] CHECK в миграциях БД до конца проставить, разобраться с этим (пока делаю минимально)
 - [ ] Внедрить идемпотентность
 - [ ] Redis для быстрой выдачи информации по продуктам (Redis, Singleflight)
-- [ ] Попробовать внедрить Taskfile вместо Makefile

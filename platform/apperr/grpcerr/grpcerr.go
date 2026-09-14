@@ -19,13 +19,14 @@ func Map(err error) error {
 	}
 
 	code := apperr.CodeFromGRPC(st.Code())
-	var reason string
+	var msg, reason string
 	var violations []apperr.Violation
 
 	for _, d := range st.Details() {
 		switch t := d.(type) {
 		case *errdetails.ErrorInfo:
 			if t.GetDomain() == Domain {
+				msg = st.Message()
 				if r := t.GetReason(); r != "" {
 					code = apperr.Code(r)
 				}
@@ -41,7 +42,7 @@ func Map(err error) error {
 		}
 	}
 
-	out := apperr.New(code).WithMessage(st.Message()).Wrap(err)
+	out := apperr.New(code).WithMessage(msg).Wrap(err)
 	if reason != "" {
 		out.WithReason(reason)
 	}
