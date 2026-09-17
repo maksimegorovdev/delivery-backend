@@ -11,12 +11,12 @@
 - [x] Сделать минимальный сервис product service для выдачи информации по id продуктов
 - [x] Clean Architecture для order-service (handler, service, domain, repository)
 - [x] Подготовить таблицы для миграции в Postgres
+- [x] Swagger для gateway-service
+- [x] Пакет для единого ответа json
 - [ ] В order service улучшить описания ошибок типа Not found user, not found product итд (сейчас просто not found общий приходит)
 - [ ] Попробовать внедрить Taskfile вместо Makefile
 - [ ] Middlewares (logger, request_id итд)
 - [ ] Interceptors для grpc
-- [ ] Swagger для gateway-service
-- [ ] Пакет для единого ответа json
 - [ ] Пакет kafka
 - [ ] Debezium поднять
 - [ ] Clean Architecture для notification-service (handler, service, domain, repository)
@@ -28,3 +28,4 @@
 - [ ] CHECK в миграциях БД до конца проставить, разобраться с этим (пока делаю минимально)
 - [ ] Внедрить идемпотентность
 - [ ] Redis для быстрой выдачи информации по продуктам (Redis, Singleflight)
+- [ ] Причесать swagger до конца

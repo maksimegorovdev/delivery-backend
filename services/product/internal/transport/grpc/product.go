@@ -14,16 +14,6 @@ type ProductUsecase interface {
 	GetProducts(ctx context.Context, ids []string) ([]domain.Product, error)
 }
 
-func productToProto(p domain.Product) *productv1.Product {
-	return &productv1.Product{
-		Id:        p.ID,
-		Name:      p.Name,
-		Price:     p.Price,
-		CreatedAt: timestamppb.New(p.CreatedAt),
-		UpdatedAt: timestamppb.New(p.UpdatedAt),
-	}
-}
-
 type ProductRouter struct {
 	productv1.UnimplementedProductServiceServer
 	uc ProductUsecase
@@ -46,4 +36,14 @@ func (r *ProductRouter) GetProducts(ctx context.Context, req *productv1.GetProdu
 		resp.Products = append(resp.Products, productToProto(product))
 	}
 	return resp, nil
+}
+
+func productToProto(p domain.Product) *productv1.Product {
+	return &productv1.Product{
+		Id:        p.ID,
+		Name:      p.Name,
+		Price:     p.Price,
+		CreatedAt: timestamppb.New(p.CreatedAt),
+		UpdatedAt: timestamppb.New(p.UpdatedAt),
+	}
 }

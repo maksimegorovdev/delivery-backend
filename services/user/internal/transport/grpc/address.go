@@ -14,16 +14,6 @@ type AddressUsecase interface {
 	GetAddress(ctx context.Context, id string) (domain.Address, error)
 }
 
-func addressToProto(a domain.Address) *addressv1.Address {
-	return &addressv1.Address{
-		Id:        a.ID,
-		UserId:    a.UserID,
-		Address:   a.Address,
-		CreatedAt: timestamppb.New(a.CreatedAt),
-		UpdatedAt: timestamppb.New(a.UpdatedAt),
-	}
-}
-
 type AddressRouter struct {
 	addressv1.UnimplementedAddressServiceServer
 	uc AddressUsecase
@@ -39,4 +29,14 @@ func (r *AddressRouter) GetAddress(ctx context.Context, req *addressv1.GetAddres
 		return nil, err
 	}
 	return &addressv1.GetAddressResponse{Address: addressToProto(address)}, nil
+}
+
+func addressToProto(a domain.Address) *addressv1.Address {
+	return &addressv1.Address{
+		Id:        a.ID,
+		UserId:    a.UserID,
+		Address:   a.Address,
+		CreatedAt: timestamppb.New(a.CreatedAt),
+		UpdatedAt: timestamppb.New(a.UpdatedAt),
+	}
 }

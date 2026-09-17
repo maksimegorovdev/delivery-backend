@@ -59,6 +59,12 @@ func New(ctx context.Context) (*App, error) {
 		return nil, err
 	}
 
+	// Repository
+	productRepo := repo.NewProductRepo(pgPool)
+
+	// Usecase
+	productUsecase := usecase.NewProductUsecase(productRepo)
+
 	// gRPC Server
 	grpcServer := grpcserver.New(
 		cfg.GRPCServer.Addr,
@@ -71,12 +77,6 @@ func New(ctx context.Context) (*App, error) {
 			),
 		),
 	)
-
-	// Repository
-	productRepo := repo.NewProductRepo(pgPool)
-
-	// Usecase
-	productUsecase := usecase.NewProductUsecase(productRepo)
 
 	// Router
 	grpcrouter.NewRouter(grpcrouter.RouterDeps{

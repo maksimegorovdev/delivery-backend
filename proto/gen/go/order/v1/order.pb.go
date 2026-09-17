@@ -99,8 +99,6 @@ type OrderItem struct {
 	ProductName   string                 `protobuf:"bytes,3,opt,name=product_name,json=productName,proto3" json:"product_name,omitempty"`
 	Quantity      int32                  `protobuf:"varint,4,opt,name=quantity,proto3" json:"quantity,omitempty"`
 	UnitPrice     int64                  `protobuf:"varint,5,opt,name=unit_price,json=unitPrice,proto3" json:"unit_price,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -168,20 +166,6 @@ func (x *OrderItem) GetUnitPrice() int64 {
 		return x.UnitPrice
 	}
 	return 0
-}
-
-func (x *OrderItem) GetCreatedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.CreatedAt
-	}
-	return nil
-}
-
-func (x *OrderItem) GetUpdatedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.UpdatedAt
-	}
-	return nil
 }
 
 type Order struct {
@@ -288,7 +272,7 @@ var File_order_v1_order_proto protoreflect.FileDescriptor
 
 const file_order_v1_order_proto_rawDesc = "" +
 	"\n" +
-	"\x14order/v1/order.proto\x12\border.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x8e\x02\n" +
+	"\x14order/v1/order.proto\x12\border.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x98\x01\n" +
 	"\tOrderItem\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -296,11 +280,7 @@ const file_order_v1_order_proto_rawDesc = "" +
 	"\fproduct_name\x18\x03 \x01(\tR\vproductName\x12\x1a\n" +
 	"\bquantity\x18\x04 \x01(\x05R\bquantity\x12\x1d\n" +
 	"\n" +
-	"unit_price\x18\x05 \x01(\x03R\tunitPrice\x129\n" +
-	"\n" +
-	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
-	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xce\x02\n" +
+	"unit_price\x18\x05 \x01(\x03R\tunitPrice\"\xce\x02\n" +
 	"\x05Order\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12-\n" +
@@ -347,17 +327,15 @@ var file_order_v1_order_proto_goTypes = []any{
 	(*timestamppb.Timestamp)(nil), // 3: google.protobuf.Timestamp
 }
 var file_order_v1_order_proto_depIdxs = []int32{
-	3, // 0: order.v1.OrderItem.created_at:type_name -> google.protobuf.Timestamp
-	3, // 1: order.v1.OrderItem.updated_at:type_name -> google.protobuf.Timestamp
-	0, // 2: order.v1.Order.status:type_name -> order.v1.OrderStatus
-	1, // 3: order.v1.Order.items:type_name -> order.v1.OrderItem
-	3, // 4: order.v1.Order.created_at:type_name -> google.protobuf.Timestamp
-	3, // 5: order.v1.Order.updated_at:type_name -> google.protobuf.Timestamp
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	0, // 0: order.v1.Order.status:type_name -> order.v1.OrderStatus
+	1, // 1: order.v1.Order.items:type_name -> order.v1.OrderItem
+	3, // 2: order.v1.Order.created_at:type_name -> google.protobuf.Timestamp
+	3, // 3: order.v1.Order.updated_at:type_name -> google.protobuf.Timestamp
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_order_v1_order_proto_init() }

@@ -10,16 +10,6 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/domain"
 )
 
-func protoToProduct(p *productv1.Product) domain.Product {
-	return domain.Product{
-		ID:        p.GetId(),
-		Name:      p.GetName(),
-		Price:     p.GetPrice(),
-		CreatedAt: p.GetCreatedAt().AsTime(),
-		UpdatedAt: p.GetUpdatedAt().AsTime(),
-	}
-}
-
 type ProductClient struct {
 	products productv1.ProductServiceClient
 }
@@ -42,4 +32,14 @@ func (c *ProductClient) GetProducts(ctx context.Context, ids []string) ([]domain
 		products = append(products, protoToProduct(product))
 	}
 	return products, nil
+}
+
+func protoToProduct(p *productv1.Product) domain.Product {
+	return domain.Product{
+		ID:        p.GetId(),
+		Name:      p.GetName(),
+		Price:     p.GetPrice(),
+		CreatedAt: p.GetCreatedAt().AsTime(),
+		UpdatedAt: p.GetUpdatedAt().AsTime(),
+	}
 }

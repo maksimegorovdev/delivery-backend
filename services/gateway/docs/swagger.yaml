@@ -1,0 +1,128 @@
+basePath: /api
+definitions:
+  apperr.Violation:
+    properties:
+      field:
+        type: string
+      message:
+        type: string
+    type: object
+  internal_transport_http_v1_order.CreateOrderItemDTO:
+    properties:
+      product_id:
+        type: string
+      quantity:
+        type: integer
+    type: object
+  internal_transport_http_v1_order.CreateOrderRequestDTO:
+    properties:
+      address_id:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/internal_transport_http_v1_order.CreateOrderItemDTO'
+        type: array
+    type: object
+  internal_transport_http_v1_order.OrderItemResponseDTO:
+    properties:
+      id:
+        type: string
+      product_id:
+        type: string
+      product_name:
+        type: string
+      quantity:
+        type: integer
+      unit_price:
+        type: integer
+    type: object
+  internal_transport_http_v1_order.OrderResponseDTO:
+    properties:
+      created_at:
+        type: string
+      delivery_address:
+        type: string
+      id:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/internal_transport_http_v1_order.OrderItemResponseDTO'
+        type: array
+      status:
+        type: string
+      total_amount:
+        type: integer
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  response.Envelope:
+    properties:
+      data: {}
+      error:
+        $ref: '#/definitions/response.ErrorBody'
+      meta:
+        $ref: '#/definitions/response.Meta'
+    type: object
+  response.ErrorBody:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+      reason:
+        type: string
+      violations:
+        items:
+          $ref: '#/definitions/apperr.Violation'
+        type: array
+    type: object
+  response.Meta:
+    properties:
+      request_id:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: These are microservices for delivery on Go
+  title: Swagger Go Delivery Microservices API
+  version: "1.0"
+paths:
+  /v1/orders:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new order with the provided details
+      parameters:
+      - description: Order data
+        in: body
+        name: order
+        required: true
+        schema:
+          $ref: '#/definitions/internal_transport_http_v1_order.CreateOrderRequestDTO'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_transport_http_v1_order.OrderResponseDTO'
+              type: object
+        default:
+          description: ""
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                error:
+                  $ref: '#/definitions/response.ErrorBody'
+              type: object
+      summary: Create an order
+      tags:
+      - orders
+swagger: "2.0"

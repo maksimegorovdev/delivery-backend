@@ -7,6 +7,17 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/domain"
 )
 
+type CreateOrderItemInput struct {
+	ProductID string
+	Quantity  int32
+}
+
+type CreateOrderInput struct {
+	UserID    string
+	AddressID string
+	Items     []CreateOrderItemInput
+}
+
 type OrderRepo interface {
 	Create(ctx context.Context, order domain.Order) error
 }
@@ -18,17 +29,6 @@ type UserProvider interface {
 
 type ProductProvider interface {
 	GetProducts(ctx context.Context, ids []string) ([]domain.Product, error)
-}
-
-type CreateOrderInput struct {
-	UserID    string
-	AddressID string
-	Items     []CreateOrderItemInput
-}
-
-type CreateOrderItemInput struct {
-	ProductID string
-	Quantity  int32
 }
 
 type OrderUsecaseDeps struct {

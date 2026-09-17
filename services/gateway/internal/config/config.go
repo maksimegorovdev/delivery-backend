@@ -8,9 +8,11 @@ import (
 )
 
 type Config struct {
-	App  App
-	Log  Log
-	HTTP HTTP
+	App          App
+	Log          Log
+	HTTP         HTTP
+	OrderService OrderService
+	FakeAuth     FakeAuth
 }
 
 func (c Config) Validate() error {
@@ -18,6 +20,7 @@ func (c Config) Validate() error {
 		validation.Field(&c.App, validation.Required),
 		validation.Field(&c.Log, validation.Required),
 		validation.Field(&c.HTTP, validation.Required),
+		validation.Field(&c.FakeAuth, validation.Required),
 	)
 }
 
@@ -52,6 +55,27 @@ func (h HTTP) Validate() error {
 		validation.Field(&h.Addr, validation.Required),
 	)
 }
+
+type OrderService struct {
+	Addr string `env:"ORDER_SERVICE_GRPC_ADDR,required"`
+}
+
+func (o OrderService) Validate() error {
+	return validation.ValidateStruct(&o,
+		validation.Field(&o.Addr, validation.Required),
+	)
+}
+
+type FakeAuth struct {
+	UserID string `env:"FAKE_AUTH_USER_ID,required"`
+}
+
+func (f FakeAuth) Validate() error {
+	return validation.ValidateStruct(&f,
+		validation.Field(&f.UserID, validation.Required),
+	)
+}
+
 func New() (*Config, error) {
 	var cfg Config
 	if err := env.Parse(&cfg); err != nil {

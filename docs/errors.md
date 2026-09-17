@@ -874,7 +874,7 @@ func FromStatus(err error) *apperr.Error {
 (сосед `grpcserver`, а не под-пакет `apperr` — интерсепторам нужны `slog.Logger`
 и `protovalidate.Validator`, которые ядру ошибок ни к чему):
 
-- **`Error()`** (`error.go`) — только перевод. Ничего не логирует. `e := apperr.From(err)`,
+- **`Error()`** (`error_box.go`) — только перевод. Ничего не логирует. `e := apperr.From(err)`,
   `status.New(e.Code.GRPC(), e.Public())`, деталь `errdetails.ErrorInfo{Reason: string(e.Code),
   Domain: grpcerr.Domain}` (+ `Metadata: {"reason": e.Reason}`, если задан) и
   `errdetails.BadRequest` из `e.Violations`, если есть. Возвращает `st.Err()`.
@@ -898,7 +898,7 @@ func FromStatus(err error) *apperr.Error {
   сообщения — один экземпляр валиден для всех методов сервиса.
 
 ```go
-// platform/grpc/interceptors/error.go
+// platform/grpc/interceptors/error_box.go
 package interceptors
 
 import (

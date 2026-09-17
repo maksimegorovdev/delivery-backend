@@ -15,56 +15,6 @@ type OrderUsecase interface {
 	CreateOrder(ctx context.Context, input usecase.CreateOrderInput) (domain.Order, error)
 }
 
-func statusToProto(status domain.OrderStatus) orderv1.OrderStatus {
-	switch status {
-	case domain.OrderStatusCreated:
-		return orderv1.OrderStatus_ORDER_STATUS_CREATED
-	case domain.OrderStatusPaid:
-		return orderv1.OrderStatus_ORDER_STATUS_PAID
-	case domain.OrderStatusConfirmed:
-		return orderv1.OrderStatus_ORDER_STATUS_CONFIRMED
-	case domain.OrderStatusAssembling:
-		return orderv1.OrderStatus_ORDER_STATUS_ASSEMBLING
-	case domain.OrderStatusAssembled:
-		return orderv1.OrderStatus_ORDER_STATUS_ASSEMBLED
-	case domain.OrderStatusCourierAssigned:
-		return orderv1.OrderStatus_ORDER_STATUS_COURIER_ASSIGNED
-	case domain.OrderStatusDelivering:
-		return orderv1.OrderStatus_ORDER_STATUS_DELIVERING
-	case domain.OrderStatusDelivered:
-		return orderv1.OrderStatus_ORDER_STATUS_DELIVERED
-	case domain.OrderStatusCanceled:
-		return orderv1.OrderStatus_ORDER_STATUS_CANCELED
-	default:
-		return orderv1.OrderStatus_ORDER_STATUS_UNSPECIFIED
-	}
-}
-
-func orderToProto(o domain.Order) *orderv1.Order {
-	items := make([]*orderv1.OrderItem, 0, len(o.Items))
-	for _, item := range o.Items {
-		items = append(items, &orderv1.OrderItem{
-			Id:          item.ID,
-			ProductId:   item.ProductID,
-			ProductName: item.ProductName,
-			Quantity:    item.Quantity,
-			UnitPrice:   item.UnitPrice,
-			CreatedAt:   timestamppb.New(item.CreatedAt),
-			UpdatedAt:   timestamppb.New(item.UpdatedAt),
-		})
-	}
-	return &orderv1.Order{
-		Id:              o.ID,
-		UserId:          o.UserID,
-		Status:          statusToProto(o.Status),
-		Items:           items,
-		TotalAmount:     o.TotalAmount,
-		DeliveryAddress: o.DeliveryAddress,
-		CreatedAt:       timestamppb.New(o.CreatedAt),
-		UpdatedAt:       timestamppb.New(o.UpdatedAt),
-	}
-}
-
 type OrderRouter struct {
 	orderv1.OrderServiceServer
 	uc OrderUsecase
@@ -92,4 +42,52 @@ func (r *OrderRouter) CreateOrder(ctx context.Context, req *orderv1.CreateOrderR
 		return nil, err
 	}
 	return &orderv1.CreateOrderResponse{Order: orderToProto(order)}, nil
+}
+
+func orderToProto(o domain.Order) *orderv1.Order {
+	items := make([]*orderv1.OrderItem, 0, len(o.Items))
+	for _, item := range o.Items {
+		items = append(items, &orderv1.OrderItem{
+			Id:          item.ID,
+			ProductId:   item.ProductID,
+			ProductName: item.ProductName,
+			Quantity:    item.Quantity,
+			UnitPrice:   item.UnitPrice,
+		})
+	}
+	return &orderv1.Order{
+		Id:              o.ID,
+		UserId:          o.UserID,
+		Status:          statusToProto(o.Status),
+		Items:           items,
+		TotalAmount:     o.TotalAmount,
+		DeliveryAddress: o.DeliveryAddress,
+		CreatedAt:       timestamppb.New(o.CreatedAt),
+		UpdatedAt:       timestamppb.New(o.UpdatedAt),
+	}
+}
+
+func statusToProto(status domain.OrderStatus) orderv1.OrderStatus {
+	switch status {
+	case domain.OrderStatusCreated:
+		return orderv1.OrderStatus_ORDER_STATUS_CREATED
+	case domain.OrderStatusPaid:
+		return orderv1.OrderStatus_ORDER_STATUS_PAID
+	case domain.OrderStatusConfirmed:
+		return orderv1.OrderStatus_ORDER_STATUS_CONFIRMED
+	case domain.OrderStatusAssembling:
+		return orderv1.OrderStatus_ORDER_STATUS_ASSEMBLING
+	case domain.OrderStatusAssembled:
+		return orderv1.OrderStatus_ORDER_STATUS_ASSEMBLED
+	case domain.OrderStatusCourierAssigned:
+		return orderv1.OrderStatus_ORDER_STATUS_COURIER_ASSIGNED
+	case domain.OrderStatusDelivering:
+		return orderv1.OrderStatus_ORDER_STATUS_DELIVERING
+	case domain.OrderStatusDelivered:
+		return orderv1.OrderStatus_ORDER_STATUS_DELIVERED
+	case domain.OrderStatusCanceled:
+		return orderv1.OrderStatus_ORDER_STATUS_CANCELED
+	default:
+		return orderv1.OrderStatus_ORDER_STATUS_UNSPECIFIED
+	}
 }

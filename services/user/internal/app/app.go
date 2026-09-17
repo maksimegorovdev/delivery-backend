@@ -58,6 +58,14 @@ func New(ctx context.Context) (*App, error) {
 		return nil, err
 	}
 
+	// Repository
+	userRepo := repo.NewUserRepo(pgPool)
+	addressRepo := repo.NewAddressRepo(pgPool)
+
+	// Usecase
+	userUsecase := usecase.NewUserUsecase(userRepo)
+	addressUsecase := usecase.NewAddressUsecase(addressRepo)
+
 	// gRPC Server
 	grpcServer := grpcserver.New(
 		cfg.GRPCServer.Addr,
@@ -70,14 +78,6 @@ func New(ctx context.Context) (*App, error) {
 			),
 		),
 	)
-
-	// Repository
-	userRepo := repo.NewUserRepo(pgPool)
-	addressRepo := repo.NewAddressRepo(pgPool)
-
-	// Usecase
-	userUsecase := usecase.NewUserUsecase(userRepo)
-	addressUsecase := usecase.NewAddressUsecase(addressRepo)
 
 	// Router
 	grpcrouter.NewRouter(grpcrouter.RouterDeps{

@@ -14,17 +14,6 @@ type UserUsecase interface {
 	GetUser(ctx context.Context, id string) (domain.User, error)
 }
 
-func userToProto(u domain.User) *userv1.User {
-	return &userv1.User{
-		Id:        u.ID,
-		Email:     u.Email,
-		FirstName: u.FirstName,
-		LastName:  u.LastName,
-		CreatedAt: timestamppb.New(u.CreatedAt),
-		UpdatedAt: timestamppb.New(u.UpdatedAt),
-	}
-}
-
 type UserRouter struct {
 	userv1.UnimplementedUserServiceServer
 	uc UserUsecase
@@ -40,4 +29,15 @@ func (r *UserRouter) GetUser(ctx context.Context, req *userv1.GetUserRequest) (*
 		return nil, err
 	}
 	return &userv1.GetUserResponse{User: userToProto(user)}, nil
+}
+
+func userToProto(u domain.User) *userv1.User {
+	return &userv1.User{
+		Id:        u.ID,
+		Email:     u.Email,
+		FirstName: u.FirstName,
+		LastName:  u.LastName,
+		CreatedAt: timestamppb.New(u.CreatedAt),
+		UpdatedAt: timestamppb.New(u.UpdatedAt),
+	}
 }

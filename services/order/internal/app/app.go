@@ -63,19 +63,6 @@ func New(ctx context.Context) (*App, error) {
 		return nil, err
 	}
 
-	// gRPC Server
-	grpcServer := grpcserver.New(
-		cfg.GRPCServer.Addr,
-		grpcserver.WithReflection(cfg.GRPCServer.Reflection),
-		grpcserver.WithServerOptions(
-			grpc.ChainUnaryInterceptor(
-				interceptors.Error(),
-				interceptors.Logger(log),
-				interceptors.Validation(validator),
-			),
-		),
-	)
-
 	// gRPC Client
 	userConn, err := grpcclient.New(cfg.UserService.Addr)
 	if err != nil {
@@ -100,6 +87,19 @@ func New(ctx context.Context) (*App, error) {
 		Users:    userClient,
 		Products: productClient,
 	})
+
+	// gRPC Server
+	grpcServer := grpcserver.New(
+		cfg.GRPCServer.Addr,
+		grpcserver.WithReflection(cfg.GRPCServer.Reflection),
+		grpcserver.WithServerOptions(
+			grpc.ChainUnaryInterceptor(
+				interceptors.Error(),
+				interceptors.Logger(log),
+				interceptors.Validation(validator),
+			),
+		),
+	)
 
 	// Router
 	grpcrouter.NewRouter(grpcrouter.RouterDeps{
@@ -138,8 +138,15 @@ func (a *App) Run(ctx context.Context) error {
 }
 
 func (a *App) Close() error {
-	a.productConn.Close()
-	a.userConn.Close()
+	if err := a.productConn.Close(); err != nil {
+		return err
+	}
+
+	if err := a.userConn.Close(); err != nil {
+		return err
+	}
+
 	a.pgPool.Close()
+
 	return nil
 }

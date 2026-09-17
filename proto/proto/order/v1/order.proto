@@ -23,8 +23,6 @@ message OrderItem {
   string product_name = 3;
   int32 quantity = 4;
   int64 unit_price = 5;
-  google.protobuf.Timestamp created_at = 6;
-  google.protobuf.Timestamp updated_at = 7;
 }
 
 message Order {
