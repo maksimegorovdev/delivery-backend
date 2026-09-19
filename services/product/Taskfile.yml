@@ -1,0 +1,72 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+dotenv: ['.env']
+
+vars:
+  LOCAL_BIN: '{{.TASKFILE_DIR}}/bin'
+  GOLANGCI_LINT_VERSION: v2.13.1
+  MIGRATE_VERSION: v4.19.1
+  GRPCUI_VERSION: v1.5.3
+  AIR_VERSION: v1.63.0
+  MIGRATIONS_DIR: migrations/pg
+
+tasks:
+  tools:
+    desc: Install local dev tools into ./bin
+    env:
+      GOBIN: '{{.LOCAL_BIN}}'
+    cmds:
+      - curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b {{.LOCAL_BIN}} {{.GOLANGCI_LINT_VERSION}}
+      - go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@{{.MIGRATE_VERSION}}
+      - go install github.com/fullstorydev/grpcui/cmd/grpcui@{{.GRPCUI_VERSION}}
+      - go install github.com/air-verse/air@{{.AIR_VERSION}}
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - '{{.LOCAL_BIN}}/golangci-lint run'
+
+  lint-fix:
+    desc: Run golangci-lint with autofix
+    cmds:
+      - '{{.LOCAL_BIN}}/golangci-lint run --fix'
+
+  migrate-create:
+    desc: Create a new migration file (prompts for a name)
+    cmds:
+      - |
+        read -p "Enter migration name: " name; \
+        [ -n "$name" ] || { echo "migration name is required"; exit 1; }; \
+        {{.LOCAL_BIN}}/migrate create -ext sql -dir {{.MIGRATIONS_DIR}} -seq "$name"
+
+  migrate-up:
+    desc: Apply all up migrations
+    cmds:
+      - "{{.LOCAL_BIN}}/migrate -database '{{.PG_DSN}}' -path {{.MIGRATIONS_DIR}} up"
+
+  migrate-down:
+    desc: Roll back all migrations
+    cmds:
+      - "{{.LOCAL_BIN}}/migrate -database '{{.PG_DSN}}' -path {{.MIGRATIONS_DIR}} down"
+
+  grpcui:
+    desc: Open grpcui against the local gRPC server
+    cmds:
+      - "{{.LOCAL_BIN}}/grpcui -plaintext '{{.GRPC_SERVER_ADDR}}'"
+
+  run:
+    desc: Run the service without hot-reload
+    cmds:
+      - go run cmd/main.go
+
+  watch:
+    desc: Run the service with hot-reload via Air
+    cmds:
+      - '{{.LOCAL_BIN}}/air -c .air.toml'
+
+  tidy:
+    desc: Tidy go.mod/go.sum
+    cmds:
+      - go mod tidy

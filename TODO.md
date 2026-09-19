@@ -13,10 +13,11 @@
 - [x] Подготовить таблицы для миграции в Postgres
 - [x] Swagger для gateway-service
 - [x] Пакет для единого ответа json
-- [ ] В order service улучшить описания ошибок типа Not found user, not found product итд (сейчас просто not found общий приходит)
-- [ ] Попробовать внедрить Taskfile вместо Makefile
-- [ ] Middlewares (logger, request_id итд)
+- [x] Попробовать внедрить Taskfile вместо Makefile
+- [x] Внедрить Air для reload при измении
+- [x] Middlewares (logger, request_id итд)
 - [ ] Interceptors для grpc
+- [ ] В order service улучшить описания ошибок типа Not found user, not found product итд (сейчас просто not found общий приходит)
 - [ ] Пакет kafka
 - [ ] Debezium поднять
 - [ ] Clean Architecture для notification-service (handler, service, domain, repository)

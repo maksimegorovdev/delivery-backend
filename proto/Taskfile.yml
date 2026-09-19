@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  LOCAL_BIN: '{{.TASKFILE_DIR}}/bin'
+  BUF_VERSION: v1.72.0
+  PROTOC_GEN_GO_VERSION: v1.36.12
+  PROTOC_GEN_GO_GRPC_VERSION: v1.6.2
+  PROTOVALIDATE_VERSION: v1.2.2
+
+tasks:
+  tools:
+    desc: Install local dev tools into ./bin
+    env:
+      GOBIN: '{{.LOCAL_BIN}}'
+    cmds:
+      - go install github.com/bufbuild/buf/cmd/buf@{{.BUF_VERSION}}
+      - go install google.golang.org/protobuf/cmd/protoc-gen-go@{{.PROTOC_GEN_GO_VERSION}}
+      - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@{{.PROTOC_GEN_GO_GRPC_VERSION}}
+
+  buf-export:
+    desc: Export protovalidate proto files into third_party
+    cmds:
+      - >-
+        {{.LOCAL_BIN}}/buf export
+        https://github.com/bufbuild/protovalidate.git#subdir=proto/protovalidate,tag={{.PROTOVALIDATE_VERSION}}
+        --path buf/validate
+        -o third_party/protovalidate
+
+  generate:
+    desc: Generate Go code from proto files
+    cmds:
+      - PATH="{{.LOCAL_BIN}}:$PATH" {{.LOCAL_BIN}}/buf generate
+
+  lint:
+    desc: Run buf lint
+    cmds:
+      - '{{.LOCAL_BIN}}/buf lint'
+
+  format:
+    desc: Format proto files with buf
+    cmds:
+      - '{{.LOCAL_BIN}}/buf format -w'
+
+  breaking:
+    desc: Check for breaking changes against main
+    cmds:
+      - "{{.LOCAL_BIN}}/buf breaking --against '.git#branch=main'"
+
+  tidy:
+    desc: Tidy go.mod/go.sum
+    cmds:
+      - go mod tidy

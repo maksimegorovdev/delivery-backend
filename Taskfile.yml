@@ -1,0 +1,71 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  MODULES: platform,proto,services/gateway,services/order,services/user,services/product
+  DB_SERVICES: order,user,product
+
+tasks:
+  compose-up:
+    desc: Start local infrastructure via docker compose
+    cmds:
+      - docker compose up -d --build
+
+  compose-down:
+    desc: Stop local infrastructure
+    cmds:
+      - docker compose down
+
+  sync:
+    desc: Sync the Go workspace
+    cmds:
+      - go work sync
+
+  tools:
+    desc: Install dev tools for every module
+    cmds:
+      - for: { var: MODULES, split: ',' }
+        cmd: task -d {{.ITEM}} tools
+
+  lint:
+    desc: Run lint across every module
+    cmds:
+      - for: { var: MODULES, split: ',' }
+        cmd: task -d {{.ITEM}} lint
+
+  tidy:
+    desc: Tidy go.mod/go.sum for every module
+    cmds:
+      - for: { var: MODULES, split: ',' }
+        cmd: task -d {{.ITEM}} tidy
+
+  migrate-up:
+    desc: Apply migrations for services with a database
+    cmds:
+      - for: { var: DB_SERVICES, split: ',' }
+        cmd: task -d services/{{.ITEM}} migrate-up
+
+  dev:
+    desc: Start infrastructure and run all services with hot-reload
+    cmds:
+      - task: compose-up
+      - task: watch-all
+
+  watch-all:
+    desc: Run all services with hot-reload (infrastructure must be up)
+    deps:
+      - task: svc-watch
+        vars: { SVC: product }
+      - task: svc-watch
+        vars: { SVC: user }
+      - task: svc-watch
+        vars: { SVC: order }
+      - task: svc-watch
+        vars: { SVC: gateway }
+
+  svc-watch:
+    internal: true
+    prefix: '{{.SVC}}'
+    cmds:
+      - task -d services/{{.SVC}} watch

@@ -1,0 +1,56 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+dotenv: ['.env']
+
+vars:
+  LOCAL_BIN: '{{.TASKFILE_DIR}}/bin'
+  GOLANGCI_LINT_VERSION: v2.13.1
+  SWAG_VERSION: v1.16.6
+  AIR_VERSION: v1.63.0
+
+tasks:
+  tools:
+    desc: Install local dev tools into ./bin
+    env:
+      GOBIN: '{{.LOCAL_BIN}}'
+    cmds:
+      - curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b {{.LOCAL_BIN}} {{.GOLANGCI_LINT_VERSION}}
+      - go install github.com/swaggo/swag/cmd/swag@{{.SWAG_VERSION}}
+      - go install github.com/air-verse/air@{{.AIR_VERSION}}
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - '{{.LOCAL_BIN}}/golangci-lint run'
+
+  lint-fix:
+    desc: Run golangci-lint with autofix
+    cmds:
+      - '{{.LOCAL_BIN}}/golangci-lint run --fix'
+
+  swag:
+    desc: Generate Swagger docs from annotations
+    cmds:
+      - '{{.LOCAL_BIN}}/swag init -g internal/transport/http/router.go --parseDependency --parseInternal'
+
+  swag-format:
+    desc: Format Swagger annotations in source files
+    cmds:
+      - '{{.LOCAL_BIN}}/swag fmt'
+
+  run:
+    desc: Run the service without hot-reload
+    cmds:
+      - go run cmd/main.go
+
+  watch:
+    desc: Run the service with hot-reload via Air
+    cmds:
+      - '{{.LOCAL_BIN}}/air -c .air.toml'
+
+  tidy:
+    desc: Tidy go.mod/go.sum
+    cmds:
+      - go mod tidy

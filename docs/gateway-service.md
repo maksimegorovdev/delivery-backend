@@ -1240,7 +1240,7 @@ gRPC — тоже уходят через `response.Fail`, с кодом `INVALI
 12. `app/app.go`: `grpcclient.New` к order-сервису → проводка → middlewares → router (§13).
 13. `swag init` → `internal/docs`, подключить `httpSwagger.WrapHandler` на `/swagger/*` (§12).
 14. Ручная проверка по чек-листу §16 (нужен живой `order` + `user` + `product`, как
-    описано в `docker-compose.yaml`).
+    описано в `../docker-compose.yml`).
 15. (Задел, не сейчас) `GET /v1/orders/{id}` — новый handler + порт `GetOrder` в
     `OrderProvider`/`OrderUsecase`, тот же паттерн.
 
