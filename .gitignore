@@ -31,7 +31,7 @@ profile.cov
 .idea/
 .vscode/
 
-# Other
+# Others
 .DS_Store
 bin/
 tmp/

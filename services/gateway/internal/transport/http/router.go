@@ -19,8 +19,10 @@ type RouterDeps struct {
 //	@description	These are microservices for delivery on Go
 //	@BasePath		/api
 func NewRouter(deps RouterDeps) {
-	deps.Router.Route("/v1", func(r chi.Router) {
-		order.Routes(r, deps.OrderHandler)
+	deps.Router.Route("/api", func(r chi.Router) {
+		r.Route("/v1", func(r chi.Router) {
+			order.Routes(r, deps.OrderHandler)
+		})
 	})
 	swagger.Routes(deps.Router)
 }

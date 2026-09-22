@@ -61,7 +61,7 @@ func Fail(w http.ResponseWriter, r *http.Request, err error) {
 		Error: &ErrorBody{
 			Code:       e.Code.String(),
 			Reason:     e.Reason,
-			Message:    e.Message,
+			Message:    e.Public(),
 			Violations: e.Violations,
 		},
 	})

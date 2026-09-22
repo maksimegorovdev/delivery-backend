@@ -16,7 +16,9 @@ type OrderClient struct {
 }
 
 func NewOrderClient(conn *grpc.ClientConn) *OrderClient {
-	return &OrderClient{}
+	return &OrderClient{
+		orders: orderv1.NewOrderServiceClient(conn),
+	}
 }
 
 func (c *OrderClient) CreateOrder(ctx context.Context, input usecase.CreateOrderInput) (domain.Order, error) {
