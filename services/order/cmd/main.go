@@ -32,7 +32,7 @@ func run() (err error) {
 		return fmt.Errorf("app init: %w", err)
 	}
 	defer func() {
-		err = errors.Join(err, a.Close())
+		err = errors.Join(err, a.Close(ctx))
 	}()
 
 	if err = a.Run(ctx); err != nil {

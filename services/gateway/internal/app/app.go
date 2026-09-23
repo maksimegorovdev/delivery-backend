@@ -2,11 +2,12 @@ package app
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc"
 
+	"github.com/maksimegorovdev/delivery-backend/platform/closer"
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcclient"
 	"github.com/maksimegorovdev/delivery-backend/platform/http/httpserver"
 	"github.com/maksimegorovdev/delivery-backend/platform/http/middleware"
@@ -22,10 +23,17 @@ type App struct {
 	cfg        *config.Config
 	log        *slog.Logger
 	httpServer *httpserver.Server
-	orderConn  *grpc.ClientConn
+	closer     *closer.Closer
 }
 
-func New(ctx context.Context) (*App, error) {
+func New(ctx context.Context) (_ *App, err error) {
+	cl := closer.New()
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, cl.Close(context.Background()))
+		}
+	}()
+
 	// Config
 	cfg, err := config.New()
 	if err != nil {
@@ -46,6 +54,7 @@ func New(ctx context.Context) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	cl.Add(closer.WrapErr(orderConn.Close))
 
 	// Provider
 	orderClient := client.NewOrderClient(orderConn)
@@ -79,7 +88,7 @@ func New(ctx context.Context) (*App, error) {
 		cfg:        cfg,
 		log:        log,
 		httpServer: httpServer,
-		orderConn:  orderConn,
+		closer:     cl,
 	}
 
 	return app, nil
@@ -103,10 +112,6 @@ func (a *App) Run(ctx context.Context) error {
 	return g.Wait()
 }
 
-func (a *App) Close() error {
-	if err := a.orderConn.Close(); err != nil {
-		return err
-	}
-
-	return nil
+func (a *App) Close(ctx context.Context) error {
+	return a.closer.Close(ctx)
 }

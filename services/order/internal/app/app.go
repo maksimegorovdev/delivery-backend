@@ -2,13 +2,14 @@ package app
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"buf.build/go/protovalidate"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 
+	"github.com/maksimegorovdev/delivery-backend/platform/closer"
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcclient"
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcserver"
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/interceptors"
@@ -23,15 +24,20 @@ import (
 )
 
 type App struct {
-	cfg         *config.Config
-	log         *slog.Logger
-	pgPool      *pgxpool.Pool
-	grpcServer  *grpcserver.Server
-	userConn    *grpc.ClientConn
-	productConn *grpc.ClientConn
+	cfg        *config.Config
+	log        *slog.Logger
+	grpcServer *grpcserver.Server
+	closer     *closer.Closer
 }
 
-func New(ctx context.Context) (*App, error) {
+func New(ctx context.Context) (_ *App, err error) {
+	cl := closer.New()
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, cl.Close(context.Background()))
+		}
+	}()
+
 	// Config
 	cfg, err := config.New()
 	if err != nil {
@@ -56,6 +62,7 @@ func New(ctx context.Context) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	cl.Add(closer.Wrap(pgPool.Close))
 
 	// Proto Validator
 	validator, err := protovalidate.New()
@@ -68,11 +75,13 @@ func New(ctx context.Context) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	cl.Add(closer.WrapErr(userConn.Close))
 
 	productConn, err := grpcclient.New(cfg.ProductService.Addr)
 	if err != nil {
 		return nil, err
 	}
+	cl.Add(closer.WrapErr(productConn.Close))
 
 	// Repository
 	orderRepo := repo.NewOrderRepo(pgPool)
@@ -108,12 +117,10 @@ func New(ctx context.Context) (*App, error) {
 	})
 
 	app := &App{
-		cfg:         cfg,
-		log:         log,
-		pgPool:      pgPool,
-		grpcServer:  grpcServer,
-		userConn:    userConn,
-		productConn: productConn,
+		cfg:        cfg,
+		log:        log,
+		grpcServer: grpcServer,
+		closer:     cl,
 	}
 
 	return app, nil
@@ -137,16 +144,6 @@ func (a *App) Run(ctx context.Context) error {
 	return g.Wait()
 }
 
-func (a *App) Close() error {
-	if err := a.productConn.Close(); err != nil {
-		return err
-	}
-
-	if err := a.userConn.Close(); err != nil {
-		return err
-	}
-
-	a.pgPool.Close()
-
-	return nil
+func (a *App) Close(ctx context.Context) error {
+	return a.closer.Close(ctx)
 }

@@ -202,13 +202,9 @@ CREATE TABLE outbox_events (
     created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Для ручной чистки/диагностики по времени.
+-- Для периодической чистки и диагностики по времени.
 CREATE INDEX idx_outbox_events_created_at
     ON outbox_events (created_at);
-
--- Debezium читает WAL; DELETE нужен old-tuple с ключом.
--- DEFAULT (= PK) достаточно, оставляем явно для наглядности.
-ALTER TABLE outbox_events REPLICA IDENTITY DEFAULT;
 ```
 
 `down.sql`:
@@ -233,8 +229,18 @@ DROP TABLE IF EXISTS outbox_events;
 Почему `payload` — `jsonb`, а не `json`: `jsonb` нормализует документ и валидирует его на входе,
 битый JSON не доедет до брокера. Цена — потеря порядка ключей, что нам безразлично.
 
-Чего в таблице **нет**: колонок `published_at`, `attempts`, `status`. Их не должно быть —
-это атрибуты поллера, которого у нас нет. Debezium отслеживает позицию в WAL, а не состояние строк.
+Чего в таблице **нет**: колонок `published_at`, `attempts`, `status`, `updated_at`. Их не должно
+быть — это атрибуты поллера, которого у нас нет. Debezium отслеживает позицию в WAL, а не состояние
+строк. Строка outbox — неизменяемый факт: вставили один раз и больше не трогаем (append-only).
+
+Почему нет `ALTER TABLE ... REPLICA IDENTITY`. Replica identity определяет, что PostgreSQL
+пишет в WAL о старой версии строки при `UPDATE`/`DELETE` (`DEFAULT` — колонки PK, `FULL` — всю
+строку). Нужен он самому PostgreSQL: `DELETE` по таблице, которая входит в публикацию с
+операцией `delete`, без replica identity падает с `cannot delete from table ... because it does
+not have a replica identity and publishes deletes`. У нас публикация содержит только `insert`
+(см. `skipped.operations` в разделе 5.4), поэтому для чистки replica identity не нужен.
+К тому же `DEFAULT` — значение по умолчанию, и при наличии PK `ALTER` ничего бы не изменил.
+`FULL` не нужен тем более: он раздувает WAL, а Outbox Event Router смотрит только на INSERT.
 
 ### 4.2 Граница транзакции — usecase (Unit of Work)
 
@@ -474,8 +480,9 @@ type OrderUsecaseDeps struct {
 
 1. **Хранить N дней** (рекомендуется здесь). Строки остаются, их видно при отладке, всегда можно
    сравнить «что лежит в БД» с «что пришло в топик». Чистка — `DELETE FROM outbox_events WHERE
-   created_at < now() - interval '7 days'` раз в сутки (воркер/`pg_cron`). Debezium DELETE-события
-   отбрасывает сам (SMT фильтрует их, плюс мы ставим `skipped.operations=u,d,t`).
+   created_at < now() - interval '7 days'` раз в сутки (воркер/`pg_cron`). Эти DELETE до Debezium
+   не доходят вообще: публикация создаётся с `publish = 'insert'` (раздел 5.4), и PostgreSQL
+   не отправляет их в поток репликации. Даже если бы дошли, SMT отфильтровал бы DELETE сам.
 2. **`INSERT` + `DELETE` в одной транзакции.** Таблица всегда пустая, но событие в WAL есть и
    Debezium его увидит. Экономит место, но лишает отладочного следа и сильно запутывает при
    первом знакомстве.
@@ -523,7 +530,11 @@ type OrderUsecaseDeps struct {
 
 Пользователь: локально ходим под `postgres` (суперюзер, атрибут `REPLICATION` есть по умолчанию).
 В проде так нельзя — нужен отдельный пользователь с `REPLICATION`, `CREATE` на БД и `SELECT`
-на захватываемых таблицах.
+на захватываемых таблицах. Кроме того, при `publication.autocreate.mode=filtered` Debezium сам
+выполняет `CREATE PUBLICATION ... FOR TABLE`, а для этого нужно владеть таблицами. Если давать
+такие права пользователю коннектора не хочется, публикацию создаёт миграция
+(`CREATE PUBLICATION order_outbox_pub FOR TABLE outbox_events, debezium_heartbeat WITH (publish = 'insert')`),
+а в коннекторе ставится `publication.autocreate.mode=disabled`.
 
 ### 5.2 Redpanda + Console
 
@@ -632,13 +643,13 @@ type OrderUsecaseDeps struct {
   "publication.name": "order_outbox_pub",
   "publication.autocreate.mode": "filtered",
 
-  "table.include.list": "public.outbox_events",
+  "table.include.list": "public.outbox_events,public.debezium_heartbeat",
   "snapshot.mode": "no_data",
   "skipped.operations": "u,d,t",
   "tombstones.on.delete": "false",
 
   "heartbeat.interval.ms": "10000",
-  "heartbeat.action.query": "INSERT INTO debezium_heartbeat (id, ts) VALUES (1, now()) ON CONFLICT (id) DO UPDATE SET ts = now()",
+  "heartbeat.action.query": "INSERT INTO debezium_heartbeat DEFAULT VALUES",
 
   "predicates": "isOutbox",
   "predicates.isOutbox.type": "org.apache.kafka.connect.transforms.predicates.TopicNameMatches",
@@ -682,7 +693,10 @@ type OrderUsecaseDeps struct {
   всю outbox-таблицу и переотправит все старые события. `never` из Debezium 2.x переименован
   в `no_data`.
 * **`publication.autocreate.mode=filtered`** — публикация создаётся только для таблиц из
-  `table.include.list`. Дефолт `all_tables` отдал бы в WAL-декодер всю БД.
+  `table.include.list`. Дефолт `all_tables` отдал бы в WAL-декодер всю БД. Вместе со
+  `skipped.operations` Debezium создаёт её так:
+  `CREATE PUBLICATION order_outbox_pub FOR TABLE public.outbox_events, public.debezium_heartbeat WITH (publish = 'insert')`.
+  Если публикация уже есть, при старте он приводит её к текущему фильтру через `ALTER PUBLICATION`.
 * **`predicates` + `TopicNameMatches`** — SMT должен применяться только к сообщениям из
   outbox-таблицы. Heartbeat и служебные сообщения имеют другую структуру, и `EventRouter` на них
   падает. Это рекомендация самой документации Debezium.
@@ -695,21 +709,32 @@ type OrderUsecaseDeps struct {
   парсить. С ним в топике лежит нормальный объект.
 * **`skipped.operations=u,d,t`** — в outbox допустим только INSERT. UPDATE — ошибка (SMT их
   и так ругает по `table.op.invalid.behavior=warn`), DELETE — это чистка, наружу её не нужно.
+  С `pgoutput` и `autocreate.mode=filtered` (начиная с Debezium 3.x) это не только фильтр
+  в коннекторе: настройка попадает в публикацию как `publish = 'insert'`, и PostgreSQL вообще
+  не отправляет UPDATE/DELETE/TRUNCATE в поток. Отсюда же следует, что replica identity для
+  этих таблиц не нужен (раздел 4.1).
 * **`heartbeat.*`** — важнее, чем кажется. Слот репликации держит WAL до последнего
   подтверждённого LSN. Если в `orderdb` идёт активность (записи в `orders`), а в `outbox_events`
-  какое-то время нет — Debezium не подтверждает LSN, и WAL пухнет на диске. Heartbeat заставляет
-  его регулярно двигать позицию. Под `heartbeat.action.query` нужна таблица (миграция ниже).
+  какое-то время нет — Debezium не подтверждает LSN, и WAL пухнет на диске. `heartbeat.action.query`
+  раз в `heartbeat.interval.ms` делает запись в служебную таблицу, Debezium получает её из WAL
+  и подтверждает свежий LSN. Работает это только если heartbeat-таблица **входит в публикацию**,
+  поэтому она есть в `table.include.list`. Запрос — именно `INSERT`: публикация пропускает только
+  INSERT, и UPDATE одной строки (`ON CONFLICT DO UPDATE`) Debezium не увидел бы.
+
+Heartbeat-события попадают в «сырой» топик `orderdb.public.debezium_heartbeat`. SMT их не трогает
+(predicate), а потребителей у этого топика нет.
 
 Таблица для heartbeat — `services/order/migrations/pg/000003_create_debezium_heartbeat.up.sql`:
 
 ```sql
 CREATE TABLE debezium_heartbeat (
-    id BIGINT PRIMARY KEY,
+    id BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     ts TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-INSERT INTO debezium_heartbeat (id, ts) VALUES (1, NOW());
 ```
+
+Таблица растёт на одну строку за heartbeat (~8,6 тыс. строк в сутки при интервале 10 с).
+Её чистят той же задачей, что и outbox: `DELETE FROM debezium_heartbeat WHERE ts < now() - interval '1 day'`.
 
 ### 5.5 Регистрация коннектора
 
@@ -1148,6 +1173,7 @@ tasks:
 Каждый шаг проверяем до перехода к следующему — иначе при первой же ошибке непонятно, где искать.
 
 1. **Миграция outbox** в order-сервисе + heartbeat-таблица. `task -d services/order migrate-up`.
+   Чистку outbox и heartbeat по времени можно добавить позже, когда всё заработает.
 2. **`platform/postgres/tx.go`**: `Executor`, `Exec`, `TxManager`. Перевести `OrderRepo.Create`
    на `postgres.Exec(ctx, r.pool)`, транзакцию убрать.
 3. **`events.proto`** + `task -d proto generate`.
@@ -1182,6 +1208,10 @@ docker exec -it order-postgres psql -U postgres -d orderdb -c "
 # Публикация: какие таблицы реально захвачены
 docker exec -it order-postgres psql -U postgres -d orderdb -c "
   SELECT * FROM pg_publication_tables;"
+
+# Публикация: какие операции публикуются (ожидаем только pubinsert = t)
+docker exec -it order-postgres psql -U postgres -d orderdb -c "
+  SELECT pubname, pubinsert, pubupdate, pubdelete, pubtruncate FROM pg_publication;"
 
 # Статус коннектора и задач
 curl -sS http://localhost:8083/connectors/order-outbox/status | jq
@@ -1242,6 +1272,14 @@ docker exec -it redpanda rpk group describe notification
 
 12. **Оффсет закоммичен, а обработка упала.** Проверить, что стоит `DisableAutoCommit()` —
     с автокоммитом franz-go двигает оффсеты по таймеру независимо от обработки.
+
+13. **Heartbeat включён, а WAL всё равно растёт.** Heartbeat-таблица не попала в публикацию
+    (нет в `table.include.list`) или `heartbeat.action.query` делает UPDATE, а публикация
+    пропускает только INSERT. Проверить `pg_publication_tables` и лаг слота (раздел 10).
+
+14. **`DELETE` из outbox падает с `does not have a replica identity and publishes deletes`.**
+    Значит, публикация публикует `delete`: её создали вручную без `WITH (publish = 'insert')`
+    или без `skipped.operations`. Правильно исправлять публикацию, а не выставлять replica identity.
 
 ---
 
