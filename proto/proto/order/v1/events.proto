@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package order.v1;
+
+import "google/protobuf/timestamp.proto";
+
+message OrderCreated {
+  string event_id = 1;
+  string order_id = 2;
+  string user_id = 3;
+  repeated OrderCreatedItem items = 4;
+  int64 total_amount = 5;
+  string delivery_address = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message OrderCreatedItem {
+  string id = 1;
+  string product_id = 2;
+  string product_name = 3;
+  int32 quantity = 4;
+  int64 unit_price = 5;
+}

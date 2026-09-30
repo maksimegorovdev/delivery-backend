@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr/pgerr"
+	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/domain"
 )
 
@@ -19,32 +20,21 @@ func NewOrderRepo(pool *pgxpool.Pool) *OrderRepo {
 }
 
 func (r *OrderRepo) Create(ctx context.Context, order domain.Order) error {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return pgerr.Map(err)
-	}
-	defer tx.Rollback(ctx)
+	db := postgres.DB(ctx, r.pool)
 
-	if err := r.insertOrder(ctx, tx, order); err != nil {
+	if err := r.insertOrder(ctx, db, order); err != nil {
 		return err
 	}
 
-	if err := r.insertItems(ctx, tx, order.Items); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return pgerr.Map(err)
-	}
-	return nil
+	return r.insertItems(ctx, db, order.Items)
 }
 
 func (r *OrderRepo) insertOrder(
 	ctx context.Context,
-	tx pgx.Tx,
+	db postgres.Executor,
 	order domain.Order,
 ) error {
-	if _, err := tx.Exec(
+	if _, err := db.Exec(
 		ctx,
 		`INSERT INTO orders (id, user_id, status, total_amount, delivery_address, created_at, updated_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -57,7 +47,7 @@ func (r *OrderRepo) insertOrder(
 
 func (r *OrderRepo) insertItems(
 	ctx context.Context,
-	tx pgx.Tx,
+	db postgres.Executor,
 	items []domain.OrderItem,
 ) error {
 	columns := []string{
@@ -71,7 +61,7 @@ func (r *OrderRepo) insertItems(
 		"updated_at",
 	}
 
-	_, err := tx.CopyFrom(
+	_, err := db.CopyFrom(
 		ctx,
 		pgx.Identifier{"order_items"},
 		columns,

@@ -18,8 +18,20 @@ type CreateOrderInput struct {
 	Items     []CreateOrderItemInput
 }
 
+type TxManager interface {
+	WithinTx(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
 type OrderRepo interface {
 	Create(ctx context.Context, order domain.Order) error
+}
+
+type OutboxRepo interface {
+	Save(ctx context.Context, event domain.OutboxEvent) error
+}
+
+type OrderEvents interface {
+	OrderCreated(order domain.Order) (domain.OutboxEvent, error)
 }
 
 type UserProvider interface {
@@ -32,20 +44,29 @@ type ProductProvider interface {
 }
 
 type OrderUsecaseDeps struct {
+	Tx       TxManager
 	Orders   OrderRepo
+	Outbox   OutboxRepo
+	Events   OrderEvents
 	Users    UserProvider
 	Products ProductProvider
 }
 
 type OrderUsecase struct {
+	tx       TxManager
 	orders   OrderRepo
+	outbox   OutboxRepo
+	events   OrderEvents
 	users    UserProvider
 	products ProductProvider
 }
 
 func NewOrderUsecase(deps OrderUsecaseDeps) *OrderUsecase {
 	return &OrderUsecase{
+		tx:       deps.Tx,
 		orders:   deps.Orders,
+		outbox:   deps.Outbox,
+		events:   deps.Events,
 		users:    deps.Users,
 		products: deps.Products,
 	}
@@ -94,8 +115,19 @@ func (uc *OrderUsecase) CreateOrder(ctx context.Context, input CreateOrderInput)
 		return domain.Order{}, apperr.InvalidArgument().Wrap(err)
 	}
 
-	if err := uc.orders.Create(ctx, order); err != nil {
+	event, err := uc.events.OrderCreated(order)
+	if err != nil {
 		return domain.Order{}, err
 	}
+
+	if err := uc.tx.WithinTx(ctx, func(ctx context.Context) error {
+		if err := uc.orders.Create(ctx, order); err != nil {
+			return err
+		}
+		return uc.outbox.Save(ctx, event)
+	}); err != nil {
+		return domain.Order{}, err
+	}
+
 	return order, nil
 }

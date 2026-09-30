@@ -16,6 +16,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
 	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/client"
+	"github.com/maksimegorovdev/delivery-backend/services/order/internal/event"
 	repo "github.com/maksimegorovdev/delivery-backend/services/order/internal/repository/pg"
 	grpcrouter "github.com/maksimegorovdev/delivery-backend/services/order/internal/transport/grpc"
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/usecase"
@@ -64,6 +65,9 @@ func New(ctx context.Context) (_ *App, err error) {
 	}
 	cl.Add(closer.Wrap(pgPool.Close))
 
+	// TxManager
+	txManager := postgres.NewTxManager(pgPool)
+
 	// Proto Validator
 	validator, err := protovalidate.New()
 	if err != nil {
@@ -85,6 +89,10 @@ func New(ctx context.Context) (_ *App, err error) {
 
 	// Repository
 	orderRepo := repo.NewOrderRepo(pgPool)
+	outboxRepo := repo.NewOutboxRepo(pgPool)
+
+	// Event Builder
+	orderEvents := event.NewOrderEventBuilder()
 
 	// Provider
 	userClient := client.NewUserClient(userConn)
@@ -92,7 +100,10 @@ func New(ctx context.Context) (_ *App, err error) {
 
 	// Usecase
 	orderUsecase := usecase.NewOrderUsecase(usecase.OrderUsecaseDeps{
+		Tx:       txManager,
 		Orders:   orderRepo,
+		Outbox:   outboxRepo,
+		Events:   orderEvents,
 		Users:    userClient,
 		Products: productClient,
 	})

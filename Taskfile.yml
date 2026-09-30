@@ -12,6 +12,15 @@ tasks:
     cmds:
       - docker compose up -d --build
 
+  connect-register:
+    desc: Register the Debezium outbox connector
+    cmds:
+      - >
+        curl -sS -X PUT
+        -H 'Content-Type: application/json'
+        --data @deploy/debezium/order-outbox.json
+        http://localhost:8083/connectors/order-outbox/config
+
   compose-down:
     desc: Stop local infrastructure
     cmds:
