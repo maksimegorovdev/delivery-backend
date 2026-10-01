@@ -3,8 +3,8 @@
 version: '3'
 
 vars:
-  MODULES: platform,proto,services/gateway,services/order,services/user,services/product
-  DB_SERVICES: order,user,product
+  MODULES: platform,proto,services/gateway,services/order,services/user,services/product,services/notification
+  DB_SERVICES: order,user,product,notification
 
 tasks:
   compose-up:

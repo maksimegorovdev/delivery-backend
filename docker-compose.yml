@@ -36,6 +36,18 @@ services:
     volumes:
       - product-postgres-data:/var/lib/postgresql/18/docker
 
+  notification-postgres:
+    container_name: notification-postgres
+    image: postgres:18
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=notificationdb
+    ports:
+      - "5435:5432"
+    volumes:
+      - notification-postgres-data:/var/lib/postgresql/18/docker
+
   redpanda:
     container_name: redpanda
     image: redpandadata/redpanda:v26.2.3
@@ -101,4 +113,5 @@ volumes:
   order-postgres-data:
   user-postgres-data:
   product-postgres-data:
+  notification-postgres-data:
   redpanda-data:
