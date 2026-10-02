@@ -74,13 +74,10 @@ func (s *Server) graceful() error {
 		close(done)
 	}()
 
-	timer := time.NewTimer(s.shutdownTimeout)
-	defer timer.Stop()
-
 	select {
 	case <-done:
 		return nil
-	case <-timer.C:
+	case <-time.After(s.shutdownTimeout):
 		s.server.Stop()
 		<-done
 		return fmt.Errorf("grpcserver: graceful stop timed out after %s", s.shutdownTimeout)

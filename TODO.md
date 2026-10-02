@@ -19,6 +19,12 @@
 - [ ] Interceptors для grpc
 - [ ] В order service улучшить описания ошибок типа Not found user, not found product итд (сейчас просто not found общий приходит)
 - [ ] Пакет kafka
+- [ ] kafkaconsumer: «ядовитые» сообщения — постоянные ошибки (битый JSON) пропускать и коммитить (ErrSkip), потом ограничение числа повторов и DLQ-топик, иначе одна плохая запись блокирует партицию навсегда
+- [ ] kafkaconsumer: таймаут на Handle (WithHandleTimeout) и согласовать maxPollRecords с rebalance timeout
+- [ ] kafkaconsumer: параллельная обработка партиций (горутина на партицию, порядок внутри партиции сохраняется), сейчас EachPartition идёт последовательно
+- [ ] kafkaconsumer: non-blocking retry (retry-топики) для событий, где порядок не важен, политика выбирается опцией; по умолчанию остаётся порядок
+- [ ] kafkaconsumer: валидация опций в New (maxPollRecords, retryBackoff > 0, nil в WithErrorHandler), recover паники в Handle
+- [ ] kafkaconsumer: kgo.ErrDataLoss не фатальна — сообщать в onError, а не завершать Run; метрики и лаг консьюмера
 - [ ] Debezium поднять
 - [ ] Clean Architecture для notification-service (handler, service, domain, repository)
 - [ ] Тесты unit, интеграционные, e2e
