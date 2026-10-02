@@ -16,6 +16,7 @@
 - [x] Попробовать внедрить Taskfile вместо Makefile
 - [x] Внедрить Air для reload при измении
 - [x] Middlewares (logger, request_id итд)
+- [x] Debezium поднять
 - [ ] Interceptors для grpc
 - [ ] В order service улучшить описания ошибок типа Not found user, not found product итд (сейчас просто not found общий приходит)
 - [ ] Пакет kafka
@@ -25,14 +26,19 @@
 - [ ] kafkaconsumer: non-blocking retry (retry-топики) для событий, где порядок не важен, политика выбирается опцией; по умолчанию остаётся порядок
 - [ ] kafkaconsumer: валидация опций в New (maxPollRecords, retryBackoff > 0, nil в WithErrorHandler), recover паники в Handle
 - [ ] kafkaconsumer: kgo.ErrDataLoss не фатальна — сообщать в onError, а не завершать Run; метрики и лаг консьюмера
-- [ ] Debezium поднять
 - [ ] Clean Architecture для notification-service (handler, service, domain, repository)
 - [ ] Тесты unit, интеграционные, e2e
 - [ ] Benchmarks, нагрузочные
-- [ ] Observability (трейсы, метрики, логи)
+- [ ] Observability (трейсы, метрики, логи). Попробовать внедрить для логов ClickHouse
 - [ ] Logger логирование ошибок по стеку
 - [ ] Доработка пакетов http, grpc, pgx, redis, kafka итд насчет кол-ва соединенией, timeout
 - [ ] CHECK в миграциях БД до конца проставить, разобраться с этим (пока делаю минимально)
 - [ ] Внедрить идемпотентность
-- [ ] Redis для быстрой выдачи информации по продуктам (Redis, Singleflight)
+- [ ] Redis (Valkey) для быстрой выдачи информации по продуктам (Redis, Singleflight)
 - [ ] Причесать swagger до конца
+
+## Глобальные задачи
+
+- [ ] Поднять сервис аутетификации и авторизации OpenID Connect, OAuth 2.0
+- [ ] Попробовать для бизнесовых задач ClickHouse
+- [ ] Попрактиковаться с K8s локально через minikube. Написать конфигурацию
