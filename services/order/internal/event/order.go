@@ -1,7 +1,6 @@
 package event
 
 import (
-	"time"
 	"uuid"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -53,6 +52,6 @@ func (b *OrderEventBuilder) OrderCreated(order domain.Order) (domain.OutboxEvent
 		AggregateID:   order.ID,
 		Type:          domain.EventTypeOrderCreated,
 		Payload:       payload,
-		CreatedAt:     time.Now().UTC(),
+		CreatedAt:     order.CreatedAt,
 	}, nil
 }

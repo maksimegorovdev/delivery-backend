@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr/pgerr"
+	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
 	"github.com/maksimegorovdev/delivery-backend/services/product/internal/domain"
 )
 
@@ -42,7 +43,7 @@ func (r *ProductRepo) GetByIDs(ctx context.Context, ids []string) ([]domain.Prod
 		return nil, nil
 	}
 
-	rows, err := r.pool.Query(
+	rows, err := postgres.DB(ctx, r.pool).Query(
 		ctx,
 		`SELECT id, name, price, created_at, updated_at
 		FROM products WHERE id = ANY($1::uuid[])`,

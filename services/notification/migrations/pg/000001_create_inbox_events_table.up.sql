@@ -5,8 +5,8 @@ CREATE TABLE inbox_events (
     msg_offset   BIGINT NOT NULL,
     event_type   TEXT NOT NULL,
     aggregate_id UUID NOT NULL,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    received_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_inbox_events_created_at
-    ON inbox_events (created_at);
+CREATE INDEX idx_inbox_events_received_at
+    ON inbox_events (received_at);

@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr/pgerr"
+	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/domain"
 )
 
@@ -38,7 +39,7 @@ func NewAddressRepo(pool *pgxpool.Pool) *AddressRepo {
 }
 
 func (r *AddressRepo) GetByID(ctx context.Context, id string) (domain.Address, error) {
-	rows, err := r.pool.Query(
+	rows, err := postgres.DB(ctx, r.pool).Query(
 		ctx,
 		`SELECT id, user_id, address, created_at, updated_at
 		FROM addresses WHERE id = $1`,

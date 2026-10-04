@@ -26,8 +26,6 @@ type OrderItem struct {
 	ProductName string
 	Quantity    int32
 	UnitPrice   int64
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
 }
 
 func (i OrderItem) Subtotal() int64 {
@@ -56,8 +54,6 @@ func NewOrder(userID string, deliveryAddress string, items []OrderItem) (Order, 
 	for i := range items {
 		items[i].ID = uuid.NewV7().String()
 		items[i].OrderID = id
-		items[i].CreatedAt = now
-		items[i].UpdatedAt = now
 		total += items[i].Subtotal()
 	}
 

@@ -97,7 +97,7 @@ commit и produce → заказ есть, события нет, потреби
                 ┌───────────────── notification-service (Go) ──────────────┐
                 │ transport/kafka  → usecase.HandleOrderCreated            │
                 │   txManager.WithinTx(ctx, func(ctx) error {              │
-                │       ok := inbox.Claim(ctx, msg)  // ON CONFLICT DO NOTHING
+                │       ok := inbox.Claim(ctx, event)      // ON CONFLICT DO NOTHING
                 │       if !ok { return nil }        // дубль — выходим     │
                 │       return notifications.Create(ctx, ...) // pending   │
                 │   })                                                     │
@@ -242,7 +242,7 @@ DROP TABLE IF EXISTS outbox_events;
 | `aggregate_id` | `order.id`; станет ключом Kafka-сообщения → все события одного заказа в одной партиции |
 | `type` | `OrderCreated`; уезжает заголовком `event-type` |
 | `payload` | тело события (JSON) |
-| `created_at` | время создания события; в Kafka-сообщение не мапится (timestamp сообщения ставит Debezium при обработке, см. раздел 5.4) |
+| `created_at` | время создания события; равно `orders.created_at` (билдер берёт `order.CreatedAt`) и передаётся в `INSERT` (`DEFAULT NOW()` в миграции — запасной вариант); в Kafka-сообщение не мапится (timestamp сообщения ставит Debezium при обработке, см. раздел 5.4) |
 
 Имена колонок подобраны так, чтобы быть близко к дефолтам SMT, но в snake_case, как в остальном
 проекте. `id` и `payload` совпадают с дефолтами SMT, а дефолты для остальных —
@@ -341,10 +341,28 @@ func (r *OrderRepo) Create(ctx context.Context, order domain.Order) error {
 	}
 	return r.insertItems(ctx, db, order.Items)
 }
+
+func (r *OrderRepo) insertOrder(ctx context.Context, db postgres.Executor, order domain.Order) error {
+	if _, err := db.Exec(
+		ctx,
+		`INSERT INTO orders (id, user_id, status, total_amount, delivery_address, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		order.ID, order.UserID, order.Status, order.TotalAmount, order.DeliveryAddress, order.CreatedAt, order.UpdatedAt,
+	); err != nil {
+		return pgerr.Map(err)
+	}
+	return nil
+}
 ```
 
-(`insertOrder`/`insertItems` меняют сигнатуру с `pgx.Tx` на `postgres.Executor` — тело остаётся
-прежним, включая `CopyFrom`.)
+`insertOrder`/`insertItems` принимают `postgres.Executor` вместо `pgx.Tx`, тело остаётся прежним,
+включая `CopyFrom`. Позиции вставляются без времени: у `order_items` нет `created_at`, позиции
+неизменяемы и принадлежат заказу, поэтому отдельная отметка повторяла бы `orders.created_at`.
+
+**Время заказа ставит домен.** `NewOrder` берёт один `now := time.Now().UTC()` и записывает его в
+`CreatedAt` и `UpdatedAt`. Это время идёт в `INSERT`, в событие и в ответ клиенту, так что везде
+оно одно и то же и известно до записи. `DEFAULT NOW()` в миграции остаётся запасным вариантом
+(ручная вставка, seed).
 
 ### 4.3 OutboxRepo
 
@@ -437,7 +455,7 @@ func (b *OrderEventBuilder) OrderCreated(order domain.Order) (domain.OutboxEvent
 		AggregateID:   order.ID,
 		Type:          domain.EventTypeOrderCreated,
 		Payload:       payload,
-		CreatedAt:     time.Now().UTC(),
+		CreatedAt:     order.CreatedAt,
 	}, nil
 }
 ```
@@ -456,6 +474,10 @@ func (b *OrderEventBuilder) OrderCreated(order domain.Order) (domain.OutboxEvent
 ```go
 type TxManager interface {
 	WithinTx(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+type OrderRepo interface {
+	Create(ctx context.Context, order domain.Order) error
 }
 
 type OutboxRepo interface {
@@ -962,11 +984,11 @@ CREATE TABLE inbox_events (
     msg_offset   BIGINT      NOT NULL,
     event_type   TEXT        NOT NULL,
     aggregate_id UUID        NOT NULL,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    received_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_inbox_events_created_at
-    ON inbox_events (created_at);
+CREATE INDEX idx_inbox_events_received_at
+    ON inbox_events (received_at);
 ```
 
 `event_id` — первичный ключ, и это весь механизм дедупликации. `topic/partition/msg_offset`
@@ -1311,16 +1333,13 @@ type InboxRepo struct {
 
 func NewInboxRepo(pool *pgxpool.Pool) *InboxRepo { return &InboxRepo{pool: pool} }
 
-```go
-// Claim пытается застолбить сообщение. false — сообщение уже обработано (дубликат).
-func (r *InboxRepo) Claim(ctx context.Context, msg domain.InboxEvent) (bool, error) {
+func (r *InboxRepo) Claim(ctx context.Context, event domain.InboxEvent) (bool, error) {
 	tag, err := postgres.DB(ctx, r.pool).Exec(
 		ctx,
-		`INSERT INTO inbox_events
-			(event_id, topic, partition, msg_offset, event_type, aggregate_id)
+		`INSERT INTO inbox_events (event_id, topic, partition, msg_offset, event_type, aggregate_id)
 			VALUES ($1, $2, $3, $4, $5, $6)
 			ON CONFLICT (event_id) DO NOTHING`,
-		msg.EventID, msg.Topic, msg.Partition, msg.Offset, msg.EventType, msg.AggregateID,
+		event.EventID, event.Topic, event.Partition, event.Offset, event.EventType, event.AggregateID,
 	)
 	if err != nil {
 		return false, pgerr.Map(err)
@@ -1328,6 +1347,10 @@ func (r *InboxRepo) Claim(ctx context.Context, msg domain.InboxEvent) (bool, err
 	return tag.RowsAffected() == 1, nil
 }
 ```
+
+`Claim` пытается застолбить сообщение. `true` — сообщение занято впервые, `false` — дубликат
+(`ON CONFLICT DO NOTHING` не вставил строку, `RowsAffected` равен нулю). `received_at` ставит БД
+(`DEFAULT NOW()`), коду оно не нужно, поэтому в `InboxEvent` его нет.
 
 Проверка `SELECT ... WHERE event_id = $1` отдельным запросом — гонка: два консьюмера (или один
 после ребаланса) могут пройти проверку одновременно. `INSERT ... ON CONFLICT DO NOTHING` +
@@ -1376,7 +1399,7 @@ type TxManager interface {
 }
 
 type InboxRepo interface {
-	Claim(ctx context.Context, msg domain.InboxEvent) (bool, error)
+	Claim(ctx context.Context, event domain.InboxEvent) (bool, error)
 }
 
 type NotificationRepo interface {
@@ -1450,8 +1473,8 @@ VALUES ($1, $2, $3, $4) ON CONFLICT (event_id, channel) DO NOTHING`. `domain.Not
 
 **Inbox растёт монотонно — как и outbox (раздел 4.7).** Хранить окно возможных повторов
 (например, 7 дней) и чистить раз в сутки:
-`DELETE FROM inbox_events WHERE created_at < now() - interval '7 days'` — для этого и нужен
-индекс `idx_inbox_events_created_at`. Повтор старше окна (например, после `rpk group seek` на
+`DELETE FROM inbox_events WHERE received_at < now() - interval '7 days'` — для этого и нужен
+индекс `idx_inbox_events_received_at`. Повтор старше окна (например, после `rpk group seek` на
 начало) снова пройдёт `Claim` — это осознанный компромисс, сейчас чистку не делаем (раздел 12).
 
 **Transport — маршрутизация по типу события.**

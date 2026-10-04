@@ -24,8 +24,6 @@ CREATE TABLE order_items (
     product_name TEXT NOT NULL,
     quantity     INT NOT NULL,
     unit_price   BIGINT NOT NULL,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT fk_order_items_order_id FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
     CONSTRAINT chk_order_items_quantity CHECK (quantity > 0),

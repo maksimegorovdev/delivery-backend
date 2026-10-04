@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr/pgerr"
+	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/domain"
 )
 
@@ -40,7 +41,7 @@ func NewUserRepo(pool *pgxpool.Pool) *UserRepo {
 }
 
 func (r *UserRepo) GetByID(ctx context.Context, id string) (domain.User, error) {
-	rows, err := r.pool.Query(
+	rows, err := postgres.DB(ctx, r.pool).Query(
 		ctx,
 		`SELECT id, email, first_name, last_name, created_at, updated_at
 		FROM users WHERE id = $1`,

@@ -57,8 +57,6 @@ func (r *OrderRepo) insertItems(
 		"product_name",
 		"quantity",
 		"unit_price",
-		"created_at",
-		"updated_at",
 	}
 
 	_, err := db.CopyFrom(
@@ -74,8 +72,6 @@ func (r *OrderRepo) insertItems(
 				it.ProductName,
 				it.Quantity,
 				it.UnitPrice,
-				it.CreatedAt,
-				it.UpdatedAt,
 			}, nil
 		}),
 	)
