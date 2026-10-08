@@ -6,11 +6,11 @@ import (
 
 type RouterDeps struct {
 	Server         *grpc.Server
-	UserUsecase    UserUsecase
-	AddressUsecase AddressUsecase
+	UserService    UserService
+	AddressService AddressService
 }
 
 func NewRouter(deps RouterDeps) {
-	NewUserRouter(deps.Server, deps.UserUsecase)
-	NewAddressRouter(deps.Server, deps.AddressUsecase)
+	NewUserRouter(deps.Server, deps.UserService)
+	NewAddressRouter(deps.Server, deps.AddressService)
 }

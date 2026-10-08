@@ -19,7 +19,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/event"
 	repo "github.com/maksimegorovdev/delivery-backend/services/order/internal/repository/pg"
 	grpcrouter "github.com/maksimegorovdev/delivery-backend/services/order/internal/transport/grpc"
-	"github.com/maksimegorovdev/delivery-backend/services/order/internal/usecase"
+	"github.com/maksimegorovdev/delivery-backend/services/order/internal/service"
 
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/config"
 )
@@ -98,8 +98,8 @@ func New(ctx context.Context) (_ *App, err error) {
 	userClient := client.NewUserClient(userConn)
 	productClient := client.NewProductClient(productConn)
 
-	// Usecase
-	orderUsecase := usecase.NewOrderUsecase(usecase.OrderUsecaseDeps{
+	// Service
+	orderService := service.NewOrderService(service.OrderServiceDeps{
 		Tx:       txManager,
 		Orders:   orderRepo,
 		Outbox:   outboxRepo,
@@ -124,7 +124,7 @@ func New(ctx context.Context) (_ *App, err error) {
 	// Router
 	grpcrouter.NewRouter(grpcrouter.RouterDeps{
 		Server:       grpcServer.Server(),
-		OrderUsecase: orderUsecase,
+		OrderService: orderService,
 	})
 
 	app := &App{

@@ -1,4 +1,4 @@
-package usecase
+package service
 
 import (
 	"context"
@@ -43,7 +43,7 @@ type ProductProvider interface {
 	GetProducts(ctx context.Context, ids []string) ([]domain.Product, error)
 }
 
-type OrderUsecaseDeps struct {
+type OrderServiceDeps struct {
 	Tx       TxManager
 	Orders   OrderRepo
 	Outbox   OutboxRepo
@@ -52,7 +52,7 @@ type OrderUsecaseDeps struct {
 	Products ProductProvider
 }
 
-type OrderUsecase struct {
+type OrderService struct {
 	tx       TxManager
 	orders   OrderRepo
 	outbox   OutboxRepo
@@ -61,8 +61,8 @@ type OrderUsecase struct {
 	products ProductProvider
 }
 
-func NewOrderUsecase(deps OrderUsecaseDeps) *OrderUsecase {
-	return &OrderUsecase{
+func NewOrderService(deps OrderServiceDeps) *OrderService {
+	return &OrderService{
 		tx:       deps.Tx,
 		orders:   deps.Orders,
 		outbox:   deps.Outbox,
@@ -72,7 +72,7 @@ func NewOrderUsecase(deps OrderUsecaseDeps) *OrderUsecase {
 	}
 }
 
-func (uc *OrderUsecase) CreateOrder(ctx context.Context, input CreateOrderInput) (domain.Order, error) {
+func (uc *OrderService) CreateOrder(ctx context.Context, input CreateOrderInput) (domain.Order, error) {
 	if _, err := uc.users.GetUser(ctx, input.UserID); err != nil {
 		return domain.Order{}, err
 	}

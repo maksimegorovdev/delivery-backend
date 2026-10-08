@@ -8,7 +8,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr/grpcerr"
 	orderv1 "github.com/maksimegorovdev/delivery-backend/proto/gen/go/order/v1"
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/domain"
-	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/usecase"
+	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/service"
 )
 
 type OrderClient struct {
@@ -21,7 +21,7 @@ func NewOrderClient(conn *grpc.ClientConn) *OrderClient {
 	}
 }
 
-func (c *OrderClient) CreateOrder(ctx context.Context, input usecase.CreateOrderInput) (domain.Order, error) {
+func (c *OrderClient) CreateOrder(ctx context.Context, input service.CreateOrderInput) (domain.Order, error) {
 	items := make([]*orderv1.CreateOrderItem, 0, len(input.Items))
 	for _, item := range input.Items {
 		items = append(items, &orderv1.CreateOrderItem{

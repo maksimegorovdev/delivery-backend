@@ -10,16 +10,16 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/domain"
 )
 
-type UserUsecase interface {
+type UserService interface {
 	GetUser(ctx context.Context, id string) (domain.User, error)
 }
 
 type UserRouter struct {
 	userv1.UnimplementedUserServiceServer
-	uc UserUsecase
+	uc UserService
 }
 
-func NewUserRouter(server *grpc.Server, uc UserUsecase) {
+func NewUserRouter(server *grpc.Server, uc UserService) {
 	userv1.RegisterUserServiceServer(server, &UserRouter{uc: uc})
 }
 

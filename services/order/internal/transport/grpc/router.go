@@ -4,9 +4,9 @@ import "google.golang.org/grpc"
 
 type RouterDeps struct {
 	Server       *grpc.Server
-	OrderUsecase OrderUsecase
+	OrderService OrderService
 }
 
 func NewRouter(deps RouterDeps) {
-	NewOrderRouter(deps.Server, deps.OrderUsecase)
+	NewOrderRouter(deps.Server, deps.OrderService)
 }

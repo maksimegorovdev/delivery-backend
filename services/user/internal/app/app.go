@@ -17,7 +17,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/config"
 	repo "github.com/maksimegorovdev/delivery-backend/services/user/internal/repository/pg"
 	grpcrouter "github.com/maksimegorovdev/delivery-backend/services/user/internal/transport/grpc"
-	"github.com/maksimegorovdev/delivery-backend/services/user/internal/usecase"
+	"github.com/maksimegorovdev/delivery-backend/services/user/internal/service"
 )
 
 type App struct {
@@ -71,9 +71,9 @@ func New(ctx context.Context) (_ *App, err error) {
 	userRepo := repo.NewUserRepo(pgPool)
 	addressRepo := repo.NewAddressRepo(pgPool)
 
-	// Usecase
-	userUsecase := usecase.NewUserUsecase(userRepo)
-	addressUsecase := usecase.NewAddressUsecase(addressRepo)
+	// Service
+	userService := service.NewUserService(userRepo)
+	addressService := service.NewAddressService(addressRepo)
 
 	// gRPC Server
 	grpcServer := grpcserver.New(
@@ -91,8 +91,8 @@ func New(ctx context.Context) (_ *App, err error) {
 	// Router
 	grpcrouter.NewRouter(grpcrouter.RouterDeps{
 		Server:         grpcServer.Server(),
-		UserUsecase:    userUsecase,
-		AddressUsecase: addressUsecase,
+		UserService:    userService,
+		AddressService: addressService,
 	})
 
 	app := &App{

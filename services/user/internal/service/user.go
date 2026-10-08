@@ -1,4 +1,4 @@
-package usecase
+package service
 
 import (
 	"context"
@@ -10,14 +10,14 @@ type UserRepo interface {
 	GetByID(ctx context.Context, id string) (domain.User, error)
 }
 
-type UserUsecase struct {
+type UserService struct {
 	users UserRepo
 }
 
-func NewUserUsecase(users UserRepo) *UserUsecase {
-	return &UserUsecase{users: users}
+func NewUserService(users UserRepo) *UserService {
+	return &UserService{users: users}
 }
 
-func (uc *UserUsecase) GetUser(ctx context.Context, id string) (domain.User, error) {
+func (uc *UserService) GetUser(ctx context.Context, id string) (domain.User, error) {
 	return uc.users.GetByID(ctx, id)
 }

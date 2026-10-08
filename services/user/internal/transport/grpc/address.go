@@ -10,16 +10,16 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/domain"
 )
 
-type AddressUsecase interface {
+type AddressService interface {
 	GetAddress(ctx context.Context, id string) (domain.Address, error)
 }
 
 type AddressRouter struct {
 	addressv1.UnimplementedAddressServiceServer
-	uc AddressUsecase
+	uc AddressService
 }
 
-func NewAddressRouter(server *grpc.Server, uc AddressUsecase) {
+func NewAddressRouter(server *grpc.Server, uc AddressService) {
 	addressv1.RegisterAddressServiceServer(server, &AddressRouter{uc: uc})
 }
 

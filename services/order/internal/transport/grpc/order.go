@@ -8,30 +8,30 @@ import (
 
 	orderv1 "github.com/maksimegorovdev/delivery-backend/proto/gen/go/order/v1"
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/domain"
-	"github.com/maksimegorovdev/delivery-backend/services/order/internal/usecase"
+	"github.com/maksimegorovdev/delivery-backend/services/order/internal/service"
 )
 
-type OrderUsecase interface {
-	CreateOrder(ctx context.Context, input usecase.CreateOrderInput) (domain.Order, error)
+type OrderService interface {
+	CreateOrder(ctx context.Context, input service.CreateOrderInput) (domain.Order, error)
 }
 
 type OrderRouter struct {
 	orderv1.OrderServiceServer
-	uc OrderUsecase
+	uc OrderService
 }
 
-func NewOrderRouter(server *grpc.Server, uc OrderUsecase) {
+func NewOrderRouter(server *grpc.Server, uc OrderService) {
 	orderv1.RegisterOrderServiceServer(server, &OrderRouter{uc: uc})
 }
 
 func (r *OrderRouter) CreateOrder(ctx context.Context, req *orderv1.CreateOrderRequest) (*orderv1.CreateOrderResponse, error) {
-	input := usecase.CreateOrderInput{
+	input := service.CreateOrderInput{
 		UserID:    req.GetUserId(),
 		AddressID: req.GetAddressId(),
-		Items:     make([]usecase.CreateOrderItemInput, 0, len(req.GetItems())),
+		Items:     make([]service.CreateOrderItemInput, 0, len(req.GetItems())),
 	}
 	for _, item := range req.GetItems() {
-		input.Items = append(input.Items, usecase.CreateOrderItemInput{
+		input.Items = append(input.Items, service.CreateOrderItemInput{
 			ProductID: item.ProductId,
 			Quantity:  item.Quantity,
 		})

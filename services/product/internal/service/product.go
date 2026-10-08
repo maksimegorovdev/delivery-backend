@@ -1,4 +1,4 @@
-package usecase
+package service
 
 import (
 	"context"
@@ -10,14 +10,14 @@ type ProductRepo interface {
 	GetByIDs(ctx context.Context, ids []string) ([]domain.Product, error)
 }
 
-type ProductUsecase struct {
+type ProductService struct {
 	products ProductRepo
 }
 
-func NewProductUsecase(products ProductRepo) *ProductUsecase {
-	return &ProductUsecase{products: products}
+func NewProductService(products ProductRepo) *ProductService {
+	return &ProductService{products: products}
 }
 
-func (uc *ProductUsecase) GetProducts(ctx context.Context, ids []string) ([]domain.Product, error) {
+func (uc *ProductService) GetProducts(ctx context.Context, ids []string) ([]domain.Product, error) {
 	return uc.products.GetByIDs(ctx, ids)
 }

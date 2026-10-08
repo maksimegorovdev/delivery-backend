@@ -71,6 +71,8 @@ tasks:
       - task: svc-watch
         vars: { SVC: order }
       - task: svc-watch
+        vars: { SVC: notification }
+      - task: svc-watch
         vars: { SVC: gateway }
 
   svc-watch:

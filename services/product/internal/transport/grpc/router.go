@@ -6,9 +6,9 @@ import (
 
 type RouterDeps struct {
 	Server         *grpc.Server
-	ProductUsecase ProductUsecase
+	ProductService ProductService
 }
 
 func NewRouter(deps RouterDeps) {
-	NewProductRouter(deps.Server, deps.ProductUsecase)
+	NewProductRouter(deps.Server, deps.ProductService)
 }

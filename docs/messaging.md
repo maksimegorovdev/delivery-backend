@@ -64,7 +64,7 @@ commit и produce → заказ есть, события нет, потреби
 
 ```
                       ┌──────────────── order-service (Go) ────────────────┐
-  gRPC CreateOrder →  │ usecase.CreateOrder                                │
+  gRPC CreateOrder →  │ service.CreateOrder                                │
                       │   txManager.WithinTx(ctx, func(ctx) error {        │
                       │       orders.Create(ctx, order)   → orders,        │
                       │                                     order_items    │
@@ -95,11 +95,11 @@ commit и produce → заказ есть, события нет, потреби
                                             │ consumer group notification
                                             ▼
                 ┌───────────────── notification-service (Go) ──────────────┐
-                │ transport/kafka  → usecase.HandleOrderCreated            │
+                │ transport/kafka  → service.CreateNotification            │
                 │   txManager.WithinTx(ctx, func(ctx) error {              │
                 │       ok := inbox.Claim(ctx, event)      // ON CONFLICT DO NOTHING
                 │       if !ok { return nil }        // дубль — выходим     │
-                │       return notifications.Create(ctx, ...) // pending   │
+                │       return notifications.CreateForChannels(...)  // pending│
                 │   })                                                     │
                 │ commit offset только после успешной транзакции           │
                 │                                                          │
@@ -266,10 +266,10 @@ not have a replica identity and publishes deletes`. Публикация Debeziu
 `RUNNING`). `FULL` не нужен тем более: он раздувает WAL, а Outbox Event Router смотрит только
 на INSERT.
 
-### 4.2 Граница транзакции — usecase (Unit of Work)
+### 4.2 Граница транзакции — service (Unit of Work)
 
-Сейчас `OrderRepo.Create` сам открывает транзакцию. Её нужно поднять на уровень usecase:
-outbox — не забота `OrderRepo`, а решение «что входит в одну бизнес-транзакцию» принимает usecase.
+Сейчас `OrderRepo.Create` сам открывает транзакцию. Её нужно поднять на уровень service:
+outbox — не забота `OrderRepo`, а решение «что входит в одну бизнес-транзакцию» принимает service.
 
 Общий механизм — в `platform/postgres` (там же, где `postgres.New`), новый файл `tx.go`:
 
@@ -284,6 +284,7 @@ type Executor interface {
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 	CopyFrom(ctx context.Context, table pgx.Identifier, columns []string, src pgx.CopyFromSource) (int64, error)
+	SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults
 }
 
 // DB возвращает транзакцию из контекста, если она там есть, иначе пул.
@@ -461,7 +462,7 @@ func (b *OrderEventBuilder) OrderCreated(order domain.Order) (domain.OutboxEvent
 ```
 
 Почему отдельный пакет, а не метод домена: сериализация в protojson тянет зависимость от
-сгенерированного `orderv1`, а домен должен остаться чистым. Usecase видит это через интерфейс
+сгенерированного `orderv1`, а домен должен остаться чистым. Service видит это через интерфейс
 (объявленный у потребителя, как `OrderRepo`/`UserProvider` сейчас).
 
 `uuid` здесь — не сторонняя библиотека, а пакет стандартной библиотеки Go (появился в 1.27,
@@ -469,7 +470,7 @@ func (b *OrderEventBuilder) OrderCreated(order domain.Order) (domain.OutboxEvent
 `go.sum` тянет `github.com/google/uuid` транзитивно через другую зависимость — это не тот `uuid`,
 что используется в коде, и добавлять его в `go.mod` явно не нужно.
 
-### 4.5 Usecase
+### 4.5 Service
 
 ```go
 type TxManager interface {
@@ -488,7 +489,7 @@ type OrderEvents interface {
 	OrderCreated(order domain.Order) (domain.OutboxEvent, error)
 }
 
-type OrderUsecaseDeps struct {
+type OrderServiceDeps struct {
 	Tx       TxManager
 	Orders   OrderRepo
 	Outbox   OutboxRepo
@@ -498,7 +499,7 @@ type OrderUsecaseDeps struct {
 }
 ```
 
-(`Deps` — по значению, раскладывается в поля `OrderUsecase` в конструкторе, как сейчас.)
+(`Deps` — по значению, раскладывается в поля `OrderService` в конструкторе, как сейчас.)
 
 Хвост `CreateOrder` меняется так:
 
@@ -530,7 +531,7 @@ type OrderUsecaseDeps struct {
 
 ### 4.6 Сборка в app.go
 
-В `services/order/internal/app/app.go` меняются только блоки «Repository» и «Usecase»;
+В `services/order/internal/app/app.go` меняются только блоки «Repository» и «Service»;
 Postgres, gRPC-клиенты, сервер и `Closer` остаются как есть. Про Kafka `order-service` по-прежнему
 ничего не знает.
 
@@ -551,8 +552,8 @@ Postgres, gRPC-клиенты, сервер и `Closer` остаются как 
 	userClient := client.NewUserClient(userConn)
 	productClient := client.NewProductClient(productConn)
 
-	// Usecase
-	orderUsecase := usecase.NewOrderUsecase(usecase.OrderUsecaseDeps{
+	// Service
+	orderService := service.NewOrderService(service.OrderServiceDeps{
 		Tx:       txManager,
 		Orders:   orderRepo,
 		Outbox:   outboxRepo,
@@ -570,7 +571,7 @@ Postgres, gRPC-клиенты, сервер и `Closer` остаются как 
 
 `postgres` (`platform/postgres`) уже импортирован — `NewTxManager` лежит рядом с `postgres.New`.
 
-Сам `usecase` `platform/postgres` не импортирует: он видит `TxManager` и `OutboxRepo` только через
+Сам `service` `platform/postgres` не импортирует: он видит `TxManager` и `OutboxRepo` только через
 интерфейсы из раздела 4.5, а `*postgres.TxManager` подходит под интерфейс неявно — достаточно
 метода `WithinTx`. Связывание конкретных типов происходит только здесь, в `app.go`.
 
@@ -1037,7 +1038,8 @@ CREATE INDEX idx_notifications_pending_next_attempt_at
 Связь логическая: `event_id` копируется, FK на `inbox_events` **не ставим** — inbox чистится.
 `event_type` нужен воркеру, чтобы знать, как разбирать `payload`: события разных типов приходят
 с разным телом, а `JSONB` позволяет держать их в одной таблице без новых колонок на каждое.
-`UNIQUE (event_id, channel)` — вторая линия защиты от дублей, если inbox почистили раньше времени.
+`UNIQUE (event_id, channel)` — вторая линия защиты от дублей, если inbox почистили раньше времени
+(вставка с `ON CONFLICT DO NOTHING` тихо пропускает дубль — раздел 6.4).
 Статусов три: `pending` (ждёт отправки или повтора), `sent` и `failed` (исчерпаны попытки либо
 ошибка заведомо постоянная). Допустимые значения закреплены `CHECK` (опечатка в статусе иначе
 молча выведет запись из выборки воркера; CHECK, а не enum — новый статус добавляется
@@ -1071,6 +1073,7 @@ CREATE INDEX idx_notifications_pending_next_attempt_at
 platform/kafka/kafkaconsumer/
     kafkaconsumer.go   # Handler, ErrorHandler, Consumer, New, Run, Close
     options.go         # Option, WithErrorHandler, WithMaxPollRecords, WithRetryBackoff, WithClientOptions
+    message.go         # Message — своя модель записи, toMessage(*kgo.Record)
 ```
 
 По конвенции проекта (`platform/grpc/grpcserver`, `platform/http/httpserver`) — тонкая обёртка
@@ -1096,11 +1099,11 @@ const (
 	defaultRetryBackoff   = time.Second
 )
 
-// Handler получает запись как есть, *kgo.Record: по конвенции platform/ (как pgxpool в postgres
-// и grpc.Server в grpcserver) типы библиотеки не прячутся. Важно, чтобы kgo не уходил глубже
-// транспортного слоя: usecase и домен о нём не знают.
+// Handler получает запись в виде своей модели Message (message.go), а не *kgo.Record:
+// franz-go остаётся внутри этого пакета, транспорт сервиса о нём не знает. Конвертация
+// kgo.Record → Message — единственное место, где типы клиента пересекают границу пакета.
 type Handler interface {
-	Handle(ctx context.Context, rec *kgo.Record) error
+	Handle(ctx context.Context, msg Message) error
 }
 
 // ErrorHandler получает нефатальные ошибки commit (худшее последствие — повторная доставка,
@@ -1178,7 +1181,7 @@ func (c *Consumer) Run(ctx context.Context, h Handler) error {
 			for _, rec := range p.Records {
 				// Ошибку Handle не логируем: это делает сам хендлер, у него есть контекст
 				// (тип события и т. п.).
-				if err := h.Handle(ctx, rec); err != nil {
+				if err := h.Handle(ctx, toMessage(rec)); err != nil {
 					// Дальше по этой партиции не идём: порядок важнее пропускной способности.
 					// Запоминаем, куда откатить позицию чтения.
 					if rewind[rec.Topic] == nil {
@@ -1223,6 +1226,44 @@ func (c *Consumer) Run(ctx context.Context, h Handler) error {
 // CloseAllowingRebalance: при BlockRebalanceOnPoll обычный Close может зависнуть на ребалансе.
 func (c *Consumer) Close() { c.client.CloseAllowingRebalance() }
 ```
+
+Модель записи — `platform/kafka/kafkaconsumer/message.go`:
+
+```go
+// Message — запись брокера без привязки к клиенту. Поля — то, что нужно транспорту сервиса.
+type Message struct {
+	Topic     string
+	Partition int32
+	Offset    int64
+	Key       []byte
+	Value     []byte
+	// Headers: при повторе ключа берётся первое значение (как делал прежний Header(rec, key)).
+	Headers map[string]string
+}
+
+func toMessage(rec *kgo.Record) Message {
+	headers := make(map[string]string, len(rec.Headers))
+	for _, h := range rec.Headers {
+		if _, ok := headers[h.Key]; !ok {
+			headers[h.Key] = string(h.Value)
+		}
+	}
+	return Message{
+		Topic:     rec.Topic,
+		Partition: rec.Partition,
+		Offset:    rec.Offset,
+		Key:       rec.Key,
+		Value:     rec.Value,
+		Headers:   headers,
+	}
+}
+```
+
+Почему не отдавать `*kgo.Record`: тогда каждый хендлер и `Router` тянут franz-go, и замена клиента
+или тест хендлера без `kgo.Record` превращаются в правки по всему сервису. Цена своей модели — одна
+функция конвертации и мапа заголовков на запись. Системные поля франца (`LeaderEpoch`, `Timestamp`,
+`Context`) в `Message` не попадают: хендлерам они не нужны, а `Run` откатывает позицию по исходной
+`kgo.Record`, которая из пакета не выходит. Нужно новое поле — добавляем в `Message` и `toMessage`.
 
 Опции — `platform/kafka/kafkaconsumer/options.go`:
 
@@ -1281,7 +1322,7 @@ func WithClientOptions(opts ...kgo.Opt) Option {
 в памяти, после N неудач — запись в DLQ-топик (`order.events.v1.dlq`) и коммит. Это следующий
 шаг, не первый.
 
-### 6.4 Repository / usecase / transport
+### 6.4 Repository / service / transport
 
 Структура повторяет order-сервис:
 
@@ -1290,22 +1331,26 @@ services/notification/internal/
     app/app.go
     config/config.go
     domain/
-        event.go              # domain.OrderCreated, EventTypeOrderCreated — своя модель, не proto
+        event.go              # EventTypeOrderCreated и другие типы событий
         inbox.go              # domain.InboxEvent
         notification.go       # domain.Notification
     notify/
-        log.go                # LogNotifier (реализация usecase.Sender, канал log)
+        log.go                # LogNotifier (реализация service.Sender, канал log)
     repository/pg/
         inbox.go              # InboxRepo, Claim
-        notification.go       # NotificationRepo: Create, ClaimBatch, MarkSent, MarkRetry, MarkFailed
+        notification.go       # NotificationRepo: CreateForChannels, ClaimBatch, MarkSent, MarkRetry, MarkFailed
     transport/kafka/
-        router.go             # OrderRouter, OrderRouterDeps, Handle/route, headerEventType
-        order.go              # handleOrderCreated: декод protojson → usecase input
-    usecase/
-        notification.go       # интерфейсы, NotificationUsecase, HandleOrderCreatedInput
-        sender.go             # SenderUsecase (воркер отправки, раздел 6.6)
+        router.go             # Router: топик → kafkaconsumer.Handler, сам реализует kafkaconsumer.Handler
+        header.go             # HeaderEventType — имя заголовка из конфига Debezium
+        order/                # всё про топик order.events.v1
+            handler.go        # Topic, Handler, HandlerDeps, Handle/route по event-type
+            created.go        # handleOrderCreated: декод protojson → service input
+        # позже: payment/, delivery/ — по подпакету на топик
+    service/
+        notification.go       # интерфейсы, NotificationService.CreateNotification, CreateNotificationInput
+        sender.go             # SenderService (воркер отправки, раздел 6.6)
     worker/
-        sender.go             # SenderWorker: тикер → SenderUsecase.RunOnce
+        sender.go             # SenderWorker: тикер → SenderService.RunOnce
 ```
 
 Конфиг (`Config.Kafka`) — в `internal/config/config.go`, сборка — в `internal/app/app.go`.
@@ -1356,42 +1401,31 @@ func (r *InboxRepo) Claim(ctx context.Context, event domain.InboxEvent) (bool, e
 после ребаланса) могут пройти проверку одновременно. `INSERT ... ON CONFLICT DO NOTHING` +
 `RowsAffected` атомарен.
 
-**Usecase — Unit of Work, как в order:**
+**Service — Unit of Work, как в order:**
 
-Файл `services/notification/internal/usecase/notification.go`. Интерфейсы объявлены у
+Файл `services/notification/internal/service/notification.go`. Интерфейсы объявлены у
 потребителя (как `OrderRepo`/`UserProvider` в order-сервисе), `Deps` — по значению,
-раскладывается в поля в конструкторе (см. раздел 4.5). Доменная модель события —
+раскладывается в поля в конструкторе (см. раздел 4.5). Типы событий — константы в
 `internal/domain/event.go`:
 
 ```go
 const EventTypeOrderCreated = "OrderCreated"
-
-type OrderCreated struct {
-	EventID         string
-	OrderID         string
-	UserID          string
-	Items           []OrderItem
-	TotalAmount     int64
-	DeliveryAddress string
-	CreatedAt       time.Time
-}
-
-type OrderItem struct {
-	ID          string
-	ProductID   string
-	ProductName string
-	Quantity    int32
-	UnitPrice   int64
-}
+// позже: EventTypeOrderPaid, EventTypeOrderCanceled
 ```
 
+Service один на все события и называется по действию — `CreateNotification`, как `CreateOrder`
+в order-сервисе. Он не знает ни про Kafka, ни про конкретные типы событий: дедуплицирует и
+создаёт уведомления. Какие каналы нужны событию, решает транспорт — каждый `handleXxx` знает,
+какое событие разбирает, и сам задаёт `Channels`. Новое событие — это новый `case` и
+`handleXxx` в роутере, без нового метода в service.
+
 ```go
-// HandleOrderCreatedInput — вход usecase: «конверт» для inbox, сырое тело (для notifications)
-// и разобранное событие.
-type HandleOrderCreatedInput struct {
-	Message domain.InboxEvent
-	Payload []byte
-	Event   domain.OrderCreated
+// CreateNotificationInput — вход service: «конверт» для inbox, сырое тело (для notifications)
+// и каналы, в которые надо уведомить.
+type CreateNotificationInput struct {
+	Message  domain.InboxEvent
+	Payload  []byte
+	Channels []domain.Channel
 }
 
 type TxManager interface {
@@ -1403,25 +1437,25 @@ type InboxRepo interface {
 }
 
 type NotificationRepo interface {
-	Create(ctx context.Context, n domain.Notification) error
+	CreateForChannels(ctx context.Context, n domain.Notification, channels []domain.Channel) error
 }
 
-type NotificationUsecaseDeps struct {
+type NotificationServiceDeps struct {
 	Tx            TxManager
 	Inbox         InboxRepo
 	Notifications NotificationRepo
 	Log           *slog.Logger
 }
 
-type NotificationUsecase struct {
+type NotificationService struct {
 	tx            TxManager
 	inbox         InboxRepo
 	notifications NotificationRepo
 	log           *slog.Logger
 }
 
-func NewNotificationUsecase(deps NotificationUsecaseDeps) *NotificationUsecase {
-	return &NotificationUsecase{
+func NewNotificationService(deps NotificationServiceDeps) *NotificationService {
+	return &NotificationService{
 		tx:            deps.Tx,
 		inbox:         deps.Inbox,
 		notifications: deps.Notifications,
@@ -1431,9 +1465,9 @@ func NewNotificationUsecase(deps NotificationUsecaseDeps) *NotificationUsecase {
 ```
 
 ```go
-func (uc *NotificationUsecase) HandleOrderCreated(
+func (uc *NotificationService) CreateNotification(
 	ctx context.Context,
-	input HandleOrderCreatedInput,
+	input CreateNotificationInput,
 ) error {
 	return uc.tx.WithinTx(ctx, func(ctx context.Context) error {
 		claimed, err := uc.inbox.Claim(ctx, input.Message)
@@ -1446,24 +1480,118 @@ func (uc *NotificationUsecase) HandleOrderCreated(
 			return nil
 		}
 
-		return uc.notifications.Create(ctx, domain.Notification{
+		// По строке на каждый канал, одним запросом (дубль пропускается).
+		return uc.notifications.CreateForChannels(ctx, domain.Notification{
 			EventID:   input.Message.EventID,
 			EventType: input.Message.EventType,
-			Channel:   domain.ChannelLog, // позже: по строке на каждый канал
 			Payload:   input.Payload,
-		})
+		}, input.Channels)
 	})
 }
 ```
 
-`NotificationRepo.Create` — `INSERT INTO notifications (event_id, event_type, channel, payload)
-VALUES ($1, $2, $3, $4) ON CONFLICT (event_id, channel) DO NOTHING`. `domain.Notification`
-(`internal/domain/notification.go`) — поля `ID, EventID, EventType, Channel, Payload` (теги
-`db:"..."` под `pgx.RowToStructByName`), `ChannelLog = "log"`.
+Доменная модель — `internal/domain/notification.go`. Как и `domain.User` в user-сервисе, она без
+`db`-тегов: маппинг на колонки живёт в репозитории (приватный `notificationRow` + `toDomain()`).
+
+```go
+// Channel — типизированная строка, как OrderStatus в order-сервисе.
+type Channel string
+
+const (
+	ChannelLog Channel = "log"
+	// позже: ChannelEmail, ChannelPush
+)
+
+type Notification struct {
+	ID        string
+	EventID   string
+	EventType string
+	Channel   Channel
+	Payload   []byte
+	Attempts  int // заполняется при захвате воркером (раздел 6.6)
+}
+```
+
+Репозиторий — `internal/repository/pg/notification.go`:
+
+```go
+type notificationRow struct {
+	ID        string `db:"id"`
+	EventID   string `db:"event_id"`
+	EventType string `db:"event_type"`
+	Channel   string `db:"channel"`
+	Payload   []byte `db:"payload"`
+	Attempts  int    `db:"attempts"`
+}
+
+func (r notificationRow) toDomain() domain.Notification {
+	return domain.Notification{
+		ID:        r.ID,
+		EventID:   r.EventID,
+		EventType: r.EventType,
+		Channel:   domain.Channel(r.Channel),
+		Payload:   r.Payload,
+		Attempts:  r.Attempts,
+	}
+}
+
+type NotificationRepo struct {
+	pool *pgxpool.Pool
+}
+
+func NewNotificationRepo(pool *pgxpool.Pool) *NotificationRepo {
+	return &NotificationRepo{pool: pool}
+}
+
+// CreateForChannels — приём события: по строке на каждый канал, все INSERT'ы уходят в БД одним
+// сетевым вызовом (pgx.Batch). id и служебные поля ставит БД (DEFAULT). Channel в notification
+// игнорируется — каналы приходят отдельным аргументом. ON CONFLICT — вторая линия защиты от
+// дублей, если inbox почистили раньше времени.
+func (r *NotificationRepo) CreateForChannels(
+	ctx context.Context,
+	notification domain.Notification,
+	channels []domain.Channel,
+) error {
+	if len(channels) == 0 {
+		return nil
+	}
+
+	batch := &pgx.Batch{}
+	for _, ch := range channels {
+		batch.Queue(
+			`INSERT INTO notifications (event_id, event_type, channel, payload)
+				VALUES ($1, $2, $3, $4)
+				ON CONFLICT (event_id, channel) DO NOTHING`,
+			notification.EventID, notification.EventType, ch, notification.Payload,
+		)
+	}
+
+	results := postgres.DB(ctx, r.pool).SendBatch(ctx, batch)
+	defer results.Close()
+
+	// Результаты читаем по одному на каждый запрос: ошибка любого из них придёт из Exec.
+	for range channels {
+		if _, err := results.Exec(); err != nil {
+			return pgerr.Map(err)
+		}
+	}
+	return nil
+}
+```
+
+Остальные методы (`ClaimBatch`, `MarkSent`, `MarkRetry`, `MarkFailed`) — раздел 6.6.
+
+**Почему `pgx.Batch`.** Обычный `INSERT ... VALUES ... ON CONFLICT DO NOTHING` по каждому
+каналу читается без трюков, а `Batch` отправляет их все за один сетевой вызов. Альтернативы
+хуже: `CopyFrom` не умеет `ON CONFLICT` (при дубле `(event_id, channel)` упал бы с unique
+violation, транзакция откатилась бы вместе с `Claim`, и сообщение зациклилось бы), а
+`INSERT ... SELECT ... FROM unnest(...)` требует явных приведений типов и выглядит непривычно.
+Для этого в `postgres.Executor` добавлен `SendBatch` (раздел 4.2): его есть и у `pgxpool.Pool`,
+и у `pgx.Tx`.
 
 Дедупликация и запись `notifications` — в одной транзакции: либо есть обе строки, либо ни одной.
-Если упадёт `Create`, откатится и запись в inbox, оффсет не закоммитится, сообщение приедет
-снова. Внешнего эффекта в транзакции приёма нет — его делает воркер (раздел 6.6).
+Если упадёт `CreateForChannels`, откатится и запись в inbox, оффсет не закоммитится, сообщение
+приедет снова. Внешнего эффекта в транзакции приёма нет — его делает воркер (раздел 6.6).
 
 **Эффект вне БД — не в транзакции приёма.** Печать в лог (как и отправка письма) не участвует
 в транзакции — на неё транзакционных гарантий нет по определению. Поэтому приём лишь фиксирует
@@ -1477,44 +1605,105 @@ VALUES ($1, $2, $3, $4) ON CONFLICT (event_id, channel) DO NOTHING`. `domain.Not
 индекс `idx_inbox_events_received_at`. Повтор старше окна (например, после `rpk group seek` на
 начало) снова пройдёт `Claim` — это осознанный компромисс, сейчас чистку не делаем (раздел 12).
 
-**Transport — маршрутизация по типу события.**
-`services/notification/internal/transport/kafka/router.go` и `order.go`. Пакет называется
-`kafka`, в `app.go` импортируется с алиасом `kafkarouter`. Usecase объявлен интерфейсом у
-потребителя:
+**Transport — подпакет на топик, роутер по топику.**
+Один топик = один агрегат = один подпакет в `services/notification/internal/transport/kafka/`.
+Так события `order`, а позже `payment`/`delivery`, не смешиваются в одном файле, а каждый
+подпакет знает только свои типы событий и свой proto-контракт. Консьюмер принимает один
+`Handler`, поэтому наверху стоит тонкий `Router`, который по `msg.Topic` отдаёт запись
+нужному обработчику. `Router` и обработчики топиков реализуют один и тот же интерфейс
+`kafkaconsumer.Handler` (composite): консьюмер не знает про роутинг, а обработчики — про топики
+друг друга. Внутри подпакета — маршрутизация по заголовку `event-type`.
+
+```
+transport/kafka/
+    router.go        # Router: topic → Handler
+    header.go        # HeaderEventType
+    order/           # топик order.events.v1
+        handler.go
+        created.go
+```
+
+**Чтение заголовков.** Отдельного хелпера нет: `kafkaconsumer.Message.Headers` — обычная мапа
+(`toMessage`, раздел 6.3), заголовок читается как `msg.Headers[kafka.HeaderEventType]`; нет
+заголовка — пустая строка.
+
+**Имя заголовка — `transport/kafka/header.go`** (package `kafka`). Оно остаётся в сервисе: это
+контракт с конфигом коннектора (`type:header:event-type`, раздел 5.4), а не свойство платформы:
 
 ```go
-const headerEventType = "event-type"
+package kafka
 
-type NotificationUsecase interface {
-	HandleOrderCreated(ctx context.Context, in usecase.HandleOrderCreatedInput) error
+const HeaderEventType = "event-type"
+```
+
+**Роутер — `transport/kafka/router.go`** (package `kafka`). Отдельный `Handler` не объявляем:
+транспорт и так импортирует `kafkaconsumer.Message`, поэтому берём `kafkaconsumer.Handler`
+как есть (раньше интерфейс дублировался ради независимости от `platform/` — с общей моделью
+сообщения она всё равно невозможна):
+
+```go
+type Router struct {
+	handlers map[string]kafkaconsumer.Handler // topic → handler
+	log      *slog.Logger
 }
 
-type OrderRouterDeps struct {
-	NotificationUsecase NotificationUsecase
+func NewRouter(log *slog.Logger) *Router {
+	return &Router{handlers: make(map[string]kafkaconsumer.Handler), log: log}
+}
+
+// Register привязывает обработчик к топику. Вызывается в app.go до старта консьюмера.
+func (r *Router) Register(topic string, h kafkaconsumer.Handler) { r.handlers[topic] = h }
+
+// Handle — точка входа от консьюмера (реализует kafkaconsumer.Handler).
+func (r *Router) Handle(ctx context.Context, msg kafkaconsumer.Message) error {
+	h, ok := r.handlers[msg.Topic]
+	if !ok {
+		// Подписались на топик, а обработчика нет — ошибка конфигурации, но не повод
+		// стопорить партицию: пропускаем и громко пишем.
+		r.log.WarnContext(ctx, "no handler for topic", slog.String("topic", msg.Topic))
+		return nil
+	}
+	return h.Handle(ctx, msg)
+}
+```
+
+**Подпакет `order` — `transport/kafka/order/handler.go`** (package `order`). Service объявлен
+интерфейсом у потребителя:
+
+```go
+// Topic — имя топика (раздел 3.3). Должно входить в KAFKA_TOPICS.
+const Topic = "order.events.v1"
+
+type NotificationService interface {
+	CreateNotification(ctx context.Context, in service.CreateNotificationInput) error
+}
+
+type HandlerDeps struct {
+	NotificationService NotificationService
 	Log                 *slog.Logger
 }
 
-type OrderRouter struct {
-	notification NotificationUsecase
+type Handler struct {
+	notification NotificationService
 	log          *slog.Logger
 }
 
-func NewOrderRouter(deps OrderRouterDeps) *OrderRouter {
-	return &OrderRouter{notification: deps.NotificationUsecase, log: deps.Log}
+func NewHandler(deps HandlerDeps) *Handler {
+	return &Handler{notification: deps.NotificationService, log: deps.Log}
 }
 ```
 
 ```go
-// Handle — точка входа от консьюмера. Ошибку логируем здесь: консьюмер из platform/ не
+// Handle — точка входа от Router. Ошибку логируем здесь: консьюмер из platform/ не
 // логирует, а контекст сообщения (тип события, откуда приехало) есть только у нас.
-func (r *OrderRouter) Handle(ctx context.Context, rec *kgo.Record) error {
-	eventType := header(rec, headerEventType)
+func (h *Handler) Handle(ctx context.Context, msg kafkaconsumer.Message) error {
+	eventType := msg.Headers[kafka.HeaderEventType]
 
-	if err := r.route(ctx, rec, eventType); err != nil {
-		r.log.ErrorContext(ctx, "handle message",
-			slog.String("topic", rec.Topic),
-			slog.Int("partition", int(rec.Partition)),
-			slog.Int64("offset", rec.Offset),
+	if err := h.route(ctx, msg, eventType); err != nil {
+		h.log.ErrorContext(ctx, "handle message",
+			slog.String("topic", msg.Topic),
+			slog.Int("partition", int(msg.Partition)),
+			slog.Int64("offset", msg.Offset),
 			slog.String("event_type", eventType),
 			logger.Err(err))
 		return err
@@ -1522,71 +1711,53 @@ func (r *OrderRouter) Handle(ctx context.Context, rec *kgo.Record) error {
 	return nil
 }
 
-func (r *OrderRouter) route(ctx context.Context, rec *kgo.Record, eventType string) error {
+func (h *Handler) route(ctx context.Context, msg kafkaconsumer.Message, eventType string) error {
 	switch eventType {
 	case domain.EventTypeOrderCreated:
-		return r.handleOrderCreated(ctx, rec)
+		return h.handleOrderCreated(ctx, msg)
+	// позже: OrderPaid, OrderCanceled — новый case и новый файл рядом (paid.go, canceled.go)
 	default:
 		// Неизвестный тип — не ошибка: старый консьюмер, новое событие. Пропускаем.
-		r.log.Debug("unknown event type", slog.String("type", eventType))
+		h.log.Debug("unknown event type", slog.String("type", eventType))
 		return nil
 	}
 }
+```
 
-// header возвращает значение первого заголовка с ключом key или "" — у kgo.Record
-// заголовки лежат слайсом, прямого доступа по ключу нет.
-func header(rec *kgo.Record, key string) string {
-	for _, h := range rec.Headers {
-		if h.Key == key {
-			return string(h.Value)
-		}
-	}
-	return ""
-}
+Подпакет `order` импортирует родительский `kafka` (за `HeaderEventType`), а не наоборот: `Router`
+про `order` ничего не знает, их связывает `app.go`. Цикла нет.
 
-func (r *OrderRouter) handleOrderCreated(ctx context.Context, rec *kgo.Record) error {
+**`transport/kafka/order/created.go`** — по файлу на событие:
+
+```go
+func (h *Handler) handleOrderCreated(ctx context.Context, msg kafkaconsumer.Message) error {
 	var pb orderv1.OrderCreated
-	if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(rec.Value, &pb); err != nil {
+	if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(msg.Value, &pb); err != nil {
 		return apperr.InvalidArgument().Wrap(err)
 	}
 
-	items := make([]domain.OrderItem, 0, len(pb.GetItems()))
-	for _, it := range pb.GetItems() {
-		items = append(items, domain.OrderItem{
-			ID:          it.GetId(),
-			ProductID:   it.GetProductId(),
-			ProductName: it.GetProductName(),
-			Quantity:    it.GetQuantity(),
-			UnitPrice:   it.GetUnitPrice(),
-		})
-	}
-
-	return r.notification.HandleOrderCreated(ctx, usecase.HandleOrderCreatedInput{
+	return h.notification.CreateNotification(ctx, service.CreateNotificationInput{
 		// «Конверт» для inbox: event_id — ключ дедупликации, остальное — для диагностики.
 		Message: domain.InboxEvent{
 			EventID:     pb.GetEventId(),
-			Topic:       rec.Topic,
-			Partition:   rec.Partition,
-			Offset:      rec.Offset,
+			Topic:       msg.Topic,
+			Partition:   msg.Partition,
+			Offset:      msg.Offset,
 			EventType:   domain.EventTypeOrderCreated,
-			AggregateID: pb.GetOrderId(), // совпадает с string(rec.Key)
+			AggregateID: pb.GetOrderId(), // совпадает с string(msg.Key)
 		},
-		Payload: rec.Value, // сырое тело — в notifications.payload, не в inbox
-		Event: domain.OrderCreated{
-			EventID:         pb.GetEventId(),
-			OrderID:         pb.GetOrderId(),
-			UserID:          pb.GetUserId(),
-			Items:           items,
-			TotalAmount:     pb.GetTotalAmount(),
-			DeliveryAddress: pb.GetDeliveryAddress(),
-			CreatedAt:       pb.GetCreatedAt().AsTime(),
-		},
+		Payload:  msg.Value, // сырое тело — в notifications.payload, не в inbox
+		Channels: []domain.Channel{domain.ChannelLog}, // каналы выбирает транспорт по типу события
 	})
 }
 ```
 
+**Как добавить новый топик** (например, `payment.events.v1`): подпакет `transport/kafka/payment/`
+со своим `Handler` и `Topic`, строка `router.Register(payment.Topic, paymentHandler)` в `app.go`,
+топик — в `KAFKA_TOPICS`. Роутер, консьюмер и `order` не меняются.
+
 Пустой или не-UUID `event_id` (и `order_id`) даст ошибку на вставке в колонки `UUID`, то есть
-такое сообщение — тоже контрактная ошибка; при желании проверяем явно до usecase.
+такое сообщение — тоже контрактная ошибка; при желании проверяем явно до service.
 
 `DiscardUnknown: true` — чтобы добавление поля в `OrderCreated` не ломало старых консьюмеров.
 
@@ -1605,7 +1776,7 @@ type App struct {
 	cfg      *config.Config
 	log      *slog.Logger
 	consumer *kafkaconsumer.Consumer
-	router   *kafkarouter.OrderRouter // alias на internal/transport/kafka
+	router   *kafka.Router // internal/transport/kafka
 	sender   *worker.SenderWorker
 	closer   *closer.Closer
 }
@@ -1665,27 +1836,28 @@ func New(ctx context.Context) (_ *App, err error) {
 	inboxRepo := repo.NewInboxRepo(pgPool)
 	notificationRepo := repo.NewNotificationRepo(pgPool)
 
-	// Usecase
-	notificationUsecase := usecase.NewNotificationUsecase(usecase.NotificationUsecaseDeps{
+	// Service
+	notificationService := service.NewNotificationService(service.NotificationServiceDeps{
 		Tx:            txManager,
 		Inbox:         inboxRepo,
 		Notifications: notificationRepo,
 		Log:           log,
 	})
-	senderUsecase := usecase.NewSenderUsecase(usecase.SenderUsecaseDeps{
+	senderService := service.NewSenderService(service.SenderServiceDeps{
 		Store:  notificationRepo,
 		Sender: notify.NewLogNotifier(log),
 		Log:    log,
 	})
 
 	// Worker
-	senderWorker := worker.NewSenderWorker(senderUsecase, 2*time.Second, log)
+	senderWorker := worker.NewSenderWorker(senderService, 2*time.Second, log)
 
-	// Router
-	router := kafkarouter.NewOrderRouter(kafkarouter.OrderRouterDeps{
-		NotificationUsecase: notificationUsecase,
+	// Transport: подпакет на топик, роутер раздаёт записи по msg.Topic
+	router := kafka.NewRouter(log)
+	router.Register(order.Topic, order.NewHandler(order.HandlerDeps{
+		NotificationService: notificationService,
 		Log:                 log,
-	})
+	}))
 
 	app := &App{
 		cfg:      cfg,
@@ -1747,7 +1919,8 @@ Kafka → консьюмер → [inbox_events + notifications] (одна тра
 этого запись **захватывается** коротким запросом и получает срок аренды (`locked_until`);
 результат отправки фиксируется отдельными короткими запросами.
 
-**Репозиторий.** Четыре метода в `internal/repository/pg/notification.go` (пятый — `Create` из 6.4):
+**Репозиторий.** Четыре метода в `internal/repository/pg/notification.go` (там же `notificationRow`,
+конструктор и `CreateForChannels` из 6.4):
 
 ```go
 // ClaimBatch захватывает до limit записей, готовых к отправке, и выдаёт им аренду на lease.
@@ -1776,7 +1949,17 @@ func (r *NotificationRepo) ClaimBatch(
 	if err != nil {
 		return nil, pgerr.Map(err)
 	}
-	return pgx.CollectRows(rows, pgx.RowToStructByName[domain.Notification])
+
+	collected, err := pgx.CollectRows(rows, pgx.RowToStructByName[notificationRow])
+	if err != nil {
+		return nil, pgerr.Map(err)
+	}
+
+	out := make([]domain.Notification, 0, len(collected))
+	for _, row := range collected {
+		out = append(out, row.toDomain())
+	}
+	return out, nil
 }
 
 func (r *NotificationRepo) MarkSent(ctx context.Context, id string) error {
@@ -1808,9 +1991,11 @@ func (r *NotificationRepo) MarkFailed(ctx context.Context, id string, cause stri
 
 `attempts` увеличивается при захвате, поэтому после падения воркера посреди отправки счётчик
 всё равно вырос, и «ядовитая» запись, на которой воркер падает, рано или поздно упрётся в
-`maxAttempts`. В `domain.Notification` добавляется поле `Attempts int`.
+`maxAttempts`. `attempts` попадает в `domain.Notification.Attempts` через `notificationRow`.
+`RowToStructByName` требует, чтобы колонки `RETURNING` и поля `notificationRow` совпадали:
+добавляя поле, меняй их вместе.
 
-**Usecase** (`internal/usecase/sender.go`):
+**Service** (`internal/service/sender.go`):
 
 ```go
 const (
@@ -1836,25 +2021,25 @@ type Sender interface {
 	Send(ctx context.Context, n domain.Notification) error
 }
 
-type SenderUsecaseDeps struct {
+type SenderServiceDeps struct {
 	Store  NotificationStore
 	Sender Sender
 	Log    *slog.Logger
 }
 
-type SenderUsecase struct {
+type SenderService struct {
 	store  NotificationStore
 	sender Sender
 	log    *slog.Logger
 }
 
-func NewSenderUsecase(deps SenderUsecaseDeps) *SenderUsecase {
-	return &SenderUsecase{store: deps.Store, sender: deps.Sender, log: deps.Log}
+func NewSenderService(deps SenderServiceDeps) *SenderService {
+	return &SenderService{store: deps.Store, sender: deps.Sender, log: deps.Log}
 }
 
 // RunOnce обрабатывает одну пачку. more == true — пачка была полной, значит, очередь, скорее
 // всего, не пуста, и воркер не ждёт следующего тика. Ошибка отправки не прерывает пачку.
-func (uc *SenderUsecase) RunOnce(ctx context.Context) (more bool, err error) {
+func (uc *SenderService) RunOnce(ctx context.Context) (more bool, err error) {
 	batch, err := uc.store.ClaimBatch(ctx, batchSize, leaseTTL)
 	if err != nil {
 		return false, err
@@ -1867,7 +2052,7 @@ func (uc *SenderUsecase) RunOnce(ctx context.Context) (more bool, err error) {
 	return len(batch) == batchSize, nil
 }
 
-func (uc *SenderUsecase) process(ctx context.Context, n domain.Notification) error {
+func (uc *SenderService) process(ctx context.Context, n domain.Notification) error {
 	sendCtx, cancel := context.WithTimeout(ctx, sendTimeout)
 	defer cancel()
 
@@ -1945,7 +2130,7 @@ func (w *SenderWorker) Run(ctx context.Context) error {
 `app.go` воркер запускается в `errgroup` рядом с консьюмером (раздел 6.5) и завершается по
 `ctx.Done()` — закрывать нечего.
 
-**Канал `log`.** `LogNotifier` (`internal/notify/log.go`) — реализация `usecase.Sender`:
+**Канал `log`.** `LogNotifier` (`internal/notify/log.go`) — реализация `service.Sender`:
 
 ```go
 package notify
@@ -1960,15 +2145,15 @@ func NewLogNotifier(log *slog.Logger) *LogNotifier {
 
 func (n *LogNotifier) Send(ctx context.Context, nt domain.Notification) error {
 	n.log.InfoContext(ctx, "notification sent",
-		slog.String("channel", nt.Channel),
+		slog.String("channel", string(nt.Channel)),
 		slog.String("event_id", nt.EventID),
 	)
 	return nil
 }
 ```
 
-Отдельным интерфейсом `Sender`, а не прямым `slog` в usecase, — чтобы потом подменить на
-письмо/пуш, не трогая usecase. Когда каналов станет несколько, `Send` выбирается по
+Отдельным интерфейсом `Sender`, а не прямым `slog` в service, — чтобы потом подменить на
+письмо/пуш, не трогая service. Когда каналов станет несколько, `Send` выбирается по
 `n.Channel` (маршрутизатор отправителей).
 
 **Когда появится email: `user_id` и `recipient`.** Отдельной миграцией добавляются колонки
@@ -1987,7 +2172,7 @@ func (n *LogNotifier) Send(ctx context.Context, nt domain.Notification) error {
   `Send` медленный, пачка обрабатывается последовательно — тогда растят число реплик или
   параллелят отправку внутри пачки (ограниченный пул горутин; `leaseTTL` пересчитывается).
 * **Лимиты каналов.** У провайдеров бывают rate limit — ограничитель ставится на реализацию
-  `Sender` конкретного канала, а не в usecase.
+  `Sender` конкретного канала, а не в service.
 * **Приём.** Масштабируется партициями топика и числом консьюмеров в группе; при большом потоке
   консьюмер может писать пачку сообщений одной транзакцией.
 * **Рост таблицы.** Частичный индекс держит выборку воркера быстрой при любом размере таблицы,
@@ -2025,7 +2210,7 @@ func (n *LogNotifier) Send(ctx context.Context, nt domain.Notification) error {
 
 | Участок | Гарантия | Чем обеспечена |
 |---|---|---|
-| usecase → БД | atomic | одна транзакция на `orders` + `order_items` + `outbox_events` |
+| service → БД | atomic | одна транзакция на `orders` + `order_items` + `outbox_events` |
 | БД → Debezium | at-least-once | позиция в WAL коммитится периодически; после падения Connect перечитает хвост |
 | Debezium → Redpanda | at-least-once | ретраи продюсера; при рестарте возможен повтор последних сообщений |
 | Redpanda → consumer | at-least-once | ручной коммит оффсета после обработки |
@@ -2099,7 +2284,7 @@ tasks:
 2. **`platform/postgres/tx.go`**: `Executor`, `Exec`, `TxManager`. Перевести `OrderRepo.Create`
    на `postgres.DB(ctx, r.pool)`, транзакцию убрать.
 3. **`events.proto`** + `task -d proto generate`.
-4. **`internal/event`, `OutboxRepo`, usecase** с `WithinTx`. Проверка: вызвать `CreateOrder`
+4. **`internal/event`, `OutboxRepo`, service** с `WithinTx`. Проверка: вызвать `CreateOrder`
    через grpcui → в `outbox_events` появилась строка, `payload` — валидный JSON.
    На этом шаге брокера ещё нет вообще, и это нормально.
 5. **compose: `wal_level=logical`** для order-postgres → `docker compose up -d` → проверить
@@ -2115,7 +2300,7 @@ tasks:
    `franz-go` добавляется в `platform/go.mod` (`go get github.com/twmb/franz-go` в модуле
    `platform`); убедиться, что notification подхватывает локальный `platform` так же, как
    остальные сервисы (replace/workspace), и сделать `go mod tidy` в обоих модулях.
-10. **domain/repository/usecase/transport** в notification: inbox, `notifications`, Unit of Work.
+10. **domain/repository/service/transport** в notification: inbox, `notifications`, Unit of Work.
     Проверка: создать заказ → в `notifications` строка `pending` (до запуска воркера).
     **Sender-воркер** (раздел 6.6): через пару секунд строка `sent` и запись `notification sent` в логе.
 11. **Проверка дедупликации**: остановить сервис, `rpk group seek notification --to start`,

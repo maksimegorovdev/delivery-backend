@@ -2,18 +2,18 @@ package order
 
 import (
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/domain"
-	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/usecase"
+	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/service"
 )
 
-func toCreateOrderInput(userID string, dto CreateOrderRequestDTO) usecase.CreateOrderInput {
-	items := make([]usecase.CreateOrderItemInput, 0, len(dto.Items))
+func toCreateOrderInput(userID string, dto CreateOrderRequestDTO) service.CreateOrderInput {
+	items := make([]service.CreateOrderItemInput, 0, len(dto.Items))
 	for _, item := range dto.Items {
-		items = append(items, usecase.CreateOrderItemInput{
+		items = append(items, service.CreateOrderItemInput{
 			ProductID: item.ProductId,
 			Quantity:  item.Quantity,
 		})
 	}
-	return usecase.CreateOrderInput{
+	return service.CreateOrderInput{
 		UserID:    userID,
 		AddressID: dto.AddressID,
 		Items:     items,

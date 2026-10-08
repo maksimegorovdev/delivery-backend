@@ -16,7 +16,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/config"
 	router "github.com/maksimegorovdev/delivery-backend/services/gateway/internal/transport/http"
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/transport/http/v1/order"
-	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/usecase"
+	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/service"
 )
 
 type App struct {
@@ -59,13 +59,13 @@ func New(ctx context.Context) (_ *App, err error) {
 	// Provider
 	orderClient := client.NewOrderClient(orderConn)
 
-	// Usecase
-	orderUsecase := usecase.NewOrderUsecase(usecase.OrderUsecaseDeps{
+	// Service
+	orderService := service.NewOrderService(service.OrderServiceDeps{
 		Orders: orderClient,
 	})
 
 	// Handler
-	orderHandler := order.NewOrderHandler(orderUsecase)
+	orderHandler := order.NewOrderHandler(orderService)
 
 	// HTTP Server
 	httpServer := httpserver.New(

@@ -1,4 +1,4 @@
-package usecase
+package service
 
 import (
 	"context"
@@ -21,20 +21,20 @@ type OrderProvider interface {
 	CreateOrder(ctx context.Context, input CreateOrderInput) (domain.Order, error)
 }
 
-type OrderUsecaseDeps struct {
+type OrderServiceDeps struct {
 	Orders OrderProvider
 }
 
-type OrderUsecase struct {
+type OrderService struct {
 	orders OrderProvider
 }
 
-func NewOrderUsecase(deps OrderUsecaseDeps) *OrderUsecase {
-	return &OrderUsecase{
+func NewOrderService(deps OrderServiceDeps) *OrderService {
+	return &OrderService{
 		orders: deps.Orders,
 	}
 }
 
-func (uc *OrderUsecase) CreateOrder(ctx context.Context, input CreateOrderInput) (domain.Order, error) {
+func (uc *OrderService) CreateOrder(ctx context.Context, input CreateOrderInput) (domain.Order, error) {
 	return uc.orders.CreateOrder(ctx, input)
 }

@@ -8,9 +8,10 @@ import (
 )
 
 type Config struct {
-	App App
-	Log Log
-	PG  PG
+	App   App
+	Log   Log
+	PG    PG
+	Kafka Kafka
 }
 
 func (c Config) Validate() error {
@@ -18,6 +19,7 @@ func (c Config) Validate() error {
 		validation.Field(&c.App, validation.Required),
 		validation.Field(&c.Log, validation.Required),
 		validation.Field(&c.PG, validation.Required),
+		validation.Field(&c.Kafka, validation.Required),
 	)
 }
 
@@ -52,6 +54,20 @@ func (p PG) Validate() error {
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.DSN, validation.Required),
 		validation.Field(&p.MaxConns, validation.Required),
+	)
+}
+
+type Kafka struct {
+	Brokers       []string `env:"KAFKA_BROKERS,required"`
+	ConsumerGroup string   `env:"KAFKA_CONSUMER_GROUP,required"`
+	Topics        []string `env:"KAFKA_TOPICS,required"`
+}
+
+func (k Kafka) Validate() error {
+	return validation.ValidateStruct(&k,
+		validation.Field(&k.Brokers, validation.Required),
+		validation.Field(&k.ConsumerGroup, validation.Required),
+		validation.Field(&k.Topics, validation.Required),
 	)
 }
 

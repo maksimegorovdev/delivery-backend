@@ -1,4 +1,4 @@
-package usecase
+package service
 
 import (
 	"context"
@@ -10,14 +10,14 @@ type AddressRepo interface {
 	GetByID(ctx context.Context, id string) (domain.Address, error)
 }
 
-type AddressUsecase struct {
+type AddressService struct {
 	addresses AddressRepo
 }
 
-func NewAddressUsecase(addresses AddressRepo) *AddressUsecase {
-	return &AddressUsecase{addresses: addresses}
+func NewAddressService(addresses AddressRepo) *AddressService {
+	return &AddressService{addresses: addresses}
 }
 
-func (uc *AddressUsecase) GetAddress(ctx context.Context, id string) (domain.Address, error) {
+func (uc *AddressService) GetAddress(ctx context.Context, id string) (domain.Address, error) {
 	return uc.addresses.GetByID(ctx, id)
 }

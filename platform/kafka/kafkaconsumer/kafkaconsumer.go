@@ -15,7 +15,7 @@ const (
 )
 
 type Handler interface {
-	Handle(ctx context.Context, rec *kgo.Record) error
+	Handle(ctx context.Context, msg Message) error
 }
 
 type ErrorHandler func(ctx context.Context, err error)
@@ -57,13 +57,13 @@ func New(brokers []string, group string, topics []string, opts ...Option) (*Cons
 	return c, nil
 }
 
-func (c *Consumer) Run(ctx context.Context, handler Handler) error {
+func (c *Consumer) Run(ctx context.Context, handler Handler) {
 	defer c.client.AllowRebalance()
 
 	for {
 		fetches := c.client.PollRecords(ctx, c.maxPollRecords)
 		if ctx.Err() != nil || fetches.IsClientClosed() {
-			return nil
+			return
 		}
 
 		var fetchErrs []error
@@ -71,7 +71,15 @@ func (c *Consumer) Run(ctx context.Context, handler Handler) error {
 			fetchErrs = append(fetchErrs, fmt.Errorf("topic=%s, partition=%d: %w", topic, partition, err))
 		})
 		if len(fetchErrs) > 0 {
-			return fmt.Errorf("kafkaconsumer: fetch: %w", errors.Join(fetchErrs...))
+			c.onError(ctx, fmt.Errorf("kafkaconsumer: fetch: %w", errors.Join(fetchErrs...)))
+			c.client.AllowRebalance()
+
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(c.retryBackoff):
+			}
+			continue
 		}
 
 		var (
@@ -81,7 +89,7 @@ func (c *Consumer) Run(ctx context.Context, handler Handler) error {
 
 		fetches.EachPartition(func(partition kgo.FetchTopicPartition) {
 			for _, record := range partition.Records {
-				if err := handler.Handle(ctx, record); err != nil {
+				if err := handler.Handle(ctx, toMessage(record)); err != nil {
 					if _, ok := rewind[record.Topic]; !ok {
 						rewind[record.Topic] = make(map[int32]kgo.EpochOffset)
 					}
@@ -110,7 +118,7 @@ func (c *Consumer) Run(ctx context.Context, handler Handler) error {
 		if len(rewind) > 0 {
 			select {
 			case <-ctx.Done():
-				return nil
+				return
 			case <-time.After(c.retryBackoff):
 			}
 		}

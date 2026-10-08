@@ -10,16 +10,16 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/services/product/internal/domain"
 )
 
-type ProductUsecase interface {
+type ProductService interface {
 	GetProducts(ctx context.Context, ids []string) ([]domain.Product, error)
 }
 
 type ProductRouter struct {
 	productv1.UnimplementedProductServiceServer
-	uc ProductUsecase
+	uc ProductService
 }
 
-func NewProductRouter(server *grpc.Server, uc ProductUsecase) {
+func NewProductRouter(server *grpc.Server, uc ProductService) {
 	productv1.RegisterProductServiceServer(server, &ProductRouter{uc: uc})
 }
 

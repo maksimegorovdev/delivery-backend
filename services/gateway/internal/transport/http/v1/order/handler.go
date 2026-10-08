@@ -8,18 +8,18 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/http/bind"
 	"github.com/maksimegorovdev/delivery-backend/platform/http/response"
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/domain"
-	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/usecase"
+	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/service"
 )
 
-type OrderUsecase interface {
-	CreateOrder(ctx context.Context, input usecase.CreateOrderInput) (domain.Order, error)
+type OrderService interface {
+	CreateOrder(ctx context.Context, input service.CreateOrderInput) (domain.Order, error)
 }
 
 type OrderHandler struct {
-	uc OrderUsecase
+	uc OrderService
 }
 
-func NewOrderHandler(uc OrderUsecase) *OrderHandler {
+func NewOrderHandler(uc OrderService) *OrderHandler {
 	return &OrderHandler{uc: uc}
 }
 

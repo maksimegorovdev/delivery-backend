@@ -16,7 +16,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
 	repo "github.com/maksimegorovdev/delivery-backend/services/product/internal/repository/pg"
 	grpcrouter "github.com/maksimegorovdev/delivery-backend/services/product/internal/transport/grpc"
-	"github.com/maksimegorovdev/delivery-backend/services/product/internal/usecase"
+	"github.com/maksimegorovdev/delivery-backend/services/product/internal/service"
 
 	"github.com/maksimegorovdev/delivery-backend/services/product/internal/config"
 )
@@ -71,8 +71,8 @@ func New(ctx context.Context) (_ *App, err error) {
 	// Repository
 	productRepo := repo.NewProductRepo(pgPool)
 
-	// Usecase
-	productUsecase := usecase.NewProductUsecase(productRepo)
+	// Service
+	productService := service.NewProductService(productRepo)
 
 	// gRPC Server
 	grpcServer := grpcserver.New(
@@ -90,7 +90,7 @@ func New(ctx context.Context) (_ *App, err error) {
 	// Router
 	grpcrouter.NewRouter(grpcrouter.RouterDeps{
 		Server:         grpcServer.Server(),
-		ProductUsecase: productUsecase,
+		ProductService: productService,
 	})
 
 	app := &App{
