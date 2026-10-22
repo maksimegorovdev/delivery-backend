@@ -1,3 +1,1 @@
-# Platform
-
-Информация о модуле находится в @README.md
+@AGENTS.md
