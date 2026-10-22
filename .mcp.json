@@ -19,9 +19,9 @@
       "command": "serena",
       "args": [
         "start-mcp-server",
-        "--context",
-        "claude-code",
-        "--project-from-cwd"
+        "--context=claude-code",
+        "--project-from-cwd",
+        "--enable-web-dashboard=false"
       ],
       "env": {}
     }
