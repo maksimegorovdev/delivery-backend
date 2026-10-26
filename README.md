@@ -22,7 +22,7 @@
 
 ## Observability
 
-Сервисы шлют логи, трейсы и метрики по OTLP в OTel Collector, он пишет их в ClickHouse (БД `otel`, хранение 72 часа).
+OTel Collector принимает логи, трейсы и метрики по OTLP и пишет их в ClickHouse (БД `otel`, хранение 72 часа).
 Смотреть — в Grafana: http://localhost:3001 → **Explore** → **ClickHouse**, Query type **Traces** или **Logs**.
 
 | Сервис | Адрес |
