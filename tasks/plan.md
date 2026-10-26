@@ -3,6 +3,10 @@
 > Спек: [SPEC-obs-stack.md](../SPEC-obs-stack.md) · Карта: [SPEC-observability-map.md](../SPEC-observability-map.md)
 > Задачи: [todo.md](todo.md)
 
+> **После реализации:** задачи `obs-smoke` и `obs-ch` удалены из Taskfile (коммит `120ad3f`). Пункты ниже, где они
+> упоминаются, — журнал проверок на момент выполнения. Сейчас данные проверяются в Grafana Explore (Query Builder,
+> SQL Editor), тестовую телеметрию можно отправить `telemetrygen` (см. Task 2).
+
 ## Overview
 
 Добавляем в `docker-compose` три сервиса: ClickHouse (хранилище), OTel Collector (приём OTLP, запись
@@ -49,7 +53,7 @@ ClickHouse (users, healthcheck)
 ### Phase 1: Хранилище и приём
 - [x] Task 1: ClickHouse в compose с пользователями и healthcheck
 - [x] Task 2: OTel Collector пишет OTLP в ClickHouse
-- [x] Task 3: Taskfile — `obs-smoke` и `obs-ch`
+- [x] Task 3: Taskfile — `obs-smoke` и `obs-ch` (отменена: задачи удалены в `120ad3f`)
 
 ### Checkpoint A: путь OTLP → ClickHouse
 - [x] `task obs-smoke` зелёный, TTL 72h в DDL, данные переживают рестарт
