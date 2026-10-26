@@ -45,6 +45,7 @@
     ]
   },
   "enabledPlugins": {
-    "gopls-lsp@claude-plugins-official": true
+    "gopls-lsp@claude-plugins-official": true,
+    "agent-skills@addy-agent-skills": true
   }
 }
