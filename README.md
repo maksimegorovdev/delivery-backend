@@ -20,6 +20,51 @@
 
 Посмотреть список можно через `task --list`.
 
+## Observability
+
+Телеметрия (логи, трейсы, метрики) идёт по OTLP в OTel Collector, хранится в ClickHouse и смотрится в Grafana.
+Стек поднимается вместе с остальной инфраструктурой через `task compose-up`.
+
+```
+Go-сервисы ──OTLP :4317/:4318──▶ OTel Collector ──native :9000──▶ ClickHouse (БД otel) ◀── Grafana :3001
+```
+
+| Сервис | Адрес | Назначение |
+|---|---|---|
+| Grafana | http://localhost:3001 | UI, вход без логина (anonymous Admin) |
+| OTel Collector | `localhost:4317` / `localhost:4318` | приём OTLP gRPC / HTTP |
+| OTel Collector | http://localhost:13133 | health check |
+| ClickHouse | `localhost:8123` / `localhost:9000` | HTTP / native |
+
+Пользователи ClickHouse (пароли — локальные, заданы в `docker-compose.yml`):
+
+| Пользователь | Пароль | Права |
+|---|---|---|
+| `default` | `clickhouse` | администратор |
+| `otel_writer` | `otel_writer` | Collector: создание таблиц и запись в `otel.*` |
+| `grafana_reader` | `grafana_reader` | Grafana: только чтение `otel.*` (`readonly=1`) |
+
+Схему создаёт экспортёр Collector: `otel_logs`, `otel_traces`, `otel_metrics_{gauge,sum,histogram,exponential_histogram,summary}`.
+Данные хранятся 72 часа (TTL).
+
+Команды:
+
+- `task obs-smoke` — отправляет тестовые трейсы, логи и метрики через `telemetrygen` и проверяет, что они дошли до ClickHouse.
+- `task obs-ch` — `clickhouse-client` на БД `otel`.
+
+Где смотреть: Grafana → **Explore** → датасорс **ClickHouse** → Query Builder, Query type **Traces** (водопад спанов)
+или **Logs**. OTel-режим для таблиц `otel_traces` и `otel_logs` включён в provisioning.
+
+Если что-то не работает:
+
+- **У `otel-collector` в `docker compose ps` нет статуса `healthy`.** Это нормально: в distroless-образе нечем выполнить
+  healthcheck. Проверка — `curl -f localhost:13133` или `task obs-smoke`.
+- **Датасорс ClickHouse не работает или его нет.** Плагин `grafana-clickhouse-datasource` скачивается при старте Grafana,
+  нужна сеть. Ищите ошибку установки в `docker compose logs grafana` и перезапустите `docker compose restart grafana`.
+- **В Query Builder выключен «Use OTel».** В provisioning датасорса для `logs` и `traces` нужен и `otelEnabled: true`,
+  и `otelVersion` — без версии плагин OTel-режим не включает.
+- **«View logs» у трейса от `obs-smoke` пусто.** Ожидаемо: `telemetrygen` не связывает логи с трейсами (`TraceId` пустой).
+
 ## Что отрабатывается
 
 ### Коммуникация между сервисами
@@ -43,3 +88,8 @@
 - Docker / Docker Compose для локального окружения
 - Taskfile для автоматизации задач
 - Air для hot reload сервисов при разработке
+
+### Observability
+- OpenTelemetry Collector — приём OTLP и запись в ClickHouse
+- ClickHouse — хранилище логов, трейсов и метрик
+- Grafana — просмотр трейсов и логов через ClickHouse-датасорс, provisioning
