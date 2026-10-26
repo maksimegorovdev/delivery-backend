@@ -149,6 +149,30 @@ services:
       clickhouse:
         condition: service_healthy
 
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:13.2.4
+    environment:
+      GF_PLUGINS_PREINSTALL_SYNC: grafana-clickhouse-datasource@4.23.2
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GRAFANA_CLICKHOUSE_PASSWORD: grafana_reader
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/etc/grafana/dashboards:ro
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
 volumes:
   order-postgres-data:
   user-postgres-data:
@@ -156,3 +180,4 @@ volumes:
   notification-postgres-data:
   redpanda-data:
   clickhouse-data:
+  grafana-data:
