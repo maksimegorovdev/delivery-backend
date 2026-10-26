@@ -2,6 +2,10 @@
 
 > План: [plan.md](plan.md) · Спек: [SPEC-obs-stack.md](../SPEC-obs-stack.md)
 
+> **После реализации:** задачи `obs-smoke` и `obs-ch` удалены из Taskfile (коммит `120ad3f`). Пункты ниже, где они
+> упоминаются, — журнал проверок на момент выполнения. Сейчас данные проверяются в Grafana Explore (Query Builder,
+> SQL Editor), тестовую телеметрию можно отправить `telemetrygen` (см. Task 2).
+
 ## Task 1: ClickHouse в compose с пользователями и healthcheck
 
 **Description:** Добавить сервис `clickhouse` (`clickhouse/clickhouse-server:26.8`) с named volume,
@@ -40,7 +44,7 @@
 
 **Verification:**
 - [x] `docker compose logs otel-collector` — нет `error`, есть `Everything is ready`
-- [x] `docker run --rm --network <compose-net> ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.163.2 traces --otlp-endpoint otel-collector:4317 --otlp-insecure --traces 5`
+- [x] `docker run --rm --network container:otel-collector ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.163.0 traces --otlp-endpoint localhost:4317 --otlp-insecure --traces 5`
 - [x] `clickhouse-client -q "SELECT count() FROM otel.otel_traces"` > 0
 
 **Dependencies:** Task 1
@@ -51,7 +55,7 @@
 
 **Estimated scope:** S
 
-## Task 3: Taskfile — `obs-smoke` и `obs-ch`
+## Task 3: Taskfile — `obs-smoke` и `obs-ch` (отменена: задачи удалены в `120ad3f`)
 
 **Description:** `obs-smoke`: проверяет health Collector, отправляет traces/logs/metrics через `telemetrygen`
 (docker, сеть compose), ждёт флаша и проверяет `count() > 0` в `otel_traces`, `otel_logs` и хотя бы
