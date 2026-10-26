@@ -1,3 +1,7 @@
+x-clickhouse-passwords:
+  otel-writer: &clickhouse-otel-writer-password otel_writer
+  grafana-reader: &clickhouse-grafana-reader-password grafana_reader
+
 services:
   order-postgres:
     container_name: order-postgres
@@ -114,8 +118,8 @@ services:
     image: clickhouse/clickhouse-server:26.8
     environment:
       CLICKHOUSE_PASSWORD: clickhouse
-      CLICKHOUSE_OTEL_WRITER_PASSWORD: otel_writer
-      CLICKHOUSE_GRAFANA_READER_PASSWORD: grafana_reader
+      CLICKHOUSE_OTEL_WRITER_PASSWORD: *clickhouse-otel-writer-password
+      CLICKHOUSE_GRAFANA_READER_PASSWORD: *clickhouse-grafana-reader-password
     ports:
       - "8123:8123"
       - "9000:9000"
@@ -127,7 +131,7 @@ services:
         soft: 262144
         hard: 262144
     healthcheck:
-      test: ["CMD", "clickhouse-client", "--password", "clickhouse", "-q", "SELECT 1"]
+      test: ["CMD", "clickhouse-client", "-q", "SELECT 1"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -138,7 +142,7 @@ services:
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     environment:
       CLICKHOUSE_USER: otel_writer
-      CLICKHOUSE_PASSWORD: otel_writer
+      CLICKHOUSE_PASSWORD: *clickhouse-otel-writer-password
     ports:
       - "4317:4317"
       - "4318:4318"
@@ -157,7 +161,7 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
-      GRAFANA_CLICKHOUSE_PASSWORD: grafana_reader
+      GRAFANA_CLICKHOUSE_PASSWORD: *clickhouse-grafana-reader-password
     ports:
       - "3001:3000"
     volumes:
