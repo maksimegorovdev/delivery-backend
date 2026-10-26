@@ -21,6 +21,46 @@ tasks:
         --data @deploy/debezium/order-outbox.json
         http://localhost:8083/connectors/order-outbox/config
 
+  obs-smoke:
+    desc: Send test telemetry via telemetrygen and verify it lands in ClickHouse
+    vars:
+      RUN_ID:
+        sh: date +%s
+      TELEMETRYGEN: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.163.0
+    cmds:
+      - cmd: >
+          curl -sf -o /dev/null http://localhost:13133
+          || { echo "otel-collector is not healthy: http://localhost:13133 is unavailable"; exit 1; }
+        silent: true
+      - for: [traces, logs, metrics]
+        cmd: >
+          docker run --rm --network container:otel-collector {{.TELEMETRYGEN}}
+          {{.ITEM}} --{{.ITEM}} 5 --otlp-endpoint localhost:4317 --otlp-insecure
+          --otlp-attributes 'smoke.run="{{.RUN_ID}}"' > /dev/null 2>&1
+      - cmd: |
+          check() {
+            for _ in $(seq 1 20); do
+              n=$(docker compose exec -T clickhouse clickhouse-client -q \
+                "SELECT count() FROM $2 WHERE ResourceAttributes['smoke.run'] = '{{.RUN_ID}}'")
+              [ "$n" -gt 0 ] && { echo "$1: $n"; return 0; }
+              sleep 0.5
+            done
+            echo "FAIL: $1 has no rows for smoke.run={{.RUN_ID}}"
+            return 1
+          }
+          rc=0
+          check otel_traces otel.otel_traces || rc=1
+          check otel_logs otel.otel_logs || rc=1
+          check otel_metrics_* "merge('otel', '^otel_metrics_')" || rc=1
+          exit $rc
+        silent: true
+
+  obs-ch:
+    desc: Open clickhouse-client on the otel database
+    interactive: true
+    cmds:
+      - docker compose exec clickhouse clickhouse-client -d otel
+
   compose-down:
     desc: Stop local infrastructure
     cmds:
