@@ -30,7 +30,7 @@
 - [ ] Тесты unit, интеграционные, e2e
 - [ ] Benchmarks, нагрузочные
 - [ ] Observability (трейсы, метрики, логи). Попробовать внедрить для логов ClickHouse
-  - [x] obs-stack: ClickHouse, OTel Collector, Grafana в docker-compose (`task obs-smoke`)
+  - [x] obs-stack: ClickHouse, OTel Collector, Grafana в docker-compose
 - [ ] Logger логирование ошибок по стеку
 - [ ] Доработка пакетов http, grpc, pgx, redis, kafka итд насчет кол-ва соединенией, timeout
 - [ ] CHECK в миграциях БД до конца проставить, разобраться с этим (пока делаю минимально)
