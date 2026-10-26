@@ -1,0 +1,29 @@
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+      http: { endpoint: 0.0.0.0:4318 }
+
+processors:
+  memory_limiter: { check_interval: 1s, limit_percentage: 80, spike_limit_percentage: 20 }
+
+exporters:
+  clickhouse:
+    endpoint: tcp://clickhouse:9000?dial_timeout=10s
+    database: otel
+    username: ${env:CLICKHOUSE_USER}
+    password: ${env:CLICKHOUSE_PASSWORD}
+    create_schema: true
+    ttl: 72h
+    sending_queue: { batch: {} }
+    retry_on_failure: { enabled: true }
+
+extensions:
+  health_check: { endpoint: 0.0.0.0:13133 }
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:  { receivers: [otlp], processors: [memory_limiter], exporters: [clickhouse] }
+    metrics: { receivers: [otlp], processors: [memory_limiter], exporters: [clickhouse] }
+    logs:    { receivers: [otlp], processors: [memory_limiter], exporters: [clickhouse] }
