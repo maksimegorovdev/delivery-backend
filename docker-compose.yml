@@ -109,9 +109,33 @@ services:
       - order-postgres
       - redpanda
 
+  clickhouse:
+    container_name: clickhouse
+    image: clickhouse/clickhouse-server:26.8
+    environment:
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_OTEL_WRITER_PASSWORD: otel_writer
+      CLICKHOUSE_GRAFANA_READER_PASSWORD: grafana_reader
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./deploy/clickhouse/users.d/otel-users.xml:/etc/clickhouse-server/users.d/otel-users.xml:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--password", "clickhouse", "-q", "SELECT 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
 volumes:
   order-postgres-data:
   user-postgres-data:
   product-postgres-data:
   notification-postgres-data:
   redpanda-data:
+  clickhouse-data:

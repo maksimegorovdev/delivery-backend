@@ -1,0 +1,32 @@
+<clickhouse>
+    <profiles>
+        <grafana_readonly>
+            <readonly>1</readonly>
+            <constraints>
+                <max_execution_time>
+                    <changeable_in_readonly/>
+                </max_execution_time>
+            </constraints>
+        </grafana_readonly>
+    </profiles>
+
+    <users>
+        <otel_writer>
+            <password from_env="CLICKHOUSE_OTEL_WRITER_PASSWORD"/>
+            <profile>default</profile>
+            <quota>default</quota>
+            <grants>
+                <query>GRANT CREATE DATABASE, CREATE TABLE, INSERT, SELECT ON otel.*</query>
+            </grants>
+        </otel_writer>
+
+        <grafana_reader>
+            <password from_env="CLICKHOUSE_GRAFANA_READER_PASSWORD"/>
+            <profile>grafana_readonly</profile>
+            <quota>default</quota>
+            <grants>
+                <query>GRANT SELECT ON otel.*</query>
+            </grants>
+        </grafana_reader>
+    </users>
+</clickhouse>
