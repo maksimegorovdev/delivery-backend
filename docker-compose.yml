@@ -115,14 +115,14 @@ services:
 
   clickhouse:
     container_name: clickhouse
-    image: clickhouse/clickhouse-server:26.8
+    image: clickhouse/clickhouse-server:26.8.35
     environment:
       CLICKHOUSE_PASSWORD: clickhouse
       CLICKHOUSE_OTEL_WRITER_PASSWORD: *clickhouse-otel-writer-password
       CLICKHOUSE_GRAFANA_READER_PASSWORD: *clickhouse-grafana-reader-password
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       - ./deploy/clickhouse/users.d/otel-users.xml:/etc/clickhouse-server/users.d/otel-users.xml:ro
@@ -144,9 +144,9 @@ services:
       CLICKHOUSE_USER: otel_writer
       CLICKHOUSE_PASSWORD: *clickhouse-otel-writer-password
     ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "13133:13133"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+      - "127.0.0.1:13133:13133"
     volumes:
       - ./deploy/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
     depends_on:
@@ -163,7 +163,7 @@ services:
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
       GRAFANA_CLICKHOUSE_PASSWORD: *clickhouse-grafana-reader-password
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro

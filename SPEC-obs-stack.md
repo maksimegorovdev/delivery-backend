@@ -37,7 +37,7 @@ Go-сервисы (Air, host) ──OTLP gRPC :4317──▶ OTel Collector ─�
 
 | Компонент | Образ | Версия |
 |---|---|---|
-| ClickHouse | `clickhouse/clickhouse-server` | `26.8` (LTS) |
+| ClickHouse | `clickhouse/clickhouse-server` | `26.8.35` (LTS 26.8) |
 | OTel Collector | `otel/opentelemetry-collector-contrib` | `0.163.2` |
 | Grafana | `grafana/grafana` | `13.2.4` |
 | ClickHouse datasource | плагин `grafana-clickhouse-datasource` | `4.23.2` |
@@ -72,7 +72,7 @@ deploy/
 README.md                                  → + раздел Observability (адреса, логины)
 ```
 
-Порты на хосте:
+Порты на хосте (публикуются только на `127.0.0.1`, из LAN недоступны):
 
 | Сервис | Порт | Назначение |
 |---|---|---|
