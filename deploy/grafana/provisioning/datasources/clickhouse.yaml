@@ -15,9 +15,11 @@ datasources:
         defaultDatabase: otel
         defaultTable: otel_logs
         otelEnabled: true
+        otelVersion: latest
       traces:
         defaultDatabase: otel
         defaultTable: otel_traces
         otelEnabled: true
+        otelVersion: latest
     secureJsonData:
       password: $GRAFANA_CLICKHOUSE_PASSWORD
