@@ -4,6 +4,8 @@ import (
 	"io"
 	"log/slog"
 	"strings"
+
+	"go.opentelemetry.io/otel/log"
 )
 
 type Option func(*logger)
@@ -37,5 +39,13 @@ func WithFormat(format string) Option {
 		default:
 			c.format = FormatText
 		}
+	}
+}
+
+// WithLoggerProvider дублирует записи в OTel-провайдер логов помимо stdout.
+// nil оставляет вывод только в stdout.
+func WithLoggerProvider(p log.LoggerProvider) Option {
+	return func(c *logger) {
+		c.provider = p
 	}
 }

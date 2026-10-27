@@ -59,13 +59,13 @@ v0.72.0, `otelpgx` v0.13.0, `kotel` v1.7.1 в `platform`. Посмотреть, 
 `logger.WithLoggerProvider(tel.LoggerProvider())`. При `Enabled=false` это noop, ветвление не нужно.
 
 **Acceptance criteria:**
-- [ ] OTel-запись (logtest Recorder) — TraceID/SpanID из ctx, `request_id` в атрибутах, нет дублей `trace_id`/`span_id`; группы `http.*` развёрнуты; Severity соответствует уровню slog
-- [ ] Записи ниже `LOG_LEVEL` не попадают ни в один хендлер (table-driven); без опции поведение как после Task 1
+- [x] OTel-запись (SimpleProcessor + fake exporter вместо logtest — отдельный модуль) — TraceID/SpanID из ctx, `request_id` в атрибутах, нет дублей `trace_id`/`span_id`; группы `http.*` развёрнуты; Severity соответствует уровню slog
+- [x] Записи ниже `LOG_LEVEL` не попадают ни в один хендлер (table-driven); без опции поведение как после Task 1
 - [ ] Gateway с `OTEL_ENABLED=true` → строки `ServiceName='gateway'` в `otel.otel_logs`, включая логи без ctx (`http server started`, пустой `TraceId`)
 
 **Verification:**
-- [ ] `task -d platform test`; `cd platform && go test -cover ./logger/...` ≥ 80%
-- [ ] `task -d platform lint`, `task -d services/gateway lint`
+- [x] `task -d platform test`; `cd platform && go test -cover ./logger/...` ≥ 80% (95.4%)
+- [x] `task -d platform lint`, `task -d services/gateway lint`
 - [ ] R3: Collector остановлен, gateway 2 минуты → в stdout ≤ 5 `WARN telemetry: export error`, сервис жив
 
 **Dependencies:** Task 1

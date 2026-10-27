@@ -4,6 +4,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+
+	"go.opentelemetry.io/otel/log"
 )
 
 type Format string
@@ -22,6 +24,9 @@ type logger struct {
 	writer io.Writer
 	level  slog.Level
 	format Format
+
+	// provider включает экспорт записей в OTel; nil — только stdout.
+	provider log.LoggerProvider
 }
 
 func New(opts ...Option) *slog.Logger {
@@ -48,5 +53,10 @@ func New(opts ...Option) *slog.Logger {
 		handler = slog.NewTextHandler(cfg.writer, handlerOpts)
 	}
 
-	return slog.New(NewCtxHandler(newTraceHandler(handler)))
+	handler = newTraceHandler(handler)
+	if cfg.provider != nil {
+		handler = slog.NewMultiHandler(handler, newOTelHandler(cfg.provider, cfg.level))
+	}
+
+	return slog.New(NewCtxHandler(handler))
 }
