@@ -14,6 +14,7 @@ type Config struct {
 	GRPCServer     GRPCServer
 	UserService    UserService
 	ProductService ProductService
+	Telemetry      Telemetry
 }
 
 func (c Config) Validate() error {
@@ -24,6 +25,8 @@ func (c Config) Validate() error {
 		validation.Field(&c.GRPCServer, validation.Required),
 		validation.Field(&c.UserService, validation.Required),
 		validation.Field(&c.ProductService, validation.Required),
+		// Без Required: нулевая Telemetry{false, ""} — валидный выключенный режим.
+		validation.Field(&c.Telemetry),
 	)
 }
 
@@ -90,6 +93,18 @@ type ProductService struct {
 func (p ProductService) Validate() error {
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.Addr, validation.Required),
+	)
+}
+
+type Telemetry struct {
+	Enabled  bool   `env:"OTEL_ENABLED,required"`
+	Endpoint string `env:"OTEL_EXPORTER_OTLP_ENDPOINT"`
+}
+
+func (t Telemetry) Validate() error {
+	return validation.ValidateStruct(&t,
+		// Required на Enabled запрещён: false считается пустым значением.
+		validation.Field(&t.Endpoint, validation.When(t.Enabled, validation.Required)),
 	)
 }
 
