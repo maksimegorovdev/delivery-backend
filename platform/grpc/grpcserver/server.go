@@ -7,6 +7,8 @@ import (
 	"net"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc/filters"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -33,13 +35,24 @@ func New(addr string, opts ...Option) *Server {
 		opt(srv)
 	}
 
-	srv.server = grpc.NewServer(srv.serverOpts...)
+	srv.server = grpc.NewServer(append([]grpc.ServerOption{otelStatsHandler()}, srv.serverOpts...)...)
 
 	if srv.reflection {
 		reflection.Register(srv.server)
 	}
 
 	return srv
+}
+
+// otelStatsHandler трассирует RPC и пишет их метрики через глобальные провайдеры OTel;
+// служебные reflection и health в телеметрию не попадают.
+func otelStatsHandler() grpc.ServerOption {
+	return grpc.StatsHandler(otelgrpc.NewServerHandler(
+		otelgrpc.WithFilter(filters.None(
+			filters.ServicePrefix("grpc.reflection."),
+			filters.HealthCheck(),
+		)),
+	))
 }
 
 func (s *Server) Server() *grpc.Server {
