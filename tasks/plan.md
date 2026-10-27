@@ -74,7 +74,7 @@ Task 0: spike — совместимость версий contrib с otel v1.47 
 
 ### Phase 2: Sync-трейсы и их метрики
 - [x] Task 4: gRPC server и client (`otelgrpc`)
-- [ ] Task 5: HTTP gateway (`otelhttp`, route-middleware, `request.id`)
+- [x] Task 5: HTTP gateway (`otelhttp`, route-middleware, `request.id`)
 - [x] Task 6: Postgres (`otelpgx` tracer + `RecordStats`)
 
 ### Checkpoint B: сквозной трейс
@@ -83,7 +83,7 @@ Task 0: spike — совместимость версий contrib с otel v1.47 
 - [ ] Логи gateway и order по одному запросу имеют одинаковый `TraceId`
 
 ### Phase 3: Async-консьюмер и runtime
-- [ ] Task 7: Kafka consumer (`kotel` tracer + meter, спан `process` на запись)
+- [x] Task 7: Kafka consumer (`kotel` tracer + meter, спан `process` на запись)
 - [ ] Task 8: Runtime-метрики Go
 
 ### Checkpoint C: инструментация завершена
@@ -105,7 +105,7 @@ Task 0: spike — совместимость версий contrib с otel v1.47 
 | R2 | В gateway нет `GET /api/v1/orders/{id}` — Success Criteria tracing/metrics ссылаются на этот маршрут | Med | **Решено:** шаблонность `http.route` проверяется unit-тестом на chi-маршруте с `{id}`; e2e — на `POST /api/v1/orders`. Формулировки спеков правятся в Task 10 |
 | R3 | Рекурсия: error handler пишет WARN в `slog.Default()`, а тот после Task 2 уходит и в OTel. При упавшем Collector ошибка экспорта логов порождает новый лог | Med | Троттлинг 30s уже ограничивает поток. В Task 2 — e2e-проверка: остановленный Collector, сервис 2 минуты, число WARN в stdout ≤ 5 |
 | R4 | `otelhttp` оборачивает chi целиком, а `RoutePattern` известен только после роутинга — имя спана в момент старта `"HTTP POST"` | Low | **Уточнено (Task 0):** chi v5.3.2 сам ставит `r.Pattern` (`mux.go:481`), а `otelhttp` v0.72 после `next.ServeHTTP` при `Pattern != ""` вызывает `span.SetName(spanNameFormatter(...))` (`handler.go:196`). Собственный `middleware.Route` вероятно не нужен — Task 5 начинает с unit-теста на имя спана и `http.route` в метрике; middleware пишем, только если тест красный по причине `otelhttp` |
-| R5 | `kotel` создаёт спан `process` только через `Tracer.WithProcessSpan(record)` (в плане было `WithProcessingSpan` — имя исправлено по Task 0) — легко забыть `End()` на ветке ошибки/rewind | Med | Логика в `processRecord` с `defer span.End()`; unit-тест: ошибка хендлера → один спан со `StatusCode=Error` |
+| R5 | `kotel` создаёт спан `process` только через `Tracer.WithProcessSpan(record)` (в плане было `WithProcessingSpan` — имя исправлено по Task 0) — легко забыть `End()` на ветке ошибки/rewind | Med | **Закрыт (Task 7):** логика в `processRecord` с `defer span.End()`; unit-тест: ошибка хендлера → один спан со `StatusCode=Error`. Уточнение: `kotel` v1.7.1 пишет semconv v1.18 — имя топика в `messaging.source.name`, а не `messaging.destination.name`; `process` — ребёнок спана `receive` (его создаёт хук `OnFetchRecordBuffered`) |
 | R6 | Успешное создание заказа в e2e пишет в локальные БД и outbox → Kafka | Low | Локальное окружение; это и нужно для спана `process` в notification. Для ошибочного пути — фиктивный `address_id` без записи |
 | R7 | `otelpgx` может писать параметры SQL в спан | Low | **Уточнено (Task 0):** в v0.13.0 параметры включаются только явно через `WithIncludeQueryParameters(...)`; `WithDisableQuerySpanArgs` не существует. Не передаём эту опцию (и не используем `WithDisableSQLStatementInAttributes` — `db.query.text` нужен). Проверка в ClickHouse остаётся: в `SpanAttributes` нет значений параметров |
 | R8 | Покрытие `platform/logger` ≥ 80% — сейчас тестов в пакете нет | Low | Task 1–2 пишут тесты вместе с кодом; `go test -cover` в верификации |
