@@ -9,6 +9,7 @@ import (
 
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr/pgerr"
 	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
+
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/domain"
 )
 

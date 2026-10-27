@@ -12,11 +12,12 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/http/httpserver"
 	"github.com/maksimegorovdev/delivery-backend/platform/http/middleware"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
+
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/client"
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/config"
+	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/service"
 	router "github.com/maksimegorovdev/delivery-backend/services/gateway/internal/transport/http"
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/transport/http/v1/order"
-	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/service"
 )
 
 type App struct {
@@ -26,7 +27,7 @@ type App struct {
 	closer     *closer.Closer
 }
 
-func New(ctx context.Context) (_ *App, err error) {
+func New(_ context.Context) (_ *App, err error) {
 	cl := closer.New()
 	defer func() {
 		if err != nil {
@@ -98,11 +99,11 @@ func (a *App) Run(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		a.log.Info(
+		a.log.InfoContext(ctx,
 			"http server started",
 			slog.String("addr", a.cfg.HTTP.Addr),
 		)
-		defer a.log.Info(
+		defer a.log.InfoContext(ctx,
 			"http server stopped",
 			slog.String("addr", a.cfg.HTTP.Addr),
 		)

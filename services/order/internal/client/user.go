@@ -8,6 +8,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr/grpcerr"
 	addressv1 "github.com/maksimegorovdev/delivery-backend/proto/gen/go/address/v1"
 	userv1 "github.com/maksimegorovdev/delivery-backend/proto/gen/go/user/v1"
+
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/domain"
 )
 

@@ -15,11 +15,12 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/interceptors"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
 	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
+
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/client"
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/event"
 	repo "github.com/maksimegorovdev/delivery-backend/services/order/internal/repository/pg"
-	grpcrouter "github.com/maksimegorovdev/delivery-backend/services/order/internal/transport/grpc"
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/service"
+	grpcrouter "github.com/maksimegorovdev/delivery-backend/services/order/internal/transport/grpc"
 
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/config"
 )
@@ -141,11 +142,11 @@ func (a *App) Run(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		a.log.Info(
+		a.log.InfoContext(ctx,
 			"grpc server started",
 			slog.String("addr", a.cfg.GRPCServer.Addr),
 		)
-		defer a.log.Info(
+		defer a.log.InfoContext(ctx,
 			"grpc server stopped",
 			slog.String("addr", a.cfg.GRPCServer.Addr),
 		)

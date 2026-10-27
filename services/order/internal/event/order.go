@@ -8,6 +8,7 @@ import (
 
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr"
 	orderv1 "github.com/maksimegorovdev/delivery-backend/proto/gen/go/order/v1"
+
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/domain"
 )
 

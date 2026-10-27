@@ -9,7 +9,7 @@ func toCreateOrderInput(userID string, dto CreateOrderRequestDTO) service.Create
 	items := make([]service.CreateOrderItemInput, 0, len(dto.Items))
 	for _, item := range dto.Items {
 		items = append(items, service.CreateOrderItemInput{
-			ProductID: item.ProductId,
+			ProductID: item.ProductID,
 			Quantity:  item.Quantity,
 		})
 	}
@@ -20,10 +20,10 @@ func toCreateOrderInput(userID string, dto CreateOrderRequestDTO) service.Create
 	}
 }
 
-func toOrderResponseDTO(order domain.Order) OrderResponseDTO {
-	items := make([]OrderItemResponseDTO, 0, len(order.Items))
+func toResponseDTO(order domain.Order) ResponseDTO {
+	items := make([]ItemResponseDTO, 0, len(order.Items))
 	for _, item := range order.Items {
-		items = append(items, OrderItemResponseDTO{
+		items = append(items, ItemResponseDTO{
 			ID:          item.ID,
 			ProductID:   item.ProductID,
 			ProductName: item.ProductName,
@@ -31,7 +31,7 @@ func toOrderResponseDTO(order domain.Order) OrderResponseDTO {
 			UnitPrice:   item.UnitPrice,
 		})
 	}
-	return OrderResponseDTO{
+	return ResponseDTO{
 		ID:              order.ID,
 		UserID:          order.UserID,
 		Status:          string(order.Status),

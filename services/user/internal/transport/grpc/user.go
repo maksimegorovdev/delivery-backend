@@ -7,6 +7,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	userv1 "github.com/maksimegorovdev/delivery-backend/proto/gen/go/user/v1"
+
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/domain"
 )
 
@@ -16,6 +17,7 @@ type UserService interface {
 
 type UserRouter struct {
 	userv1.UnimplementedUserServiceServer
+
 	uc UserService
 }
 

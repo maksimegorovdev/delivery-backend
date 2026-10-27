@@ -51,7 +51,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/internal_transport_http_v1_order.OrderResponseDTO"
+                                            "$ref": "#/definitions/internal_transport_http_v1_order.ResponseDTO"
                                         }
                                     }
                                 }
@@ -117,7 +117,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_transport_http_v1_order.OrderItemResponseDTO": {
+        "internal_transport_http_v1_order.ItemResponseDTO": {
             "type": "object",
             "properties": {
                 "id": {
@@ -137,7 +137,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_transport_http_v1_order.OrderResponseDTO": {
+        "internal_transport_http_v1_order.ResponseDTO": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -152,7 +152,7 @@ const docTemplate = `{
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_http_v1_order.OrderItemResponseDTO"
+                        "$ref": "#/definitions/internal_transport_http_v1_order.ItemResponseDTO"
                     }
                 },
                 "status": {

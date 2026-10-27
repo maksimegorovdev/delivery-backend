@@ -7,20 +7,21 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/appctx"
 	"github.com/maksimegorovdev/delivery-backend/platform/http/bind"
 	"github.com/maksimegorovdev/delivery-backend/platform/http/response"
+
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/domain"
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/service"
 )
 
-type OrderService interface {
+type Service interface {
 	CreateOrder(ctx context.Context, input service.CreateOrderInput) (domain.Order, error)
 }
 
-type OrderHandler struct {
-	uc OrderService
+type Handler struct {
+	uc Service
 }
 
-func NewOrderHandler(uc OrderService) *OrderHandler {
-	return &OrderHandler{uc: uc}
+func NewOrderHandler(uc Service) *Handler {
+	return &Handler{uc: uc}
 }
 
 // CreateOrder create a new order
@@ -31,10 +32,10 @@ func NewOrderHandler(uc OrderService) *OrderHandler {
 //	@Accept			json
 //	@Produce		json
 //	@Param			order	body		CreateOrderRequestDTO	true	"Order data"
-//	@Success		201		{object}	response.Envelope{data=OrderResponseDTO}
+//	@Success		201		{object}	response.Envelope{data=ResponseDTO}
 //	@Failure		default	{object}	response.Envelope{error=response.ErrorBody}
 //	@Router			/v1/orders [post]
-func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	dto, err := bind.JSON[CreateOrderRequestDTO](r)
 	if err != nil {
 		response.Fail(w, r, err)
@@ -47,5 +48,5 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		response.Fail(w, r, err)
 		return
 	}
-	response.Created(w, r, toOrderResponseDTO(order))
+	response.Created(w, r, toResponseDTO(order))
 }

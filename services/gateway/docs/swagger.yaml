@@ -23,7 +23,7 @@ definitions:
           $ref: '#/definitions/internal_transport_http_v1_order.CreateOrderItemDTO'
         type: array
     type: object
-  internal_transport_http_v1_order.OrderItemResponseDTO:
+  internal_transport_http_v1_order.ItemResponseDTO:
     properties:
       id:
         type: string
@@ -36,7 +36,7 @@ definitions:
       unit_price:
         type: integer
     type: object
-  internal_transport_http_v1_order.OrderResponseDTO:
+  internal_transport_http_v1_order.ResponseDTO:
     properties:
       created_at:
         type: string
@@ -46,7 +46,7 @@ definitions:
         type: string
       items:
         items:
-          $ref: '#/definitions/internal_transport_http_v1_order.OrderItemResponseDTO'
+          $ref: '#/definitions/internal_transport_http_v1_order.ItemResponseDTO'
         type: array
       status:
         type: string
@@ -111,7 +111,7 @@ paths:
             - $ref: '#/definitions/response.Envelope'
             - properties:
                 data:
-                  $ref: '#/definitions/internal_transport_http_v1_order.OrderResponseDTO'
+                  $ref: '#/definitions/internal_transport_http_v1_order.ResponseDTO'
               type: object
         default:
           description: ""

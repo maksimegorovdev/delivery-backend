@@ -9,7 +9,7 @@ import (
 
 type RouterDeps struct {
 	Router       chi.Router
-	OrderHandler *order.OrderHandler
+	OrderHandler *order.Handler
 }
 
 // NewRouter initializes all routes

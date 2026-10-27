@@ -7,6 +7,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	productv1 "github.com/maksimegorovdev/delivery-backend/proto/gen/go/product/v1"
+
 	"github.com/maksimegorovdev/delivery-backend/services/product/internal/domain"
 )
 
@@ -16,6 +17,7 @@ type ProductService interface {
 
 type ProductRouter struct {
 	productv1.UnimplementedProductServiceServer
+
 	uc ProductService
 }
 
@@ -23,7 +25,10 @@ func NewProductRouter(server *grpc.Server, uc ProductService) {
 	productv1.RegisterProductServiceServer(server, &ProductRouter{uc: uc})
 }
 
-func (r *ProductRouter) GetProducts(ctx context.Context, req *productv1.GetProductsRequest) (*productv1.GetProductsResponse, error) {
+func (r *ProductRouter) GetProducts(
+	ctx context.Context,
+	req *productv1.GetProductsRequest,
+) (*productv1.GetProductsResponse, error) {
 	list, err := r.uc.GetProducts(ctx, req.GetIds())
 	if err != nil {
 		return nil, err

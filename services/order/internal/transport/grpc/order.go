@@ -7,6 +7,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	orderv1 "github.com/maksimegorovdev/delivery-backend/proto/gen/go/order/v1"
+
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/domain"
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/service"
 )
@@ -17,6 +18,7 @@ type OrderService interface {
 
 type OrderRouter struct {
 	orderv1.OrderServiceServer
+
 	uc OrderService
 }
 
@@ -24,7 +26,10 @@ func NewOrderRouter(server *grpc.Server, uc OrderService) {
 	orderv1.RegisterOrderServiceServer(server, &OrderRouter{uc: uc})
 }
 
-func (r *OrderRouter) CreateOrder(ctx context.Context, req *orderv1.CreateOrderRequest) (*orderv1.CreateOrderResponse, error) {
+func (r *OrderRouter) CreateOrder(
+	ctx context.Context,
+	req *orderv1.CreateOrderRequest,
+) (*orderv1.CreateOrderResponse, error) {
 	input := service.CreateOrderInput{
 		UserID:    req.GetUserId(),
 		AddressID: req.GetAddressId(),
@@ -32,8 +37,8 @@ func (r *OrderRouter) CreateOrder(ctx context.Context, req *orderv1.CreateOrderR
 	}
 	for _, item := range req.GetItems() {
 		input.Items = append(input.Items, service.CreateOrderItemInput{
-			ProductID: item.ProductId,
-			Quantity:  item.Quantity,
+			ProductID: item.GetProductId(),
+			Quantity:  item.GetQuantity(),
 		})
 	}
 

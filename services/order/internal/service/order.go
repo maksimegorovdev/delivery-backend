@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr"
+
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/domain"
 )
 
@@ -120,9 +121,9 @@ func (uc *OrderService) CreateOrder(ctx context.Context, input CreateOrderInput)
 		return domain.Order{}, err
 	}
 
-	if err := uc.tx.WithinTx(ctx, func(ctx context.Context) error {
-		if err := uc.orders.Create(ctx, order); err != nil {
-			return err
+	if err = uc.tx.WithinTx(ctx, func(ctx context.Context) error {
+		if createErr := uc.orders.Create(ctx, order); createErr != nil {
+			return createErr
 		}
 		return uc.outbox.Save(ctx, event)
 	}); err != nil {
