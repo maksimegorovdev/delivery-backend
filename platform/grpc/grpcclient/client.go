@@ -3,6 +3,7 @@ package grpcclient
 import (
 	"fmt"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -15,6 +16,7 @@ func New(addr string, opts ...Option) (*grpc.ClientConn, error) {
 	c := &client{
 		dialOpts: []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		},
 	}
 

@@ -73,7 +73,7 @@ Task 0: spike — совместимость версий contrib с otel v1.47 
 - [ ] `SELECT DISTINCT ServiceName FROM otel.otel_logs` — все 5 сервисов; с `OTEL_ENABLED=false` только stdout
 
 ### Phase 2: Sync-трейсы и их метрики
-- [ ] Task 4: gRPC server и client (`otelgrpc`)
+- [x] Task 4: gRPC server и client (`otelgrpc`)
 - [ ] Task 5: HTTP gateway (`otelhttp`, route-middleware, `request.id`)
 - [ ] Task 6: Postgres (`otelpgx` tracer + `RecordStats`)
 

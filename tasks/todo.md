@@ -109,12 +109,12 @@ v0.72.0, `otelpgx` v0.13.0, `kotel` v1.7.1 в `platform`. Посмотреть, 
 и могут дополнять. Метрики длительности `otelgrpc` появляются автоматически.
 
 **Acceptance criteria:**
-- [ ] bufconn-тест: client-span — родитель server-span, один TraceID; вызов reflection не создаёт спанов
-- [ ] Хендлер с `codes.Internal` → server-span `Error`; `codes.NotFound` → по semconv otelgrpc
-- [ ] ManualReader: есть метрика длительности RPC с `rpc.service`, `rpc.method`, `rpc.grpc.status_code`
+- [x] bufconn-тест: client-span — родитель server-span, один TraceID; вызов reflection не создаёт спанов
+- [x] Хендлер с `codes.Internal` → server-span `Error`; `codes.NotFound` → по semconv otelgrpc
+- [x] ManualReader: есть метрика `rpc.server.call.duration` с `rpc.method` (`service/method`) и `rpc.response.status_code` (otelgrpc v0.72 пишет новую семконвенцию `rpc.*`, отдельного `rpc.service` нет)
 
 **Verification:**
-- [ ] `task -d platform test`, `task -d platform lint`
+- [x] `task -d platform test`, `task -d platform lint`
 - [ ] E2E: grpcui → order `CreateOrder` → в `otel.otel_traces` спаны order (server, client) + user/product (server) с одним `TraceId`
 
 **Dependencies:** Task 0
