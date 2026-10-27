@@ -1,141 +1,251 @@
-# Tasks: obs-stack
+# Tasks: telemetry-sdk
 
-> План: [plan.md](plan.md) · Спек: [SPEC-obs-stack.md](../SPEC-obs-stack.md)
+> План: [plan.md](plan.md) · Спек: [SPEC-telemetry-sdk.md](../spec/SPEC-telemetry-sdk.md)
 
-> **После реализации:** задачи `obs-smoke` и `obs-ch` удалены из Taskfile (коммит `120ad3f`). Пункты ниже, где они
-> упоминаются, — журнал проверок на момент выполнения. Сейчас данные проверяются в Grafana Explore (Query Builder,
-> SQL Editor), тестовую телеметрию можно отправить `telemetrygen` (см. Task 2).
+## Task 1: Каркас пакета, noop-путь и `task -d platform test`
 
-## Task 1: ClickHouse в compose с пользователями и healthcheck
-
-**Description:** Добавить сервис `clickhouse` (`clickhouse/clickhouse-server:26.8`) с named volume,
-портами 8123/9000 и healthcheck `SELECT 1`. Пользователи задаются через `users.d`:
-`otel_writer` (права на создание и запись в БД `otel`), `grafana_reader` (readonly) и `default` с паролем.
+**Description:** Добавить зависимости OTel из Tech Stack спека в `platform/go.mod`. Создать
+`platform/telemetry` с `Config{Enabled, ServiceName, Endpoint}`, `New(ctx, Config)`, `Shutdown(ctx)`,
+`LoggerProvider()`. Реализовать только `Enabled=false`: глобальные провайдеры не трогаются,
+`LoggerProvider()` — noop, `Shutdown` → `nil`. При `Enabled=true` и пустом `Endpoint`/`ServiceName` —
+ошибка с префиксом `telemetry:`. Добавить задачу `test` (`go test -race ./...`) в `platform/Taskfile.yml`.
 
 **Acceptance criteria:**
-- [x] `docker compose ps clickhouse` → `healthy`
-- [x] `otel_writer` может выполнить `CREATE DATABASE IF NOT EXISTS otel` и создать таблицу в `otel`
-- [x] `grafana_reader` может выполнять `SELECT`, а любой `INSERT`/`CREATE` отклоняется с ошибкой прав
+- [x] `New(ctx, Config{Enabled: false})` не меняет `otel.GetTracerProvider()`/`GetMeterProvider()`/`global.GetLoggerProvider()`
+- [x] `Shutdown` noop-экземпляра → `nil`; `LoggerProvider()` не `nil`
+- [x] Невалидный `Config` при `Enabled=true` → ошибка `telemetry: …`
 
 **Verification:**
-- [x] `docker compose up -d clickhouse && docker compose ps clickhouse`
-- [x] `docker compose exec clickhouse clickhouse-client -u otel_writer --password … -q "CREATE DATABASE IF NOT EXISTS otel"`
-- [x] `docker compose exec clickhouse clickhouse-client -u grafana_reader --password … -q "CREATE TABLE otel.t (x UInt8) ENGINE=Memory"` → ошибка `READONLY`/`ACCESS_DENIED`
+- [x] `task -d platform test`
+- [ ] `task -d platform lint`
+- [x] `go build ./...` во всех модулях go.work (риск R6)
 
 **Dependencies:** None
 
 **Files likely touched:**
-- `docker-compose.yml`
-- `deploy/clickhouse/users.d/otel-users.xml`
+- `platform/go.mod`, `platform/go.sum`
+- `platform/telemetry/telemetry.go`, `platform/telemetry/config.go`
+- `platform/telemetry/telemetry_test.go`
+- `platform/Taskfile.yml`
 
-**Estimated scope:** S
+**Estimated scope:** M
 
-## Task 2: OTel Collector пишет OTLP в ClickHouse
+## Task 2: Resource
 
-**Description:** Добавить сервис `otel-collector` (`otel/opentelemetry-collector-contrib:0.163.2`) с
-конфигом из спека: OTLP gRPC/HTTP, `memory_limiter`, `clickhouseexporter` (`otel_writer`, `create_schema`,
-`ttl: 72h`, `sending_queue.batch`), `health_check` на 13133. Добавить `depends_on` от ClickHouse
-с условием healthy. Разобраться с healthcheck (риск R1).
+**Description:** `resource.go`: Resource с `service.name` = `Config.ServiceName`, `service.version` =
+`vcs.revision` из `debug.ReadBuildInfo` (или `unknown`), `service.instance.id` (hostname + pid или UUID),
+слияние с `resource.WithFromEnv()` (`OTEL_RESOURCE_ATTRIBUTES`) и schema URL semconv v1.47.0.
 
 **Acceptance criteria:**
-- [x] Collector стартует без ошибок конфига, `curl -f localhost:13133` → 200
-- [x] После ручного запуска `telemetrygen traces|logs|metrics` в `otel` появляются `otel_traces`, `otel_logs`, `otel_metrics_*` со строками
-- [x] В `SHOW CREATE TABLE otel.otel_traces` есть TTL на 72 часа
+- [x] Resource содержит `service.name`, `service.version`, `service.instance.id`
+- [x] Атрибуты из `OTEL_RESOURCE_ATTRIBUTES` попадают в Resource
+- [x] Без build info `service.version` = `unknown`
 
 **Verification:**
-- [x] `docker compose logs otel-collector` — нет `error`, есть `Everything is ready`
-- [x] `docker run --rm --network container:otel-collector ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.163.0 traces --otlp-endpoint localhost:4317 --otlp-insecure --traces 5`
-- [x] `clickhouse-client -q "SELECT count() FROM otel.otel_traces"` > 0
+- [x] `task -d platform test` (table-driven, `t.Setenv`)
 
 **Dependencies:** Task 1
 
 **Files likely touched:**
-- `docker-compose.yml`
-- `deploy/otel-collector/config.yaml`
+- `platform/telemetry/resource.go`
+- `platform/telemetry/resource_test.go`
 
 **Estimated scope:** S
 
-## Task 3: Taskfile — `obs-smoke` и `obs-ch` (отменена: задачи удалены в `120ad3f`)
+## Task 3: TracerProvider, пропагатор и error handler
 
-**Description:** `obs-smoke`: проверяет health Collector, отправляет traces/logs/metrics через `telemetrygen`
-(docker, сеть compose), ждёт флаша и проверяет `count() > 0` в `otel_traces`, `otel_logs` и хотя бы
-одной `otel_metrics_*`. Если какая-то таблица пустая — выходит с ненулевым кодом и называет её.
-`obs-ch`: интерактивный `clickhouse-client` к БД `otel`.
+**Description:** При `Enabled=true`: `otlptracegrpc` (insecure, `Endpoint`), `sdktrace.TracerProvider`
+с batcher и Resource, сэмплер `ParentBased(AlwaysSample)`, если `OTEL_TRACES_SAMPLER` не задан.
+Регистрация `otel.SetTracerProvider`, `otel.SetTextMapPropagator(TraceContext + Baggage)`,
+`otel.SetErrorHandler` — `WARN` в `slog.Default()` не чаще раза в 30s с числом пропущенных ошибок.
 
 **Acceptance criteria:**
-- [x] `task obs-smoke` на поднятом стеке → exit 0, вывод показывает count по каждой таблице
-- [x] На остановленном Collector `task obs-smoke` → ненулевой код с понятным сообщением
-- [x] `task --list` показывает обе задачи с `desc`
+- [x] После `New` глобальный TracerProvider — SDK, пропагатор содержит `traceparent` и `baggage`
+- [x] При заданном `OTEL_TRACES_SAMPLER=always_off` спаны не сэмплируются
+- [x] Error handler: N ошибок за интервал → один `WARN`, следующий содержит `suppressed`
 
 **Verification:**
-- [x] `task obs-smoke; echo $?`
-- [x] `docker compose stop otel-collector && task obs-smoke; echo $?` → ≠ 0, затем `docker compose start otel-collector`
+- [x] `task -d platform test` (handler тестируется с подменённым временем и slog в `bytes.Buffer`)
+- [x] `task -d platform lint`
 
 **Dependencies:** Task 2
 
 **Files likely touched:**
-- `Taskfile.yml`
-
-**Estimated scope:** XS
-
-## Checkpoint A: путь OTLP → ClickHouse
-- [x] `task obs-smoke` зелёный
-- [x] TTL 72h присутствует в DDL таблиц `otel.*`
-- [x] `task compose-down && task compose-up && task obs-ch` → старые строки на месте
-- [x] Существующие сервисы compose (Postgres, Redpanda, Debezium) работают как прежде
-- [x] Ревью с пользователем, если R1 потребовал отклонения от спека (решение: без compose-healthcheck, спек обновлён)
-
-## Task 4: Grafana с provisioning датасорса ClickHouse
-
-**Description:** Добавить сервис `grafana` (`grafana/grafana:13.2.4`) на порту 3001 с named volume,
-`GF_PLUGINS_PREINSTALL_SYNC=grafana-clickhouse-datasource@4.23.2`, anonymous Admin и healthcheck `/api/health`.
-Provisioning: датасорс ClickHouse (native, `clickhouse:9000`, `grafana_reader`, для logs/traces
-`defaultDatabase: otel`, таблицы `otel_logs`/`otel_traces`, `otelEnabled: true`), провайдер дашбордов
-на пустую папку `deploy/grafana/dashboards`.
-
-**Acceptance criteria:**
-- [x] `http://localhost:3001` открывается без логина, `docker compose ps grafana` → `healthy`
-- [x] Датасорс ClickHouse провиженен, `GET /api/datasources/uid/<uid>/health` → OK
-- [x] Explore → Query type *Traces* показывает водопад трейса от `obs-smoke`; *Logs* показывает логи
-
-**Verification:**
-- [x] `curl -s localhost:3001/api/health`
-- [x] `curl -s localhost:3001/api/datasources/uid/clickhouse/health`
-- [x] Ручная проверка в Explore после `task obs-smoke` (Traces: водопад ок; логи telemetrygen без TraceId — переход trace→logs пуст, это ожидаемо)
-
-**Dependencies:** Task 1 (лучше после Task 3 — чтобы были данные)
-
-**Files likely touched:**
-- `docker-compose.yml`
-- `deploy/grafana/provisioning/datasources/clickhouse.yaml`
-- `deploy/grafana/provisioning/dashboards/dashboards.yaml`
-- `deploy/grafana/dashboards/.gitkeep`
+- `platform/telemetry/telemetry.go`, `platform/telemetry/exporters.go`
+- `platform/telemetry/errorhandler.go`, `platform/telemetry/errorhandler_test.go`
 
 **Estimated scope:** M
 
-## Task 5: README (раздел Observability) и статус в карте
+## Task 4: MeterProvider с delta temporality
 
-**Description:** Добавить в README раздел Observability: схема потока, адреса и порты, пользователи
-ClickHouse, команды `obs-smoke`/`obs-ch`, куда смотреть в Grafana, что делать, если плагин не
-установился. Добавить пункт в «Что отрабатывается». В карте отметить `obs-stack` как done,
-в TODO.md — частичный прогресс по пункту Observability.
+**Description:** `otlpmetricgrpc` с temporality selector: Counter/Histogram (и их Observable-варианты
+Counter) → Delta, UpDownCounter/Gauge → Cumulative. `PeriodicReader` с интервалом 10s, если
+`OTEL_METRIC_EXPORT_INTERVAL` не задан. `otel.SetMeterProvider`.
 
 **Acceptance criteria:**
-- [x] README содержит адреса и порты, логины и команды, совпадающие с compose/Taskfile
-- [x] `SPEC-observability-map.md`: `obs-stack` → done
+- [x] Selector возвращает Delta для Counter/Histogram/ObservableCounter, Cumulative для UpDownCounter/ObservableUpDownCounter/ObservableGauge
+- [x] Интервал 10s по умолчанию, `OTEL_METRIC_EXPORT_INTERVAL` переопределяет
+- [x] Глобальный MeterProvider — SDK после `New`
 
 **Verification:**
-- [x] Пройти README с нуля: `task compose-up` → `task obs-smoke` → открыть Grafana по инструкции
+- [x] `task -d platform test` (table-driven по `metric.InstrumentKind`)
+
+**Dependencies:** Task 3
+
+**Files likely touched:**
+- `platform/telemetry/exporters.go`, `platform/telemetry/telemetry.go`
+- `platform/telemetry/exporters_test.go`
+
+**Estimated scope:** S
+
+## Task 5: LoggerProvider, общий Shutdown и покрытие
+
+**Description:** `otlploggrpc` + `sdklog.LoggerProvider` с batch-процессором и Resource,
+`global.SetLoggerProvider`, `LoggerProvider()` отдаёт его. `Shutdown` — `errors.Join` трёх провайдеров.
+Если `New` падает на середине — уже созданные провайдеры закрываются. Довести покрытие до ≥ 80%.
+
+**Acceptance criteria:**
+- [x] `LoggerProvider()` при `Enabled=true` — SDK-провайдер, зарегистрированный глобально
+- [x] `Shutdown` с endpoint на закрытый порт и `context.WithTimeout(…, 2s)` возвращается ≤ deadline
+- [x] `go test -cover ./telemetry/...` ≥ 80%
+
+**Verification:**
+- [x] `task -d platform test`
+- [x] `cd platform && go test -cover ./telemetry/...`
+- [ ] `task -d platform lint`
 
 **Dependencies:** Task 4
 
 **Files likely touched:**
-- `README.md`
-- `SPEC-observability-map.md`
-- `TODO.md`
+- `platform/telemetry/telemetry.go`, `platform/telemetry/exporters.go`
+- `platform/telemetry/telemetry_test.go`
 
-**Estimated scope:** XS
+**Estimated scope:** S
 
-## Checkpoint B: модуль завершён
-- [x] Все пункты Success Criteria в `SPEC-obs-stack.md` отмечены
-- [ ] Ревью с пользователем → переход к спеку `telemetry-sdk`
+## Checkpoint A: пакет готов
+- [ ] `task -d platform test` и `task -d platform lint` зелёные, покрытие ≥ 80%
+- [ ] `go build ./...` во всех модулях go.work
+- [ ] Ревью API пакета с пользователем
+
+## Task 6: Shutdown-контекст с таймаутом в `main.go` всех сервисов
+
+**Description:** Сейчас `a.Close(ctx)` получает уже отменённый контекст `signal.NotifyContext`.
+Заменить на `context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)` (константа в `main.go`)
+во всех 5 сервисах. Поведение остальных closer'ов не меняется.
+
+**Acceptance criteria:**
+- [x] Во всех `services/*/cmd/main.go` `Close` вызывается с неотменённым контекстом с deadline 10s
+- [ ] `Ctrl+C` завершает каждый сервис без ошибок `context canceled` в логах
+
+**Verification:**
+- [ ] `task lint`
+- [ ] `task watch-all` → `Ctrl+C` → все сервисы пишут `… stopped`, выход ≤ 10s
+
+**Dependencies:** None (выполнять до Task 7)
+
+**Files likely touched:**
+- `services/{gateway,order,user,product,notification}/cmd/main.go`
+
+**Estimated scope:** S (5 однотипных правок)
+
+## Task 7: Пилот — order-service
+
+**Description:** Секция `Telemetry{Enabled (OTEL_ENABLED, required), Endpoint (OTEL_EXPORTER_OTLP_ENDPOINT)}`
+в `config` с валидацией ozzo: `Endpoint` обязателен при `Enabled` (`validation.When`); на `Enabled`
+нет `validation.Required`, иначе `false` не пройдёт (риск R7). В `app.New` вызов `telemetry.New`
+сразу после `config.New`, `cl.Add(tel.Shutdown)` первым. `.env.example` (и локальный `.env`) —
+новые переменные.
+
+**Acceptance criteria:**
+- [ ] `OTEL_ENABLED=true` без endpoint → сервис не стартует с ошибкой валидации; без `OTEL_ENABLED` → ошибка `required`
+- [ ] `OTEL_ENABLED=false` проходит валидацию
+- [ ] С `OTEL_ENABLED=false` и `true` (`localhost:4317`) сервис стартует, gRPC-методы работают
+- [ ] При `docker compose stop otel-collector` сервис работает; `Ctrl+C` ≤ 10s
+
+**Verification:**
+- [ ] `task -d services/order lint`, `go build ./...`
+- [ ] `task svc-watch SVC=order` в обоих режимах, вызов метода через grpcui
+- [ ] `Ctrl+C` при остановленном Collector — замер времени выхода
+
+**Dependencies:** Task 5, Task 6
+
+**Files likely touched:**
+- `services/order/internal/config/config.go`
+- `services/order/internal/app/app.go`
+- `services/order/.env.example`
+
+**Estimated scope:** S
+
+## Task 8: user-service и product-service
+
+**Description:** Повторить Task 7 для user и product.
+
+**Acceptance criteria:**
+- [ ] Оба сервиса стартуют с `OTEL_ENABLED=false` и `true`, `Shutdown` зарегистрирован первым
+- [ ] `.env.example` содержат новые переменные
+
+**Verification:**
+- [ ] `task -d services/user lint`, `task -d services/product lint`
+- [ ] Запуск обоих в двух режимах, `Ctrl+C` ≤ 10s
+
+**Dependencies:** Task 7
+
+**Files likely touched:**
+- `services/{user,product}/internal/config/config.go`
+- `services/{user,product}/internal/app/app.go`
+- `services/{user,product}/.env.example`
+
+**Estimated scope:** M
+
+## Task 9: gateway-service и notification-service
+
+**Description:** Повторить Task 7 для gateway (HTTP) и notification (Kafka-консьюмер).
+
+**Acceptance criteria:**
+- [ ] Оба сервиса стартуют с `OTEL_ENABLED=false` и `true`, `Shutdown` зарегистрирован первым
+- [ ] notification при `Ctrl+C` корректно закрывает консьюмер, затем telemetry (порядок closer)
+- [ ] `.env.example` содержат новые переменные
+
+**Verification:**
+- [ ] `task -d services/gateway lint`, `task -d services/notification lint`
+- [ ] Запуск в двух режимах, запрос через Swagger gateway, `Ctrl+C` ≤ 10s
+
+**Dependencies:** Task 7 (параллельно с Task 8)
+
+**Files likely touched:**
+- `services/{gateway,notification}/internal/config/config.go`
+- `services/{gateway,notification}/internal/app/app.go`
+- `services/{gateway,notification}/.env.example`
+
+**Estimated scope:** M
+
+## Checkpoint B: сервисы
+- [ ] `task lint` по всем модулям
+- [ ] `task watch-all` с `OTEL_ENABLED=true` и `false` — все 5 сервисов стартуют и завершаются ≤ 10s
+- [ ] Остановка Collector не роняет ни один сервис
+
+## Task 10: README, карта, TODO, Success Criteria спека
+
+**Description:** Описать `platform/telemetry` в `platform/README.md` (API, env-переменные, порядок в
+`app.New`). В корневом README — переменные `OTEL_*`. Карта: `telemetry-sdk` → done. TODO.md — подпункт
+прогресса Observability. Отметить Success Criteria в спеке; у критерия про WARN — пометка, что он закрыт unit-тестами, а e2e
+перенесён в `logs`/`tracing` (R1).
+
+**Acceptance criteria:**
+- [ ] Переменные и порядок вызова в README совпадают с кодом
+- [ ] `SPEC-observability-map.md`: `telemetry-sdk` → done; Success Criteria спека отмечены
+
+**Verification:**
+- [ ] Пройти README: включить `OTEL_ENABLED=true` в одном сервисе по инструкции и запустить
+
+**Dependencies:** Task 8, Task 9
+
+**Files likely touched:**
+- `platform/README.md`, `README.md`
+- `SPEC-observability-map.md`, `SPEC-telemetry-sdk.md`, `TODO.md`
+
+**Estimated scope:** S
+
+## Checkpoint C: модуль завершён
+- [ ] Все Success Criteria в `SPEC-telemetry-sdk.md` отмечены
+- [ ] Ревью с пользователем → переход к `logs`/`tracing`/`metrics`

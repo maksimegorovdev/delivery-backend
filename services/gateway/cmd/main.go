@@ -8,9 +8,13 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/app"
 )
+
+// shutdownTimeout ограничивает время graceful shutdown, включая сброс телеметрии.
+const shutdownTimeout = 10 * time.Second
 
 func main() {
 	if err := run(); err != nil {
@@ -31,7 +35,11 @@ func run() (err error) {
 		return fmt.Errorf("app init: %w", err)
 	}
 	defer func() {
-		err = errors.Join(err, a.Close(ctx))
+		// ctx к этому моменту уже отменён сигналом, поэтому Close получает его копию без отмены.
+		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
+		defer cancel()
+
+		err = errors.Join(err, a.Close(closeCtx))
 	}()
 
 	if err = a.Run(ctx); err != nil {
