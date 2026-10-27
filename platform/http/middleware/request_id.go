@@ -4,6 +4,9 @@ import (
 	"net/http"
 	"uuid"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/maksimegorovdev/delivery-backend/platform/appctx"
 )
 
@@ -16,6 +19,7 @@ func RequestID(next http.Handler) http.Handler {
 			id = uuid.NewV7().String()
 		}
 		w.Header().Set(RequestIDHeader, id)
+		trace.SpanFromContext(r.Context()).SetAttributes(attribute.String("request.id", id))
 		next.ServeHTTP(w, r.WithContext(appctx.WithRequestID(r.Context(), id)))
 	})
 }
