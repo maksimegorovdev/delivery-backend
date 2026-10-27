@@ -160,12 +160,12 @@ Counter) → Delta, UpDownCounter/Gauge → Cumulative. `PeriodicReader` с ин
 - [x] `OTEL_ENABLED=true` без endpoint → сервис не стартует с ошибкой валидации; без `OTEL_ENABLED` → ошибка `required`
 - [x] `OTEL_ENABLED=false` проходит валидацию
 - [ ] С `OTEL_ENABLED=false` и `true` (`localhost:4317`) сервис стартует, gRPC-методы работают
-- [ ] При `docker compose stop otel-collector` сервис работает; `Ctrl+C` ≤ 10s
+- [x] При `docker compose stop otel-collector` сервис работает; `Ctrl+C` ≤ `shutdownTimeout` (10s): при недоступном Collector выход занимает ровно таймаут (~10s), в логе одна ERROR — принято
 
 **Verification:**
 - [x] `task -d services/order lint`, `go build ./...`
 - [ ] `task svc-watch SVC=order` в обоих режимах, вызов метода через grpcui
-- [ ] `Ctrl+C` при остановленном Collector — замер времени выхода
+- [x] `Ctrl+C` при остановленном Collector — замер времени выхода (~10.05s)
 
 **Dependencies:** Task 5, Task 6
 
