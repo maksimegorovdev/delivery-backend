@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -21,6 +22,10 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/transport/http/v1/order"
 )
 
+// initCloseTimeout ограничивает освобождение ресурсов, если New упал на середине:
+// иначе сброс телеметрии в недоступный Collector задержал бы выход из сервиса.
+const initCloseTimeout = 5 * time.Second
+
 type App struct {
 	cfg        *config.Config
 	log        *slog.Logger
@@ -32,7 +37,10 @@ func New(ctx context.Context) (_ *App, err error) {
 	cl := closer.New()
 	defer func() {
 		if err != nil {
-			err = errors.Join(err, cl.Close(context.Background()))
+			closeCtx, cancel := context.WithTimeout(context.Background(), initCloseTimeout)
+			defer cancel()
+
+			err = errors.Join(err, cl.Close(closeCtx))
 		}
 	}()
 
