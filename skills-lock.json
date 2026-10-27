@@ -89,7 +89,7 @@
       "source": "samber/cc-skills-golang",
       "sourceType": "github",
       "skillPath": "skills/golang-cli/SKILL.md",
-      "computedHash": "96b9f4023920ad11434d2e75895371bd583baf7e149fe1a02d45a083013313e1"
+      "computedHash": "24db08f64df0fba352d24ebd23188ce6a697cd22387081f618bf170f67931808"
     },
     "golang-code-style": {
       "source": "samber/cc-skills-golang",
