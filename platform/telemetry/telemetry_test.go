@@ -2,6 +2,7 @@ package telemetry_test
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 
@@ -9,6 +10,21 @@ import (
 
 	"github.com/maksimegorovdev/delivery-backend/platform/telemetry"
 )
+
+// TestMain удаляет OTEL_* из окружения процесса: SDK читает их сам (сэмплер,
+// атрибуты Resource, endpoint), и значения из shell разработчика меняли бы
+// результат тестов. Тесты, которым нужна переменная, задают её через t.Setenv.
+func TestMain(m *testing.M) {
+	for _, kv := range os.Environ() {
+		if key, _, _ := strings.Cut(kv, "="); strings.HasPrefix(key, "OTEL_") {
+			if err := os.Unsetenv(key); err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	m.Run()
+}
 
 //nolint:paralleltest // читает глобальные провайдеры OTel, тест нельзя запускать параллельно
 func TestNew_Disabled(t *testing.T) {

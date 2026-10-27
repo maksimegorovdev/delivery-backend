@@ -1,14 +1,23 @@
 package config_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/maksimegorovdev/delivery-backend/services/product/internal/config"
 )
 
 // setBaseEnv задаёт минимально валидное окружение без OTEL_* переменных.
+// OTEL_* удаляются явно: иначе экспортированные в shell значения подменят кейсы.
 func setBaseEnv(t *testing.T) {
 	t.Helper()
+
+	for _, key := range []string{"OTEL_ENABLED", "OTEL_EXPORTER_OTLP_ENDPOINT"} {
+		t.Setenv(key, "") // восстанавливает исходное значение после теста
+		if err := os.Unsetenv(key); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	t.Setenv("APP_NAME", "product")
 	t.Setenv("LOG_LEVEL", "info")
