@@ -134,13 +134,13 @@ v0.72.0, `otelpgx` v0.13.0, `kotel` v1.7.1 в `platform`. Посмотреть, 
 `request.id` в активный span.
 
 **Acceptance criteria:**
-- [ ] Unit (chi-маршрут `/api/v1/orders/{id}`, запрос `/api/v1/orders/42`): имя спана `GET /api/v1/orders/{id}`, `http.route` — шаблон в спане и в метрике `http.server.request.duration`
-- [ ] `/swagger/index.html` — без спана; ответ 500 → `Error`, 404 — нет; входящий `traceparent` продолжает трейс; `request.id` в спане
-- [ ] E2E: `POST /api/v1/orders` → один `TraceId` с корнем в gateway и детьми order/user/product
+- [x] Unit (chi-маршрут `/api/v1/orders/{id}`, запрос `/api/v1/orders/42`): имя спана `GET /api/v1/orders/{id}`, `http.route` — шаблон в спане и в метрике `http.server.request.duration`
+- [x] `/swagger/index.html` — без спана; ответ 500 → `Error`, 404 — нет; входящий `traceparent` продолжает трейс; `request.id` в спане
+- [x] E2E: `POST /api/v1/orders` → один `TraceId` с корнем в gateway и детьми order/user/product (9 спанов, корень `POST /api/v1/orders`, `request.id` в спане)
 
 **Verification:**
-- [ ] `task -d platform test` (`httptest` + `tracetest.InMemoryExporter` + `sdkmetric.NewManualReader`)
-- [ ] `task -d platform lint`, `task -d services/gateway lint`
+- [x] `task -d platform test` (`httptest` + `tracetest.InMemoryExporter` + `sdkmetric.NewManualReader`)
+- [x] `task -d platform lint`, `task -d services/gateway lint`
 
 **Dependencies:** Task 4
 
