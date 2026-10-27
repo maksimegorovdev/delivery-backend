@@ -1,81 +1,105 @@
-# Implementation Plan: obs-stack
+# Implementation Plan: telemetry-sdk
 
-> Спек: [SPEC-obs-stack.md](../SPEC-obs-stack.md) · Карта: [SPEC-observability-map.md](../SPEC-observability-map.md)
-> Задачи: [todo.md](todo.md)
-
-> **После реализации:** задачи `obs-smoke` и `obs-ch` удалены из Taskfile (коммит `120ad3f`). Пункты ниже, где они
-> упоминаются, — журнал проверок на момент выполнения. Сейчас данные проверяются в Grafana Explore (Query Builder,
-> SQL Editor), тестовую телеметрию можно отправить `telemetrygen` (см. Task 2).
+> Спек: [SPEC-telemetry-sdk.md](../spec/SPEC-telemetry-sdk.md) · Карта: [SPEC-observability-map.md](../spec/SPEC-observability-map.md)
+> Задачи: [todo.md](todo.md) · Предыдущий модуль: [archive/obs-stack-plan.md](archive/obs-stack-plan.md)
 
 ## Overview
 
-Добавляем в `docker-compose` три сервиса: ClickHouse (хранилище), OTel Collector (приём OTLP, запись
-в ClickHouse) и Grafana (просмотр). Конфиги кладём в `deploy/`. Go-код не меняется. Каждый шаг
-проверяется без Go-сервисов: OTLP-трафик генерирует `telemetrygen`.
+Пакет `platform/telemetry` инициализирует OpenTelemetry одним вызовом: Resource, TracerProvider,
+MeterProvider, LoggerProvider с OTLP gRPC экспортёрами, глобальная регистрация и W3C-пропагатор.
+Пять сервисов вызывают `telemetry.New` в `app.New` (после конфига, до логгера) и закрывают его через
+`closer` последним. Инструментации (`otelhttp`, `otelgrpc`, `otelslog` и т. д.) в этом модуле нет —
+она появится в `logs`/`tracing`/`metrics`.
 
 ## Dependency Graph
 
 ```
-ClickHouse (users, healthcheck)
+platform/telemetry: Config + noop-путь (Enabled=false) + task test
     │
-    ├── OTel Collector (otel_writer, create_schema, TTL)
+    ├── Resource (service.*, OTEL_RESOURCE_ATTRIBUTES, build info)
     │       │
-    │       └── task obs-smoke (telemetrygen → count() по otel.*)
-    │
-    └── Grafana (grafana_reader, datasource provisioning)
-            │
-            └── ручная проверка Traces/Logs на данных obs-smoke
-                    │
-                    └── README + статус карты
+    │       └── TracerProvider + пропагатор + error handler (WARN с троттлингом)
+    │               │
+    │               ├── MeterProvider (delta temporality, интервал)
+    │               │
+    │               └── LoggerProvider + общий Shutdown + покрытие ≥ 80%
+    │                       │
+    │   shutdown-контекст   │
+    │   с таймаутом в       │
+    │   main.go (5 серв.) ──┤
+    │                       └── пилот: order (config + app + .env.example)
+    │                               │
+    │                               ├── user + product
+    │                               └── gateway + notification
+    │                                       │
+    │                                       └── docs: README, карта, TODO, Success Criteria
 ```
 
-Ветки Collector и Grafana зависят только от ClickHouse. Grafana идёт после smoke, чтобы в ней сразу
-были данные для проверки.
+Задачи пакета последовательны (каждая расширяет `New`). Таймаут shutdown не зависит от пакета, но
+нужен до подключения сервисов. После пилота две пары сервисов независимы.
 
 ## Architecture Decisions
 
-- **Схему создаёт экспортёр** (`create_schema: true`). Поэтому `otel_writer` получает в БД `otel`
-  права `CREATE DATABASE`, `CREATE TABLE`, `INSERT`, `SELECT`. Своих DDL нет — это вопрос из Ask first.
-- **Пользователи ClickHouse** задаются XML-файлом в `users.d` (декларативно, без SQL при старте):
-  - `otel_writer` — доступ только к `otel.*`;
-  - `grafana_reader` — профиль `readonly = 1`, доступ только на чтение `otel.*`;
-  - `default` — с паролем, доступен только из сети compose.
-  Пароли — локальные значения в compose, как у Postgres.
-- **Батчинг** выполняет `sending_queue.batch` экспортёра; processor `batch` не используется (deprecated).
-- **Healthcheck Collector:** образ contrib distroless (нет shell/curl), поэтому `CMD`-healthcheck внутри
-  контейнера невозможен (подробнее — риск R1).
-- **Grafana:** anonymous Admin; плагин ставится через `GF_PLUGINS_PREINSTALL_SYNC`; порт 3001.
-- **obs-smoke** запускает `telemetrygen` через `docker run --network` в сети compose, чтобы не ставить
-  бинарник на хост. Проверка строк — через `docker compose exec clickhouse clickhouse-client`.
+- **Порядок в `app.New`:** `config.New` → `telemetry.New` → `logger.New`. Спек говорит «до создания
+  логгера»; конфиг нужен раньше, потому что из него берутся `Enabled`/`Endpoint`/`APP_NAME`.
+- **`Enabled=false`:** `New` не вызывает `otel.Set*` и возвращает `Telemetry` с noop `LoggerProvider`
+  (`go.opentelemetry.io/otel/log/noop`); `Shutdown` → `nil`. Так выполняется AC7 без ветвлений в сервисах.
+- **Сэмплер и интервал метрик — из SDK:** `sdktrace` без явного `WithSampler` читает
+  `OTEL_TRACES_SAMPLER`/`_ARG`, `PeriodicReader` без `WithInterval` читает `OTEL_METRIC_EXPORT_INTERVAL`.
+  Свой код задаёт только дефолты спека (`ParentBased(AlwaysSample)`, 10s), если env не задан. Поведение
+  сверить с документацией SDK v1.47.0 при реализации (context7 / godig).
+- **Error handler:** `otel.SetErrorHandler` с функцией, которая пишет в `slog.Default()` в момент вызова
+  (логгер создаётся после `telemetry.New`) и не чаще раза в 30s; пропущенные ошибки считаются и
+  выводятся в следующем `WARN` (`suppressed=N`). Интервал — константа пакета.
+- **Shutdown-таймаут (дополнение к спеку):** сейчас все `main.go` передают в `a.Close` контекст
+  `signal.NotifyContext`, который к этому моменту уже отменён — `Shutdown` провайдеров сразу вернёт
+  `context.Canceled` и ничего не дошлёт. Исправление: `context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)`
+  в каждом `main.go`. Это делает выполнимыми AC6 и Success Criteria «Ctrl+C ≤ 10s».
+- **Тестовые зависимости — только stdlib** (`testing`, `net` для закрытого порта). Для проверки
+  temporality вызывается сам selector; для noop — проверка типов провайдеров и что `otel.GetTracerProvider()`
+  не изменился.
 
 ## Task List
 
-### Phase 1: Хранилище и приём
-- [x] Task 1: ClickHouse в compose с пользователями и healthcheck
-- [x] Task 2: OTel Collector пишет OTLP в ClickHouse
-- [x] Task 3: Taskfile — `obs-smoke` и `obs-ch` (отменена: задачи удалены в `120ad3f`)
+### Phase 1: Пакет `platform/telemetry`
+- [x] Task 1: Каркас пакета, noop-путь и `task -d platform test`
+- [x] Task 2: Resource
+- [x] Task 3: TracerProvider, пропагатор и error handler
+- [x] Task 4: MeterProvider с delta temporality
+- [x] Task 5: LoggerProvider, общий Shutdown и покрытие
 
-### Checkpoint A: путь OTLP → ClickHouse
-- [x] `task obs-smoke` зелёный, TTL 72h в DDL, данные переживают рестарт
+### Checkpoint A: пакет готов
+- [ ] `task -d platform test` и `task -d platform lint` зелёные, покрытие `platform/telemetry` ≥ 80%
+- [ ] Ревью API пакета с пользователем (на нём строятся `logs`/`tracing`/`metrics`)
 
-### Phase 2: Просмотр
-- [x] Task 4: Grafana с provisioning датасорса ClickHouse
-- [x] Task 5: README (раздел Observability) и статус в карте
+### Phase 2: Подключение сервисов
+- [ ] Task 6: Shutdown-контекст с таймаутом в `main.go` всех сервисов
+- [ ] Task 7: Пилот — order-service
+- [ ] Task 8: user-service и product-service
+- [ ] Task 9: gateway-service и notification-service
 
-### Checkpoint B: модуль завершён
-- [ ] Все Success Criteria спека выполнены, ревью с пользователем
+### Checkpoint B: сервисы
+- [ ] `task lint` по всем модулям, `go build ./...` в каждом модуле go.work
+- [ ] `task watch-all` с `OTEL_ENABLED=true` и `false` — все 5 сервисов стартуют и завершаются ≤ 10s
+
+### Phase 3: Документация
+- [ ] Task 10: README, карта, TODO, Success Criteria спека
+
+### Checkpoint C: модуль завершён
+- [ ] Все Success Criteria `SPEC-telemetry-sdk.md` отмечены, ревью с пользователем → переход к `logs`/`tracing`/`metrics`
 
 ## Risks and Mitigations
 
 | # | Риск | Влияние | Митигация |
 |---|---|---|---|
-| R1 | В образе Collector нет shell/curl — compose-healthcheck не выполнить | Med | Проверить при реализации, есть ли в образе бинарник для проверки. Если нет — Collector без compose-healthcheck, health проверяется в `obs-smoke` через `curl localhost:13133` с хоста. Это отклонение от AC1 согласовать с пользователем |
-| R2 | `clickhouseexporter` 0.163.2 не поддерживает `sending_queue.batch` или ведёт себя иначе | Low | Collector падает при невалидном конфиге — сразу видно в Task 2. Сверить с README экспортёра этой версии |
-| R3 | Collector стартует раньше ClickHouse и не может создать схему | Med | `depends_on: clickhouse: condition: service_healthy` + `retry_on_failure` |
-| R4 | Плагин Grafana не скачается (нет сети) — датасорс не работает | Low | Локальная разработка подразумевает сеть; в README описать симптом |
-| R5 | Конфликт портов 8123/9000/4317/4318/3001/13133 на хосте | Low | Проверить `lsof -i` до первого запуска |
-| R6 | Схема `Map` vs `JSON` атрибутов: плагин определяет её автоматически, но запросы дашбордов зависят от неё | Low | Держим схему по умолчанию (`Map`), фиксируем в спеке |
+| R1 | Без инструментации сервисы ничего не экспортируют, поэтому Success Criteria «WARN при остановленном Collector» нельзя увидеть e2e в этом модуле | Med | **Решено:** критерий закрывается unit-тестом error handler'а (Task 3) и тестом экспорта на закрытый порт (Task 5); e2e-проверка WARN — в первом из модулей `logs`/`tracing`/`metrics` |
+| R2 | `otlploggrpc` v0.23.0 / `sdk/log` — нестабильный API, может отличаться от ожиданий | Low | Сверить API по godig для точной версии в Task 5 до написания кода |
+| R3 | SDK читает `OTEL_TRACES_SAMPLER`/`OTEL_METRIC_EXPORT_INTERVAL` не так, как ожидается, при явных опциях | Med | Не передавать явные опции, если env задан; тест с `t.Setenv` на оба случая |
+| R4 | gRPC-экспортёр при недоступном Collector блокирует `Shutdown` дольше deadline | Med | Тест Task 5 на закрытый порт с `context.WithTimeout`; при необходимости — `WithTimeout` у экспортёров |
+| R5 | Локальные `.env` в gitignore — после изменения `config` сервисы не стартуют без `OTEL_ENABLED` | Low | **Решено:** `OTEL_ENABLED` — `required`, как остальные переменные; в Task 7–9 обновить `.env.example` и локальный `.env` |
+| R7 | ozzo `validation.Required` на `bool` отклоняет `false` (zero value) — так уже работает `GRPCServer.Reflection` | Med | На `Enabled` не ставить `validation.Required` (присутствие проверяет тег `env:",required"`); `Endpoint` — `validation.When(Enabled, validation.Required)` |
+| R6 | Конфликт версий транзитивных зависимостей (`grpc`, `protobuf`, `genproto`) после добавления OTel в `platform` | Med | Task 1 добавляет зависимости первым шагом; `task tidy` и `go build ./...` по всем модулям go.work |
 
 ## Open Questions
 
-Нет.
+Нет. Решения: R1 — unit-тесты, e2e WARN в следующем модуле; `OTEL_ENABLED` — `required` (R5).
