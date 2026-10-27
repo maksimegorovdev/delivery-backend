@@ -12,15 +12,15 @@ v0.72.0, `otelpgx` v0.13.0, `kotel` v1.7.1 в `platform`. Посмотреть, 
 выше v1.47.0 и `grpc`/`franz-go`. Через godig сверить API, на которое опирается план: `otelhttp.WithFilter`,
 `otelhttp.LabelerFromContext`, умеет ли `otelhttp` сам выставлять `http.route`, `otelgrpc.WithFilter`
 и `filters.ServicePrefix`, опцию отключения аргументов SQL в `otelpgx`, `otelpgx.RecordStats`,
-`kotel.WithTracer`/`WithMeter`/`WithProcessingSpan`. Без коммита кода.
+`kotel.WithTracer`/`WithMeter`/`WithProcessSpan`. Без коммита кода.
 
 **Acceptance criteria:**
-- [ ] Таблица «модуль → версия → что поднимает» дописана в Risks плана (R1 закрыт или эскалирован пользователю)
-- [ ] Подтверждены или скорректированы API из Architecture Decisions (route-middleware, фильтры, аргументы SQL)
+- [x] Таблица «модуль → версия → что поднимает» дописана в Risks плана (R1 закрыт или эскалирован пользователю)
+- [x] Подтверждены или скорректированы API из Architecture Decisions (route-middleware, фильтры, аргументы SQL)
 
 **Verification:**
-- [ ] `go build ./...` во всех модулях go.work на spike-ветке
-- [ ] Spike-ветка удалена, рабочая ветка без изменений `go.mod`
+- [x] `go build ./...` во всех модулях go.work на spike-ветке
+- [x] Spike-ветка удалена, рабочая ветка без изменений `go.mod`
 
 **Dependencies:** None
 
@@ -186,7 +186,7 @@ v0.72.0, `otelpgx` v0.13.0, `kotel` v1.7.1 в `platform`. Посмотреть, 
 
 **Description:** `kafkaconsumer.New` создаёт `kotel.NewKotel(kotel.WithTracer(...), kotel.WithMeter(...))`
 и добавляет `kgo.WithHooks(...)`. Обработка записи выносится в `processRecord`: спан через
-`tracer.WithProcessingSpan(record)`, ошибка → `RecordError` + `codes.Error`, `defer span.End()`.
+`tracer.WithProcessSpan(record)`, ошибка → `RecordError` + `codes.Error`, `defer span.End()`.
 Логика commit/rewind в `process` не меняется.
 
 **Acceptance criteria:**
