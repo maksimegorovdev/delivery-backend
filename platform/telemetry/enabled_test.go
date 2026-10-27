@@ -44,6 +44,7 @@ func newEnabled(t *testing.T) *telemetry.Telemetry {
 	return tel
 }
 
+//nolint:paralleltest // регистрирует глобальные провайдеры OTel и/или меняет env, тест нельзя запускать параллельно
 func TestNew_Enabled_RegistersMeterProvider(t *testing.T) {
 	newEnabled(t)
 
@@ -52,6 +53,7 @@ func TestNew_Enabled_RegistersMeterProvider(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // регистрирует глобальные провайдеры OTel и/или меняет env, тест нельзя запускать параллельно
 func TestNew_Enabled_RegistersTracerProviderAndPropagator(t *testing.T) {
 	newEnabled(t)
 
@@ -94,6 +96,7 @@ func TestNew_Enabled_Sampler(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // регистрирует глобальные провайдеры OTel и/или меняет env, тест нельзя запускать параллельно
 func TestNew_Enabled_ChildFollowsParentSampling(t *testing.T) {
 	newEnabled(t)
 

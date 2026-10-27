@@ -40,6 +40,7 @@ func New(opts ...Option) *slog.Logger {
 	}
 
 	var handler slog.Handler
+	//nolint:exhaustive // остальные форматы обрабатывает default (текстовый)
 	switch cfg.format {
 	case FormatJSON:
 		handler = slog.NewJSONHandler(cfg.writer, handlerOpts)

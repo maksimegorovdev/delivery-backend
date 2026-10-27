@@ -1,6 +1,7 @@
 package ozzoerr
 
 import (
+	"errors"
 	"sort"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -9,7 +10,8 @@ import (
 )
 
 func Flatten(prefix string, err error) []apperr.Violation {
-	verrs, ok := err.(validation.Errors)
+	var verrs validation.Errors
+	ok := errors.As(err, &verrs)
 	if !ok {
 		return []apperr.Violation{
 			{

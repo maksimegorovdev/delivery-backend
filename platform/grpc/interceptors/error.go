@@ -16,7 +16,7 @@ func Error() grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
 		req any,
-		info *grpc.UnaryServerInfo,
+		_ *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
 	) (any, error) {
 		resp, err := handler(ctx, req)

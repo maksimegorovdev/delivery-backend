@@ -85,6 +85,7 @@ func newPeriodicReader(exp sdkmetric.Exporter) *sdkmetric.PeriodicReader {
 // deltaTemporality выбирает Delta для аддитивных монотонных инструментов
 // (Counter, Histogram и Observable Counter), Cumulative — для остальных.
 func deltaTemporality(kind sdkmetric.InstrumentKind) metricdata.Temporality {
+	//nolint:exhaustive // все остальные виды инструментов получают Cumulative в default
 	switch kind {
 	case sdkmetric.InstrumentKindCounter,
 		sdkmetric.InstrumentKindHistogram,

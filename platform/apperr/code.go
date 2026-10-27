@@ -45,11 +45,15 @@ const (
 	MessageUnavailable        = "unavailable"
 )
 
+// statusClientClosedRequest — нестандартный HTTP-статус 499 (клиент закрыл соединение).
+const statusClientClosedRequest = 499
+
 func (c Code) String() string {
 	return string(c)
 }
 
 func (c Code) GRPC() codes.Code {
+	//nolint:exhaustive // неизвестные коды сводятся к codes.Internal в default
 	switch c {
 	case CodeCanceled:
 		return codes.Canceled
@@ -87,6 +91,7 @@ func (c Code) GRPC() codes.Code {
 }
 
 func (c Code) HTTP() int {
+	//nolint:exhaustive // неизвестные коды сводятся к 500 в default
 	switch c {
 	case CodeInvalidArgument, CodeFailedPrecondition, CodeOutOfRange:
 		return http.StatusBadRequest
@@ -101,7 +106,7 @@ func (c Code) HTTP() int {
 	case CodeResourceExhausted:
 		return http.StatusTooManyRequests
 	case CodeCanceled:
-		return 499
+		return statusClientClosedRequest
 	case CodeUnimplemented:
 		return http.StatusNotImplemented
 	case CodeUnavailable:
@@ -114,6 +119,7 @@ func (c Code) HTTP() int {
 }
 
 func (c Code) Level() slog.Level {
+	//nolint:exhaustive // остальные коды логируются как WARN в default
 	switch c {
 	case CodeInternal, CodeUnknown, CodeDataLoss, CodeUnavailable, CodeDeadlineExceeded, CodeUnimplemented:
 		return slog.LevelError
@@ -123,6 +129,7 @@ func (c Code) Level() slog.Level {
 }
 
 func (c Code) Public() string {
+	//nolint:exhaustive // остальные коды получают общее сообщение в default
 	switch c {
 	case CodeInvalidArgument:
 		return MessageInvalidArgument

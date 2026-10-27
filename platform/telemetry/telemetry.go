@@ -36,10 +36,12 @@ type factories struct {
 	logger func(context.Context, Config, *resource.Resource) (*sdklog.LoggerProvider, error)
 }
 
-var defaultFactories = factories{
-	tracer: newTracerProvider,
-	meter:  newMeterProvider,
-	logger: newLoggerProvider,
+func defaultFactories() factories {
+	return factories{
+		tracer: newTracerProvider,
+		meter:  newMeterProvider,
+		logger: newLoggerProvider,
+	}
 }
 
 // New создаёт Telemetry по cfg.
@@ -51,7 +53,7 @@ var defaultFactories = factories{
 // Если провайдер не удалось создать, уже созданные закрываются, а глобальное состояние
 // остаётся прежним.
 func New(ctx context.Context, cfg Config) (*Telemetry, error) {
-	return build(ctx, cfg, defaultFactories)
+	return build(ctx, cfg, defaultFactories())
 }
 
 func build(ctx context.Context, cfg Config, f factories) (*Telemetry, error) {
@@ -72,9 +74,9 @@ func build(ctx context.Context, cfg Config, f factories) (*Telemetry, error) {
 	// Данных ещё нет, поэтому откат ограничен по времени: иначе финальный flush
 	// в недоступный Collector задержал бы старт сервиса до таймаута экспортёра.
 	rollback := func(cause error) error {
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
+		rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
 		defer cancel()
-		return errors.Join(cause, t.Shutdown(ctx))
+		return errors.Join(cause, t.Shutdown(rollbackCtx))
 	}
 
 	if t.tracerProvider, err = f.tracer(ctx, cfg, res); err != nil {

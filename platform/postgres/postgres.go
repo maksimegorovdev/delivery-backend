@@ -36,9 +36,9 @@ func New(ctx context.Context, dsn string, opts ...Option) (*pgxpool.Pool, error)
 		return nil, fmt.Errorf("postgres: pool: %w", err)
 	}
 
-	if err := pool.Ping(ctx); err != nil {
+	if pingErr := pool.Ping(ctx); pingErr != nil {
 		pool.Close()
-		return nil, fmt.Errorf("postgres: ping: %w", err)
+		return nil, fmt.Errorf("postgres: ping: %w", pingErr)
 	}
 
 	return pool, nil

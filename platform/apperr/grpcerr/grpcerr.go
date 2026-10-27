@@ -1,3 +1,4 @@
+//nolint:cyclop // маппинг ошибок — плоский switch, средняя сложность не показатель
 package grpcerr
 
 import (
@@ -44,10 +45,10 @@ func Map(err error) error {
 
 	out := apperr.New(code).WithMessage(msg).Wrap(err)
 	if reason != "" {
-		out.WithReason(reason)
+		out = out.WithReason(reason)
 	}
 	if len(violations) > 0 {
-		out.WithViolations(violations...)
+		out = out.WithViolations(violations...)
 	}
 	return out
 }
