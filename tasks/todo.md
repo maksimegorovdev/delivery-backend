@@ -224,24 +224,21 @@ Counter) → Delta, UpDownCounter/Gauge → Cumulative. `PeriodicReader` с ин
 - [ ] `task watch-all` с `OTEL_ENABLED=true` и `false` — все 5 сервисов стартуют и завершаются ≤ 10s
 - [ ] Остановка Collector не роняет ни один сервис
 
-## Task 10: README, карта, TODO, Success Criteria спека
+## Task 10: Карта, TODO, Success Criteria спека
 
-**Description:** Описать `platform/telemetry` в `platform/README.md` (API, env-переменные, порядок в
-`app.New`). В корневом README — переменные `OTEL_*`. Карта: `telemetry-sdk` → done. TODO.md — подпункт
-прогресса Observability. Отметить Success Criteria в спеке; у критерия про WARN — пометка, что он закрыт unit-тестами, а e2e
+**Description:** Карта: `telemetry-sdk` → done. TODO.md — подпункт прогресса Observability.
+README не трогаем (решение: не захламлять; API описан godoc-комментариями пакета, переменные — в `.env.example`). Отметить Success Criteria в спеке; у критерия про WARN — пометка, что он закрыт unit-тестами, а e2e
 перенесён в `logs`/`tracing` (R1).
 
 **Acceptance criteria:**
-- [x] Переменные и порядок вызова в README совпадают с кодом
 - [x] `SPEC-observability-map.md`: `telemetry-sdk` → done; Success Criteria спека отмечены
 
 **Verification:**
-- [ ] Пройти README: включить `OTEL_ENABLED=true` в одном сервисе по инструкции и запустить
+- [ ] Включить `OTEL_ENABLED=true` в одном сервисе по его `.env.example` и запустить
 
 **Dependencies:** Task 8, Task 9
 
 **Files likely touched:**
-- `platform/README.md`, `README.md`
 - `SPEC-observability-map.md`, `SPEC-telemetry-sdk.md`, `TODO.md`
 
 **Estimated scope:** S
