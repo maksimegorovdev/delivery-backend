@@ -3,6 +3,7 @@ package closer
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 )
 
@@ -30,8 +31,8 @@ func (c *Closer) Close(ctx context.Context) error {
 	c.mu.Unlock()
 
 	var errs []error
-	for i := len(funcs) - 1; i >= 0; i-- {
-		if err := funcs[i](ctx); err != nil {
+	for _, f := range slices.Backward(funcs) {
+		if err := f(ctx); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -39,14 +40,14 @@ func (c *Closer) Close(ctx context.Context) error {
 }
 
 func Wrap(f func()) Func {
-	return func(ctx context.Context) error {
+	return func(_ context.Context) error {
 		f()
 		return nil
 	}
 }
 
 func WrapErr(f func() error) Func {
-	return func(ctx context.Context) error {
+	return func(_ context.Context) error {
 		return f()
 	}
 }

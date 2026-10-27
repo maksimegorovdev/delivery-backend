@@ -1,3 +1,4 @@
+//nolint:testpackage // тест использует неэкспортируемые символы пакета
 package telemetry
 
 import (
@@ -13,6 +14,8 @@ import (
 )
 
 func TestDeltaTemporality(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		kind sdkmetric.InstrumentKind
 		want metricdata.Temporality
@@ -28,6 +31,8 @@ func TestDeltaTemporality(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.kind.String(), func(t *testing.T) {
+			t.Parallel()
+
 			if got := deltaTemporality(tt.kind); got != tt.want {
 				t.Errorf("deltaTemporality(%v) = %v, want %v", tt.kind, got, tt.want)
 			}
@@ -38,7 +43,8 @@ func TestDeltaTemporality(t *testing.T) {
 // countingExporter считает вызовы Export; остальные методы — заглушки.
 type countingExporter struct {
 	sdkmetric.Exporter // nil: Temporality/Aggregation в тестах не вызываются
-	exports            atomic.Int32
+
+	exports atomic.Int32
 }
 
 func (e *countingExporter) Temporality(sdkmetric.InstrumentKind) metricdata.Temporality {
@@ -66,7 +72,13 @@ func TestNewPeriodicReader_Interval(t *testing.T) {
 		wantPost int32 // экспортов через ещё 2s после before
 	}{
 		{name: "по умолчанию 10s", env: "", before: 9 * time.Second, wantPre: 0, wantPost: 1},
-		{name: "OTEL_METRIC_EXPORT_INTERVAL=3000 переопределяет", env: "3000", before: 2 * time.Second, wantPre: 0, wantPost: 1},
+		{
+			name:     "OTEL_METRIC_EXPORT_INTERVAL=3000 переопределяет",
+			env:      "3000",
+			before:   2 * time.Second,
+			wantPre:  0,
+			wantPost: 1,
+		},
 	}
 
 	for _, tt := range tests {

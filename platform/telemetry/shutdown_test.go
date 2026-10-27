@@ -11,6 +11,7 @@ import (
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 )
 
+//nolint:paralleltest // регистрирует глобальные провайдеры OTel, тест нельзя запускать параллельно
 func TestNew_Enabled_RegistersLoggerProvider(t *testing.T) {
 	tel := newEnabled(t)
 
@@ -25,6 +26,8 @@ func TestNew_Enabled_RegistersLoggerProvider(t *testing.T) {
 
 // Shutdown с накопленными данными всех трёх сигналов и недоступным Collector
 // должен вернуться не позже deadline контекста (риск R4).
+//
+//nolint:paralleltest // регистрирует глобальные провайдеры OTel, тест нельзя запускать параллельно
 func TestShutdown_UnreachableCollectorRespectsDeadline(t *testing.T) {
 	const deadline = 2 * time.Second
 	const slack = 500 * time.Millisecond
@@ -55,6 +58,7 @@ func TestShutdown_UnreachableCollectorRespectsDeadline(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // регистрирует глобальные провайдеры OTel, тест нельзя запускать параллельно
 func TestShutdown_Idempotent(t *testing.T) {
 	tel := newEnabled(t)
 

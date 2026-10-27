@@ -10,6 +10,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/telemetry"
 )
 
+//nolint:paralleltest // читает глобальные провайдеры OTel, тест нельзя запускать параллельно
 func TestNew_Disabled(t *testing.T) {
 	tracerBefore := otel.GetTracerProvider()
 	meterBefore := otel.GetMeterProvider()
@@ -39,13 +40,15 @@ func TestNew_Disabled(t *testing.T) {
 	})
 
 	t.Run("Shutdown возвращает nil", func(t *testing.T) {
-		if err := tel.Shutdown(context.Background()); err != nil {
-			t.Errorf("Shutdown: %v", err)
+		if shutdownErr := tel.Shutdown(context.Background()); shutdownErr != nil {
+			t.Errorf("Shutdown: %v", shutdownErr)
 		}
 	})
 }
 
 func TestNew_InvalidConfig(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		cfg  telemetry.Config
@@ -57,6 +60,8 @@ func TestNew_InvalidConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			tel, err := telemetry.New(context.Background(), tt.cfg)
 			if err == nil {
 				t.Fatalf("New: ожидалась ошибка, получен %v", tel)

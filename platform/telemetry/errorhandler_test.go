@@ -1,3 +1,4 @@
+//nolint:testpackage // тест использует неэкспортируемые символы пакета
 package telemetry
 
 import (
@@ -9,7 +10,7 @@ import (
 	"time"
 )
 
-// captureDefaultLogger подменяет slog.Default() на текстовый логгер в буфере.
+// captureDefaultLogger подменяет [slog.Default] на текстовый логгер в буфере.
 func captureDefaultLogger(t *testing.T) *bytes.Buffer {
 	t.Helper()
 
@@ -28,6 +29,7 @@ func logLines(buf *bytes.Buffer) []string {
 	return strings.Split(s, "\n")
 }
 
+//nolint:paralleltest // подменяет slog.Default, тест нельзя запускать параллельно
 func TestErrorHandler_Throttling(t *testing.T) {
 	buf := captureDefaultLogger(t)
 
@@ -50,8 +52,8 @@ func TestErrorHandler_Throttling(t *testing.T) {
 		now = now.Add(5 * time.Second)
 		h.Handle(exportErr)
 	}
-	if lines := logLines(buf); len(lines) != 1 {
-		t.Fatalf("внутри интервала строк лога = %d, want 1: %q", len(lines), lines)
+	if got := logLines(buf); len(got) != 1 {
+		t.Fatalf("внутри интервала строк лога = %d, want 1: %q", len(got), got)
 	}
 
 	// После интервала — один WARN с числом пропущенных.
@@ -67,11 +69,12 @@ func TestErrorHandler_Throttling(t *testing.T) {
 
 	// Счётчик сброшен: следующая ошибка снова подавляется.
 	h.Handle(exportErr)
-	if lines := logLines(buf); len(lines) != 2 {
-		t.Errorf("сразу после WARN строк лога = %d, want 2", len(lines))
+	if got := logLines(buf); len(got) != 2 {
+		t.Errorf("сразу после WARN строк лога = %d, want 2", len(got))
 	}
 }
 
+//nolint:paralleltest // подменяет slog.Default, тест нельзя запускать параллельно
 func TestErrorHandler_UsesCurrentDefaultLogger(t *testing.T) {
 	h := newErrorHandler(30*time.Second, time.Now)
 

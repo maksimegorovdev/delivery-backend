@@ -1,3 +1,4 @@
+//nolint:cyclop // маппинг кодов PostgreSQL — плоский switch, средняя сложность не показатель
 package pgerr
 
 import (

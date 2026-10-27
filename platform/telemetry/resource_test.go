@@ -1,3 +1,4 @@
+//nolint:testpackage // тест использует неэкспортируемые символы пакета
 package telemetry
 
 import (
@@ -20,6 +21,8 @@ func attr(t *testing.T, res *resource.Resource, key string) string {
 }
 
 func TestNewResource_ServiceAttributes(t *testing.T) {
+	t.Parallel()
+
 	res, err := newResource(context.Background(), "order")
 	if err != nil {
 		t.Fatalf("newResource: %v", err)
@@ -46,9 +49,19 @@ func TestNewResource_FromEnv(t *testing.T) {
 		key  string
 		want string
 	}{
-		{name: "атрибут из OTEL_RESOURCE_ATTRIBUTES", env: "deployment.environment.name=staging,team=delivery", key: "team", want: "delivery"},
+		{
+			name: "атрибут из OTEL_RESOURCE_ATTRIBUTES",
+			env:  "deployment.environment.name=staging,team=delivery",
+			key:  "team",
+			want: "delivery",
+		},
 		{name: "service.name из конфига главнее env", env: "service.name=other", key: "service.name", want: "order"},
-		{name: "service.instance.id из env главнее сгенерированного", env: "service.instance.id=pod-1", key: "service.instance.id", want: "pod-1"},
+		{
+			name: "service.instance.id из env главнее сгенерированного",
+			env:  "service.instance.id=pod-1",
+			key:  "service.instance.id",
+			want: "pod-1",
+		},
 	}
 
 	for _, tt := range tests {
@@ -67,6 +80,8 @@ func TestNewResource_FromEnv(t *testing.T) {
 }
 
 func TestServiceVersion(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		info *debug.BuildInfo
@@ -91,6 +106,8 @@ func TestServiceVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			if got := serviceVersion(tt.info); got != tt.want {
 				t.Errorf("serviceVersion() = %q, want %q", got, tt.want)
 			}

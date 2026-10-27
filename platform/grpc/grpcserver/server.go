@@ -47,21 +47,22 @@ func (s *Server) Server() *grpc.Server {
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	lis, err := net.Listen("tcp", s.addr)
+	var lc net.ListenConfig
+	lis, err := lc.Listen(ctx, "tcp", s.addr)
 	if err != nil {
 		return fmt.Errorf("grpcserver: listen: %w", err)
 	}
 
 	serveErr := make(chan error, 1)
 	go func() {
-		if err := s.server.Serve(lis); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-			serveErr <- err
+		if serr := s.server.Serve(lis); serr != nil && !errors.Is(serr, grpc.ErrServerStopped) {
+			serveErr <- serr
 		}
 	}()
 
 	select {
-	case err := <-serveErr:
-		return fmt.Errorf("grpcserver: serve: %w", err)
+	case serr := <-serveErr:
+		return fmt.Errorf("grpcserver: serve: %w", serr)
 	case <-ctx.Done():
 		return s.graceful()
 	}

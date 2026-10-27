@@ -15,7 +15,7 @@ func Validation(validator protovalidate.Validator) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
 		req any,
-		info *grpc.UnaryServerInfo,
+		_ *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
 	) (any, error) {
 		msg, ok := req.(proto.Message)
@@ -24,7 +24,7 @@ func Validation(validator protovalidate.Validator) grpc.UnaryServerInterceptor {
 		}
 
 		if err := validator.Validate(msg); err != nil {
-			if validationErr, ok := errors.AsType[*protovalidate.ValidationError](err); ok {
+			if validationErr, isValidation := errors.AsType[*protovalidate.ValidationError](err); isValidation {
 				violations := make([]apperr.Violation, 0, len(validationErr.Violations))
 				for _, violation := range validationErr.Violations {
 					violations = append(violations, apperr.Violation{

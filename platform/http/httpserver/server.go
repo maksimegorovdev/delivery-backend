@@ -13,6 +13,8 @@ import (
 
 const (
 	defaultShutdownTimeout = 10 * time.Second
+	// defaultReadHeaderTimeout защищает от Slowloris-атак.
+	defaultReadHeaderTimeout = 10 * time.Second
 )
 
 type Server struct {
@@ -34,7 +36,8 @@ func New(addr string, opts ...Option) *Server {
 	}
 
 	srv.server = &http.Server{
-		Handler: srv.router,
+		Handler:           srv.router,
+		ReadHeaderTimeout: defaultReadHeaderTimeout,
 	}
 
 	return srv
@@ -45,21 +48,22 @@ func (s *Server) Router() *chi.Mux {
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	lis, err := net.Listen("tcp", s.addr)
+	var lc net.ListenConfig
+	lis, err := lc.Listen(ctx, "tcp", s.addr)
 	if err != nil {
 		return fmt.Errorf("httpserver: listen: %w", err)
 	}
 
 	serveErr := make(chan error, 1)
 	go func() {
-		if err := s.server.Serve(lis); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			serveErr <- err
+		if serr := s.server.Serve(lis); serr != nil && !errors.Is(serr, http.ErrServerClosed) {
+			serveErr <- serr
 		}
 	}()
 
 	select {
-	case err := <-serveErr:
-		return fmt.Errorf("httpserver: serve: %w", err)
+	case serr := <-serveErr:
+		return fmt.Errorf("httpserver: serve: %w", serr)
 	case <-ctx.Done():
 		return s.shutdown()
 	}

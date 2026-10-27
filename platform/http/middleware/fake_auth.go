@@ -6,7 +6,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/appctx"
 )
 
-const UserIDHeader = "X-User-ID"
+const UserIDHeader = "X-User-Id"
 
 func FakeAuth(defaultUserID string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

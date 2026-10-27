@@ -9,7 +9,7 @@ import (
 // errorLogInterval — минимальный интервал между WARN об ошибках экспорта.
 const errorLogInterval = 30 * time.Second
 
-// errorHandler реализует otel.ErrorHandler: пишет ошибки SDK в slog.Default()
+// errorHandler реализует otel.ErrorHandler: пишет ошибки SDK в [slog.Default]
 // не чаще одного раза за interval, а число пропущенных ошибок добавляет к следующему WARN.
 // Логгер берётся при каждом вызове, поскольку создаётся уже после telemetry.New.
 type errorHandler struct {
@@ -39,5 +39,6 @@ func (h *errorHandler) Handle(err error) {
 	h.suppressed = 0
 	h.mu.Unlock()
 
+	//nolint:sloglint // глобальный логгер нужен намеренно: сервисный логгер создаётся после telemetry.New
 	slog.Warn("telemetry: export error", "error", err, "suppressed", suppressed)
 }

@@ -16,7 +16,12 @@ type Executor interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
+	CopyFrom(
+		ctx context.Context,
+		tableName pgx.Identifier,
+		columnNames []string,
+		rowSrc pgx.CopyFromSource,
+	) (int64, error)
 	SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults
 }
 
@@ -48,12 +53,12 @@ func (m *TxManager) WithinTx(ctx context.Context, fn func(ctx context.Context) e
 		_ = tx.Rollback(context.WithoutCancel(ctx))
 	}()
 
-	if err := fn(context.WithValue(ctx, txKey{}, tx)); err != nil {
-		return err
+	if fnErr := fn(context.WithValue(ctx, txKey{}, tx)); fnErr != nil {
+		return fnErr
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return pgerr.Map(err)
+	if commitErr := tx.Commit(ctx); commitErr != nil {
+		return pgerr.Map(commitErr)
 	}
 	return err
 }
