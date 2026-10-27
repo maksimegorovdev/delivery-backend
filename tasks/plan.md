@@ -61,7 +61,7 @@ Task 0: spike — совместимость версий contrib с otel v1.47 
 ## Task List
 
 ### Phase 0: Риски
-- [ ] Task 0: Spike — версии contrib-модулей совместимы с otel v1.47 (без коммита)
+- [x] Task 0: Spike — версии contrib-модулей совместимы с otel v1.47 (без коммита)
 
 ### Phase 1: Логи
 - [ ] Task 1: stdout-логи с `trace_id`/`span_id`
@@ -101,14 +101,41 @@ Task 0: spike — совместимость версий contrib с otel v1.47 
 
 | # | Риск | Влияние | Митигация |
 |---|---|---|---|
-| R1 | `kotel` v1.7.1, `otelpgx` v0.13.0 или `otelslog` v0.21.0 тянут otel core новее v1.47 — апгрейд SDK во всех модулях | High | Task 0 до кода: `go get` в отдельной ветке, сверка через godig. При конфликте — согласовать с пользователем: поднять всё или взять более старую версию contrib |
+| R1 | ~~`kotel` v1.7.1, `otelpgx` v0.13.0 или `otelslog` v0.21.0 тянут otel core новее v1.47~~ | ~~High~~ | **Закрыт (Task 0, 2026-10-27):** `go get` всех шести модулей не меняет `otel*` (v1.47.0), `grpc` (v1.83.2), `franz-go` (v1.22.1), `pgx` (v5.10.0); `go build ./...` зелёный во всех 7 модулях go.work. См. таблицу ниже |
 | R2 | В gateway нет `GET /api/v1/orders/{id}` — Success Criteria tracing/metrics ссылаются на этот маршрут | Med | **Решено:** шаблонность `http.route` проверяется unit-тестом на chi-маршруте с `{id}`; e2e — на `POST /api/v1/orders`. Формулировки спеков правятся в Task 10 |
 | R3 | Рекурсия: error handler пишет WARN в `slog.Default()`, а тот после Task 2 уходит и в OTel. При упавшем Collector ошибка экспорта логов порождает новый лог | Med | Троттлинг 30s уже ограничивает поток. В Task 2 — e2e-проверка: остановленный Collector, сервис 2 минуты, число WARN в stdout ≤ 5 |
-| R4 | `otelhttp` оборачивает chi целиком, а `RoutePattern` известен только после роутинга — имя спана в момент старта `"HTTP POST"` | Med | Route-middleware переименовывает спан (`span.SetName`) и пишет `http.route` после `next.ServeHTTP`; unit-тест на финальное имя через `tracetest` |
-| R5 | `kotel` создаёт спан `process` только через `WithProcessingSpan` — легко забыть `End()` на ветке ошибки/rewind | Med | Логика в `processRecord` с `defer span.End()`; unit-тест: ошибка хендлера → один спан со `StatusCode=Error` |
+| R4 | `otelhttp` оборачивает chi целиком, а `RoutePattern` известен только после роутинга — имя спана в момент старта `"HTTP POST"` | Low | **Уточнено (Task 0):** chi v5.3.2 сам ставит `r.Pattern` (`mux.go:481`), а `otelhttp` v0.72 после `next.ServeHTTP` при `Pattern != ""` вызывает `span.SetName(spanNameFormatter(...))` (`handler.go:196`). Собственный `middleware.Route` вероятно не нужен — Task 5 начинает с unit-теста на имя спана и `http.route` в метрике; middleware пишем, только если тест красный по причине `otelhttp` |
+| R5 | `kotel` создаёт спан `process` только через `Tracer.WithProcessSpan(record)` (в плане было `WithProcessingSpan` — имя исправлено по Task 0) — легко забыть `End()` на ветке ошибки/rewind | Med | Логика в `processRecord` с `defer span.End()`; unit-тест: ошибка хендлера → один спан со `StatusCode=Error` |
 | R6 | Успешное создание заказа в e2e пишет в локальные БД и outbox → Kafka | Low | Локальное окружение; это и нужно для спана `process` в notification. Для ошибочного пути — фиктивный `address_id` без записи |
-| R7 | `otelpgx` по умолчанию может писать параметры SQL в спан | Med | Явно `otelpgx.WithDisableQuerySpanArgs`/аналог для v0.13 (сверить в Task 0); проверка в ClickHouse: в `SpanAttributes` нет значений параметров |
+| R7 | `otelpgx` может писать параметры SQL в спан | Low | **Уточнено (Task 0):** в v0.13.0 параметры включаются только явно через `WithIncludeQueryParameters(...)`; `WithDisableQuerySpanArgs` не существует. Не передаём эту опцию (и не используем `WithDisableSQLStatementInAttributes` — `db.query.text` нужен). Проверка в ClickHouse остаётся: в `SpanAttributes` нет значений параметров |
 | R8 | Покрытие `platform/logger` ≥ 80% — сейчас тестов в пакете нет | Low | Task 1–2 пишут тесты вместе с кодом; `go test -cover` в верификации |
+
+## Результат Task 0: совместимость версий (2026-10-27)
+
+`go get` в `platform` на временной ветке (удалена), `godig` не установлен — API сверены `go doc` и чтением исходников в module cache.
+
+| Модуль | Версия | Что поднимает в go.mod |
+|---|---|---|
+| `contrib/bridges/otelslog` | v0.21.0 | новый indirect |
+| `contrib/instrumentation/net/http/otelhttp` | v0.72.0 | v0.70.0 → v0.72.0; новый indirect `httpsnoop` v1.1.0 |
+| `contrib/instrumentation/google.golang.org/grpc/otelgrpc` | v0.72.0 | v0.70.0 → v0.72.0 |
+| `contrib/instrumentation/runtime` | v0.72.0 | новый indirect |
+| `github.com/exaring/otelpgx` | v0.13.0 | новый indirect |
+| `github.com/twmb/franz-go/plugin/kotel` | v1.7.1 | новый indirect; `franz-go` остаётся v1.22.1 |
+
+`otel*` v1.47.0, `grpc` v1.83.2, `pgx` v5.10.0 — без изменений.
+
+Сверка API из плана:
+
+| API | Статус |
+|---|---|
+| `otelhttp.WithFilter`, `LabelerFromContext`, `WithMeterProvider`/`WithTracerProvider`, `WithSpanNameFormatter` | есть |
+| `http.route` / имя спана из chi | `otelhttp` сам переименовывает спан по `r.Pattern`, который ставит chi (см. R4) |
+| `otelgrpc.WithFilter`, `filters.ServicePrefix`, `filters.HealthCheck` | есть; `NewServerHandler`/`NewClientHandler` — stats handler |
+| `otelpgx.NewTracer`, `RecordStats(db PoolStats)` | есть; параметры SQL выключены по умолчанию (см. R7) |
+| `kotel.NewKotel(WithTracer, WithMeter)`, `Kotel.Hooks()` | есть; спан обработки — `Tracer.WithProcessSpan` (см. R5) |
+| `otelslog.NewHandler(name, opts...)`, `slog.NewMultiHandler` | есть |
+| `runtime.Start(opts...)` | есть |
 
 ## Open Questions
 
