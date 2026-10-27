@@ -182,10 +182,10 @@ Counter) → Delta, UpDownCounter/Gauge → Cumulative. `PeriodicReader` с ин
 
 **Acceptance criteria:**
 - [ ] Оба сервиса стартуют с `OTEL_ENABLED=false` и `true`, `Shutdown` зарегистрирован первым
-- [ ] `.env.example` содержат новые переменные
+- [x] `.env.example` содержат новые переменные
 
 **Verification:**
-- [ ] `task -d services/user lint`, `task -d services/product lint`
+- [x] `task -d services/user lint`, `task -d services/product lint`
 - [ ] Запуск обоих в двух режимах, `Ctrl+C` ≤ 10s
 
 **Dependencies:** Task 7

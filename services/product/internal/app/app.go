@@ -14,6 +14,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/interceptors"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
 	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
+	"github.com/maksimegorovdev/delivery-backend/platform/telemetry"
 
 	repo "github.com/maksimegorovdev/delivery-backend/services/product/internal/repository/pg"
 	"github.com/maksimegorovdev/delivery-backend/services/product/internal/service"
@@ -42,6 +43,13 @@ func New(ctx context.Context) (_ *App, err error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Telemetry
+	tel, err := newTelemetry(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	cl.Add(tel.Shutdown)
 
 	// Logger
 	log := logger.New(
@@ -102,6 +110,14 @@ func New(ctx context.Context) (_ *App, err error) {
 	}
 
 	return app, nil
+}
+
+func newTelemetry(ctx context.Context, cfg *config.Config) (*telemetry.Telemetry, error) {
+	return telemetry.New(ctx, telemetry.Config{
+		Enabled:     cfg.Telemetry.Enabled,
+		ServiceName: cfg.App.Name,
+		Endpoint:    cfg.Telemetry.Endpoint,
+	})
 }
 
 func (a *App) Run(ctx context.Context) error {
