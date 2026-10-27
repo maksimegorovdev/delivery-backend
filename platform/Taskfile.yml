@@ -14,6 +14,11 @@ tasks:
     cmds:
       - curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b {{.LOCAL_BIN}} {{.GOLANGCI_LINT_VERSION}}
 
+  test:
+    desc: Run tests with race detector
+    cmds:
+      - go test -race ./...
+
   lint:
     desc: Run golangci-lint
     cmds:
