@@ -27,7 +27,7 @@ func newEnabled(t *testing.T) *telemetry.Telemetry {
 	tel, err := telemetry.New(context.Background(), telemetry.Config{
 		Enabled:     true,
 		ServiceName: "test-service",
-		Endpoint:    "127.0.0.1:1",
+		Endpoint:    "http://127.0.0.1:1",
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)

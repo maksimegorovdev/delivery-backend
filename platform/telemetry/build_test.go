@@ -44,7 +44,7 @@ func TestBuild_LoggerFailure_ShutsDownCreatedProviders(t *testing.T) {
 	tracerBefore := otel.GetTracerProvider()
 	meterBefore := otel.GetMeterProvider()
 
-	cfg := Config{Enabled: true, ServiceName: "test-service", Endpoint: "127.0.0.1:1"}
+	cfg := Config{Enabled: true, ServiceName: "test-service", Endpoint: "http://127.0.0.1:1"}
 	tel, err := build(context.Background(), cfg, f)
 	if !errors.Is(err, failure) {
 		t.Fatalf("build: err = %v, want %v", err, failure)

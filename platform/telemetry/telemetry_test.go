@@ -54,7 +54,23 @@ func TestNew_InvalidConfig(t *testing.T) {
 		cfg  telemetry.Config
 	}{
 		{name: "пустой Endpoint", cfg: telemetry.Config{Enabled: true, ServiceName: "order"}},
-		{name: "пустой ServiceName", cfg: telemetry.Config{Enabled: true, Endpoint: "localhost:4317"}},
+		{name: "пустой ServiceName", cfg: telemetry.Config{Enabled: true, Endpoint: "http://localhost:4317"}},
+		{
+			name: "Endpoint без схемы",
+			cfg:  telemetry.Config{Enabled: true, ServiceName: "order", Endpoint: "localhost:4317"},
+		},
+		{
+			name: "Endpoint IP без схемы",
+			cfg:  telemetry.Config{Enabled: true, ServiceName: "order", Endpoint: "127.0.0.1:4317"},
+		},
+		{
+			name: "Endpoint со схемой grpc",
+			cfg:  telemetry.Config{Enabled: true, ServiceName: "order", Endpoint: "grpc://localhost:4317"},
+		},
+		{
+			name: "Endpoint без хоста",
+			cfg:  telemetry.Config{Enabled: true, ServiceName: "order", Endpoint: "http://"},
+		},
 		{name: "всё пусто", cfg: telemetry.Config{Enabled: true}},
 	}
 

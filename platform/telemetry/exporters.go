@@ -19,14 +19,13 @@ import (
 // defaultMetricInterval — период экспорта метрик, если не задан OTEL_METRIC_EXPORT_INTERVAL.
 const defaultMetricInterval = 10 * time.Second
 
-// newTracerProvider создаёт TracerProvider с OTLP gRPC экспортёром (без TLS).
+// newTracerProvider создаёт TracerProvider с OTLP gRPC экспортёром.
 //
 // Сэмплер не задаётся явно: SDK читает OTEL_TRACES_SAMPLER/OTEL_TRACES_SAMPLER_ARG,
 // а без них использует ParentBased(AlwaysSample).
 func newTracerProvider(ctx context.Context, cfg Config, res *resource.Resource) (*sdktrace.TracerProvider, error) {
 	exp, err := otlptracegrpc.New(ctx,
-		otlptracegrpc.WithEndpoint(cfg.Endpoint),
-		otlptracegrpc.WithInsecure(),
+		otlptracegrpc.WithEndpointURL(cfg.Endpoint),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("telemetry: trace exporter: %w", err)
@@ -38,12 +37,11 @@ func newTracerProvider(ctx context.Context, cfg Config, res *resource.Resource) 
 	), nil
 }
 
-// newMeterProvider создаёт MeterProvider с OTLP gRPC экспортёром (без TLS)
+// newMeterProvider создаёт MeterProvider с OTLP gRPC экспортёром
 // и delta temporality для счётчиков и гистограмм.
 func newMeterProvider(ctx context.Context, cfg Config, res *resource.Resource) (*sdkmetric.MeterProvider, error) {
 	exp, err := otlpmetricgrpc.New(ctx,
-		otlpmetricgrpc.WithEndpoint(cfg.Endpoint),
-		otlpmetricgrpc.WithInsecure(),
+		otlpmetricgrpc.WithEndpointURL(cfg.Endpoint),
 		otlpmetricgrpc.WithTemporalitySelector(deltaTemporality),
 	)
 	if err != nil {
@@ -56,11 +54,10 @@ func newMeterProvider(ctx context.Context, cfg Config, res *resource.Resource) (
 	), nil
 }
 
-// newLoggerProvider создаёт LoggerProvider с OTLP gRPC экспортёром (без TLS) и batch-процессором.
+// newLoggerProvider создаёт LoggerProvider с OTLP gRPC экспортёром и batch-процессором.
 func newLoggerProvider(ctx context.Context, cfg Config, res *resource.Resource) (*sdklog.LoggerProvider, error) {
 	exp, err := otlploggrpc.New(ctx,
-		otlploggrpc.WithEndpoint(cfg.Endpoint),
-		otlploggrpc.WithInsecure(),
+		otlploggrpc.WithEndpointURL(cfg.Endpoint),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("telemetry: log exporter: %w", err)
