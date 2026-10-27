@@ -4,7 +4,7 @@ version: '3'
 
 vars:
   LOCAL_BIN: '{{.TASKFILE_DIR}}/bin'
-  GOLANGCI_LINT_VERSION: v2.13.1
+  GOLANGCI_LINT_VERSION: v2.15.0
 
 tasks:
   tools:
