@@ -158,13 +158,13 @@ v0.72.0, `otelpgx` v0.13.0, `kotel` v1.7.1 в `platform`. Посмотреть, 
 пул (Code Style из SPEC-metrics).
 
 **Acceptance criteria:**
-- [ ] SQL-спаны с `db.query.text` без значений параметров — дети gRPC server-спанов order/user/product
-- [ ] Запросы внутри `TxManager.WithinTx` видны в трейсе под родительским спаном
-- [ ] Метрики пула (acquired/idle/total/max, acquire wait) для order/user/product/notification
+- [x] SQL-спаны с `db.query.text` без значений параметров — дети gRPC server-спанов order/user/product (E2E: трейс `ef684e64…`, 27 спанов, 0 осиротевших; значений параметров в `SpanAttributes` нет)
+- [x] Запросы внутри `TxManager.WithinTx` видны в трейсе под родительским спаном
+- [x] Метрики пула (acquired/idle/total/max, acquire wait) для order/user/product/notification (`pgxpool.*` + `db.client.operation.duration` у всех четырёх сервисов)
 
 **Verification:**
-- [ ] `task -d platform lint`, `go build ./...` во всех модулях
-- [ ] Ручная проверка на локальном Postgres (интеграционные тесты/testcontainers — Ask first): SQL к `otel_traces` и `otel_metrics_*`
+- [x] `task -d platform lint`, `go build ./...` во всех модулях
+- [x] Ручная проверка на локальном Postgres (интеграционные тесты/testcontainers — Ask first): SQL к `otel_traces` и `otel_metrics_*`
 
 **Dependencies:** Task 5
 

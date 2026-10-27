@@ -75,7 +75,7 @@ Task 0: spike — совместимость версий contrib с otel v1.47 
 ### Phase 2: Sync-трейсы и их метрики
 - [x] Task 4: gRPC server и client (`otelgrpc`)
 - [ ] Task 5: HTTP gateway (`otelhttp`, route-middleware, `request.id`)
-- [ ] Task 6: Postgres (`otelpgx` tracer + `RecordStats`)
+- [x] Task 6: Postgres (`otelpgx` tracer + `RecordStats`)
 
 ### Checkpoint B: сквозной трейс
 - [ ] Создание заказа — один `TraceId` со спанами gateway/order/user/product и SQL под gRPC; водопад в Grafana
