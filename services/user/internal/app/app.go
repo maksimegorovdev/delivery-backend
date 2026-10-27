@@ -14,10 +14,11 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/interceptors"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
 	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
+
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/config"
 	repo "github.com/maksimegorovdev/delivery-backend/services/user/internal/repository/pg"
-	grpcrouter "github.com/maksimegorovdev/delivery-backend/services/user/internal/transport/grpc"
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/service"
+	grpcrouter "github.com/maksimegorovdev/delivery-backend/services/user/internal/transport/grpc"
 )
 
 type App struct {

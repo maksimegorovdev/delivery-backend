@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
+
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/app"
 )
 
@@ -19,6 +20,7 @@ const shutdownTimeout = 10 * time.Second
 
 func main() {
 	if err := run(); err != nil {
+		//nolint:sloglint // логгер сервиса недоступен за пределами run, поэтому используется slog по умолчанию
 		slog.Error(
 			"service stopped with error",
 			logger.Err(err),

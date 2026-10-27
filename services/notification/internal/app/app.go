@@ -11,6 +11,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/kafka/kafkaconsumer"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
 	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
+
 	repo "github.com/maksimegorovdev/delivery-backend/services/notification/internal/repository/pg"
 	"github.com/maksimegorovdev/delivery-backend/services/notification/internal/service"
 	"github.com/maksimegorovdev/delivery-backend/services/notification/internal/transport/kafka"
@@ -115,13 +116,13 @@ func (a *App) Run(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		a.log.Info(
+		a.log.InfoContext(ctx,
 			"kafka consumer started",
 			slog.Any("brokers", a.cfg.Kafka.Brokers),
 			slog.String("group", a.cfg.Kafka.ConsumerGroup),
 			slog.Any("topic", a.cfg.Kafka.Topics),
 		)
-		defer a.log.Info(
+		defer a.log.InfoContext(ctx,
 			"kafka consumer stopped",
 			slog.Any("brokers", a.cfg.Kafka.Brokers),
 			slog.String("group", a.cfg.Kafka.ConsumerGroup),

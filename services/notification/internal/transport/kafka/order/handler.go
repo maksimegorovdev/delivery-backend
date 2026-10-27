@@ -6,6 +6,7 @@ import (
 
 	"github.com/maksimegorovdev/delivery-backend/platform/kafka/kafkaconsumer"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
+
 	"github.com/maksimegorovdev/delivery-backend/services/notification/internal/domain"
 	"github.com/maksimegorovdev/delivery-backend/services/notification/internal/service"
 	"github.com/maksimegorovdev/delivery-backend/services/notification/internal/transport/kafka"

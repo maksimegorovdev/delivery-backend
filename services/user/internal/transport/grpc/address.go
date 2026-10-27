@@ -7,6 +7,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	addressv1 "github.com/maksimegorovdev/delivery-backend/proto/gen/go/address/v1"
+
 	"github.com/maksimegorovdev/delivery-backend/services/user/internal/domain"
 )
 
@@ -16,6 +17,7 @@ type AddressService interface {
 
 type AddressRouter struct {
 	addressv1.UnimplementedAddressServiceServer
+
 	uc AddressService
 }
 
@@ -23,7 +25,10 @@ func NewAddressRouter(server *grpc.Server, uc AddressService) {
 	addressv1.RegisterAddressServiceServer(server, &AddressRouter{uc: uc})
 }
 
-func (r *AddressRouter) GetAddress(ctx context.Context, req *addressv1.GetAddressRequest) (*addressv1.GetAddressResponse, error) {
+func (r *AddressRouter) GetAddress(
+	ctx context.Context,
+	req *addressv1.GetAddressRequest,
+) (*addressv1.GetAddressResponse, error) {
 	address, err := r.uc.GetAddress(ctx, req.GetId())
 	if err != nil {
 		return nil, err

@@ -8,6 +8,7 @@ import (
 
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr/pgerr"
 	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
+
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/domain"
 )
 
@@ -38,7 +39,13 @@ func (r *OrderRepo) insertOrder(
 		ctx,
 		`INSERT INTO orders (id, user_id, status, total_amount, delivery_address, created_at, updated_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		order.ID, order.UserID, order.Status, order.TotalAmount, order.DeliveryAddress, order.CreatedAt, order.UpdatedAt,
+		order.ID,
+		order.UserID,
+		order.Status,
+		order.TotalAmount,
+		order.DeliveryAddress,
+		order.CreatedAt,
+		order.UpdatedAt,
 	); err != nil {
 		return pgerr.Map(err)
 	}

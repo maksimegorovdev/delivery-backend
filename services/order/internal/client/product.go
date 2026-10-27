@@ -7,6 +7,7 @@ import (
 
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr/grpcerr"
 	productv1 "github.com/maksimegorovdev/delivery-backend/proto/gen/go/product/v1"
+
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/domain"
 )
 

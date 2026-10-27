@@ -8,6 +8,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr"
 	"github.com/maksimegorovdev/delivery-backend/platform/kafka/kafkaconsumer"
 	orderv1 "github.com/maksimegorovdev/delivery-backend/proto/gen/go/order/v1"
+
 	"github.com/maksimegorovdev/delivery-backend/services/notification/internal/domain"
 	"github.com/maksimegorovdev/delivery-backend/services/notification/internal/service"
 )

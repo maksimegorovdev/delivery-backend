@@ -7,6 +7,7 @@ import (
 
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr/grpcerr"
 	orderv1 "github.com/maksimegorovdev/delivery-backend/proto/gen/go/order/v1"
+
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/domain"
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/service"
 )
@@ -42,8 +43,8 @@ func (c *OrderClient) CreateOrder(ctx context.Context, input service.CreateOrder
 }
 
 func protoToOrder(p *orderv1.Order) domain.Order {
-	items := make([]domain.OrderItem, 0, len(p.Items))
-	for _, item := range p.Items {
+	items := make([]domain.OrderItem, 0, len(p.GetItems()))
+	for _, item := range p.GetItems() {
 		items = append(items, domain.OrderItem{
 			ID:          item.GetId(),
 			ProductID:   item.GetProductId(),
@@ -66,6 +67,7 @@ func protoToOrder(p *orderv1.Order) domain.Order {
 }
 
 func statusFromProto(status orderv1.OrderStatus) domain.OrderStatus {
+	//nolint:exhaustive // UNSPECIFIED и неизвестные значения обрабатываются в default
 	switch status {
 	case orderv1.OrderStatus_ORDER_STATUS_CREATED:
 		return domain.OrderStatusCreated

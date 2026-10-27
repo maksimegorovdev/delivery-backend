@@ -8,28 +8,9 @@ import (
 
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr/pgerr"
 	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
+
 	"github.com/maksimegorovdev/delivery-backend/services/notification/internal/domain"
 )
-
-type notificationRow struct {
-	ID        string `db:"id"`
-	EventID   string `db:"event_id"`
-	EventType string `db:"event_type"`
-	Channel   string `db:"channel"`
-	Payload   []byte `db:"payload"`
-	Attempts  int    `db:"attempts"`
-}
-
-func (r notificationRow) toDomain() domain.Notification {
-	return domain.Notification{
-		ID:        r.ID,
-		EventID:   r.EventID,
-		EventType: r.EventType,
-		Channel:   domain.Channel(r.Channel),
-		Payload:   r.Payload,
-		Attempts:  r.Attempts,
-	}
-}
 
 type NotificationRepo struct {
 	pool *pgxpool.Pool
@@ -39,7 +20,11 @@ func NewNotificationRepo(pool *pgxpool.Pool) *NotificationRepo {
 	return &NotificationRepo{pool: pool}
 }
 
-func (r *NotificationRepo) CreateForChannels(ctx context.Context, notification domain.Notification, channels []domain.Channel) error {
+func (r *NotificationRepo) CreateForChannels(
+	ctx context.Context,
+	notification domain.Notification,
+	channels []domain.Channel,
+) error {
 	if len(channels) == 0 {
 		return nil
 	}
