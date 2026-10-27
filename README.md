@@ -20,17 +20,6 @@
 
 Посмотреть список можно через `task --list`.
 
-## Observability
-
-OTel Collector принимает логи, трейсы и метрики по OTLP и пишет их в ClickHouse (БД `otel`, хранение 72 часа).
-Смотреть — в Grafana: http://localhost:3001 → **Explore** → **ClickHouse**, Query type **Traces** или **Logs**.
-
-| Сервис | Адрес |
-|---|---|
-| Grafana | http://localhost:3001 (без логина) |
-| OTel Collector | `localhost:4317` (gRPC), `localhost:4318` (HTTP) |
-| ClickHouse | `localhost:9000`, пользователь `default` / `clickhouse` |
-
 ## Что отрабатывается
 
 ### Коммуникация между сервисами
