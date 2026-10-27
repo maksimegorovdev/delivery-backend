@@ -115,7 +115,7 @@ v0.72.0, `otelpgx` v0.13.0, `kotel` v1.7.1 в `platform`. Посмотреть, 
 
 **Verification:**
 - [x] `task -d platform test`, `task -d platform lint`
-- [ ] E2E: grpcui → order `CreateOrder` → в `otel.otel_traces` спаны order (server, client) + user/product (server) с одним `TraceId`
+- [x] E2E: grpcui → order `CreateOrder` → в `otel.otel_traces` спаны order (server, client) + user/product (server) с одним `TraceId`
 
 **Dependencies:** Task 0
 
