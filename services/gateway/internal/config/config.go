@@ -13,6 +13,7 @@ type Config struct {
 	HTTP         HTTP
 	OrderService OrderService
 	FakeAuth     FakeAuth
+	Telemetry    Telemetry
 }
 
 func (c Config) Validate() error {
@@ -21,6 +22,8 @@ func (c Config) Validate() error {
 		validation.Field(&c.Log, validation.Required),
 		validation.Field(&c.HTTP, validation.Required),
 		validation.Field(&c.FakeAuth, validation.Required),
+		// Без Required: нулевая Telemetry{false, ""} — валидный выключенный режим.
+		validation.Field(&c.Telemetry),
 	)
 }
 
@@ -73,6 +76,18 @@ type FakeAuth struct {
 func (f FakeAuth) Validate() error {
 	return validation.ValidateStruct(&f,
 		validation.Field(&f.UserID, validation.Required),
+	)
+}
+
+type Telemetry struct {
+	Enabled  bool   `env:"OTEL_ENABLED,required"`
+	Endpoint string `env:"OTEL_EXPORTER_OTLP_ENDPOINT"`
+}
+
+func (t Telemetry) Validate() error {
+	return validation.ValidateStruct(&t,
+		// Required на Enabled запрещён: false считается пустым значением.
+		validation.Field(&t.Endpoint, validation.When(t.Enabled, validation.Required)),
 	)
 }
 
