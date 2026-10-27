@@ -1,248 +1,277 @@
-# Tasks: telemetry-sdk
+# Tasks: logs + tracing + metrics
 
-> План: [plan.md](plan.md) · Спек: [SPEC-telemetry-sdk.md](../spec/SPEC-telemetry-sdk.md)
+> План: [plan.md](plan.md) · Спеки: [logs](../spec/SPEC-logs.md) · [tracing](../spec/SPEC-tracing.md) · [metrics](../spec/SPEC-metrics.md)
 
-## Task 1: Каркас пакета, noop-путь и `task -d platform test`
+E2E-запросы к ClickHouse: `docker exec clickhouse clickhouse-client -q "<SQL>"` или Grafana Explore → SQL Editor.
+Запуск всех сервисов: `task watch-all` (или бинарники + `.env`, как при закрытии telemetry-sdk).
 
-**Description:** Добавить зависимости OTel из Tech Stack спека в `platform/go.mod`. Создать
-`platform/telemetry` с `Config{Enabled, ServiceName, Endpoint}`, `New(ctx, Config)`, `Shutdown(ctx)`,
-`LoggerProvider()`. Реализовать только `Enabled=false`: глобальные провайдеры не трогаются,
-`LoggerProvider()` — noop, `Shutdown` → `nil`. При `Enabled=true` и пустом `Endpoint`/`ServiceName` —
-ошибка с префиксом `telemetry:`. Добавить задачу `test` (`go test -race ./...`) в `platform/Taskfile.yml`.
+## Task 0: Spike — совместимость версий contrib с otel v1.47
+
+**Description:** В отдельной ветке выполнить `go get` для `otelslog` v0.21.0, `otelhttp`/`otelgrpc`/`runtime`
+v0.72.0, `otelpgx` v0.13.0, `kotel` v1.7.1 в `platform`. Посмотреть, поднимают ли они `go.opentelemetry.io/otel*`
+выше v1.47.0 и `grpc`/`franz-go`. Через godig сверить API, на которое опирается план: `otelhttp.WithFilter`,
+`otelhttp.LabelerFromContext`, умеет ли `otelhttp` сам выставлять `http.route`, `otelgrpc.WithFilter`
+и `filters.ServicePrefix`, опцию отключения аргументов SQL в `otelpgx`, `otelpgx.RecordStats`,
+`kotel.WithTracer`/`WithMeter`/`WithProcessingSpan`. Без коммита кода.
 
 **Acceptance criteria:**
-- [x] `New(ctx, Config{Enabled: false})` не меняет `otel.GetTracerProvider()`/`GetMeterProvider()`/`global.GetLoggerProvider()`
-- [x] `Shutdown` noop-экземпляра → `nil`; `LoggerProvider()` не `nil`
-- [x] Невалидный `Config` при `Enabled=true` → ошибка `telemetry: …`
+- [ ] Таблица «модуль → версия → что поднимает» дописана в Risks плана (R1 закрыт или эскалирован пользователю)
+- [ ] Подтверждены или скорректированы API из Architecture Decisions (route-middleware, фильтры, аргументы SQL)
 
 **Verification:**
-- [x] `task -d platform test`
-- [x] `task -d platform lint`
-- [x] `go build ./...` во всех модулях go.work (риск R6)
+- [ ] `go build ./...` во всех модулях go.work на spike-ветке
+- [ ] Spike-ветка удалена, рабочая ветка без изменений `go.mod`
 
 **Dependencies:** None
 
-**Files likely touched:**
-- `platform/go.mod`, `platform/go.sum`
-- `platform/telemetry/telemetry.go`, `platform/telemetry/config.go`
-- `platform/telemetry/telemetry_test.go`
-- `platform/Taskfile.yml`
+**Files likely touched:** `tasks/plan.md` (только Risks)
 
-**Estimated scope:** M
+**Estimated scope:** XS
 
-## Task 2: Resource
+## Task 1: stdout-логи с `trace_id`/`span_id`
 
-**Description:** `resource.go`: Resource с `service.name` = `Config.ServiceName`, `service.version` =
-`vcs.revision` из `debug.ReadBuildInfo` (или `unknown`), `service.instance.id` (hostname + pid или UUID),
-слияние с `resource.WithFromEnv()` (`OTEL_RESOURCE_ATTRIBUTES`) и schema URL semconv v1.47.0.
+**Description:** `platform/logger/trace.go`: хендлер-обёртка `traceHandler`. Если в `ctx` есть валидный
+`trace.SpanContext`, он добавляет `trace_id`/`span_id` в запись. `New` строит `CtxHandler(traceHandler(base))`.
+Без span вывод не меняется. Тесты пакета `logger` — с нуля.
 
 **Acceptance criteria:**
-- [x] Resource содержит `service.name`, `service.version`, `service.instance.id`
-- [x] Атрибуты из `OTEL_RESOURCE_ATTRIBUTES` попадают в Resource
-- [x] Без build info `service.version` = `unknown`
+- [ ] С валидным SpanContext в ctx stdout содержит `trace_id=<32 hex>` и `span_id=<16 hex>`, без него — не содержит
+- [ ] Без span вывод байт-в-байт совпадает с golden-строкой текущего формата (text и json)
+- [ ] `request_id` выводится как раньше, `WithAttrs`/`WithGroup` сохраняют обёртку
 
 **Verification:**
-- [x] `task -d platform test` (table-driven, `t.Setenv`)
+- [ ] `task -d platform test` (`bytes.Buffer`, `trace.ContextWithSpanContext` с фиксированным SpanContext)
+- [ ] `task -d platform lint`
+
+**Dependencies:** Task 0
+
+**Files likely touched:**
+- `platform/logger/trace.go`, `platform/logger/logger.go`
+- `platform/logger/logger_test.go`
+
+**Estimated scope:** S
+
+## Task 2: OTel fan-out в `logger` + пилот gateway
+
+**Description:** Опция `WithLoggerProvider(log.LoggerProvider)`. С ней `New` строит
+`CtxHandler(slog.NewMultiHandler(traceHandler(base), otelslog.NewHandler(...)))`. Уровень проверяется
+до fan-out через `slog.HandlerOptions.Level` / обёртку `Enabled`. В gateway `app.go` передаётся
+`logger.WithLoggerProvider(tel.LoggerProvider())`. При `Enabled=false` это noop, ветвление не нужно.
+
+**Acceptance criteria:**
+- [ ] OTel-запись (logtest Recorder) — TraceID/SpanID из ctx, `request_id` в атрибутах, нет дублей `trace_id`/`span_id`; группы `http.*` развёрнуты; Severity соответствует уровню slog
+- [ ] Записи ниже `LOG_LEVEL` не попадают ни в один хендлер (table-driven); без опции поведение как после Task 1
+- [ ] Gateway с `OTEL_ENABLED=true` → строки `ServiceName='gateway'` в `otel.otel_logs`, включая логи без ctx (`http server started`, пустой `TraceId`)
+
+**Verification:**
+- [ ] `task -d platform test`; `cd platform && go test -cover ./logger/...` ≥ 80%
+- [ ] `task -d platform lint`, `task -d services/gateway lint`
+- [ ] R3: Collector остановлен, gateway 2 минуты → в stdout ≤ 5 `WARN telemetry: export error`, сервис жив
 
 **Dependencies:** Task 1
 
 **Files likely touched:**
-- `platform/telemetry/resource.go`
-- `platform/telemetry/resource_test.go`
+- `platform/logger/options.go`, `platform/logger/logger.go`, `platform/logger/logger_test.go`
+- `platform/go.mod`, `platform/go.sum`
+- `services/gateway/internal/app/app.go`
 
-**Estimated scope:** S
+**Estimated scope:** M
 
-## Task 3: TracerProvider, пропагатор и error handler
+## Task 3: OTel-логи в order, user, product, notification
 
-**Description:** При `Enabled=true`: `otlptracegrpc` (insecure, `Endpoint`), `sdktrace.TracerProvider`
-с batcher и Resource, сэмплер `ParentBased(AlwaysSample)`, если `OTEL_TRACES_SAMPLER` не задан.
-Регистрация `otel.SetTracerProvider`, `otel.SetTextMapPropagator(TraceContext + Baggage)`,
-`otel.SetErrorHandler` — `WARN` в `slog.Default()` не чаще раза в 30s с числом пропущенных ошибок.
+**Description:** Повторить строку из Task 2 в `app.go` четырёх сервисов.
 
 **Acceptance criteria:**
-- [x] После `New` глобальный TracerProvider — SDK, пропагатор содержит `traceparent` и `baggage`
-- [x] При заданном `OTEL_TRACES_SAMPLER=always_off` спаны не сэмплируются
-- [x] Error handler: N ошибок за интервал → один `WARN`, следующий содержит `suppressed`
+- [ ] `SELECT DISTINCT ServiceName FROM otel.otel_logs` — все 5 сервисов
+- [ ] С `OTEL_ENABLED=false` все сервисы логируют только в stdout, без ошибок
 
 **Verification:**
-- [x] `task -d platform test` (handler тестируется с подменённым временем и slog в `bytes.Buffer`)
-- [x] `task -d platform lint`
+- [ ] `task lint`
+- [ ] Запуск всех 5 сервисов в двух режимах, SQL выше
 
 **Dependencies:** Task 2
 
 **Files likely touched:**
-- `platform/telemetry/telemetry.go`, `platform/telemetry/exporters.go`
-- `platform/telemetry/errorhandler.go`, `platform/telemetry/errorhandler_test.go`
+- `services/{order,user,product,notification}/internal/app/app.go`
+
+**Estimated scope:** S (4 однотипные правки)
+
+## Checkpoint A: логи
+- [ ] `task -d platform test`/`lint` зелёные, покрытие `platform/logger` ≥ 80%
+- [ ] Все 5 сервисов в `otel.otel_logs`; `SeverityText` соответствует уровню
+- [ ] Ревью с пользователем
+
+## Task 4: gRPC server и client (`otelgrpc`)
+
+**Description:** `grpcserver.New` первым добавляет `grpc.StatsHandler(otelgrpc.NewServerHandler(...))`
+с фильтром `grpc.reflection.*` и `grpc.health.*`. `grpcclient.New` добавляет
+`grpc.WithStatsHandler(otelgrpc.NewClientHandler())`. Пользовательские опции идут после
+и могут дополнять. Метрики длительности `otelgrpc` появляются автоматически.
+
+**Acceptance criteria:**
+- [ ] bufconn-тест: client-span — родитель server-span, один TraceID; вызов reflection не создаёт спанов
+- [ ] Хендлер с `codes.Internal` → server-span `Error`; `codes.NotFound` → по semconv otelgrpc
+- [ ] ManualReader: есть метрика длительности RPC с `rpc.service`, `rpc.method`, `rpc.grpc.status_code`
+
+**Verification:**
+- [ ] `task -d platform test`, `task -d platform lint`
+- [ ] E2E: grpcui → order `CreateOrder` → в `otel.otel_traces` спаны order (server, client) + user/product (server) с одним `TraceId`
+
+**Dependencies:** Task 0
+
+**Files likely touched:**
+- `platform/grpc/grpcserver/server.go`, `platform/grpc/grpcclient/client.go`
+- `platform/grpc/otel_test.go` (или `grpcserver/server_test.go`)
+- `platform/go.mod`, `platform/go.sum`
 
 **Estimated scope:** M
 
-## Task 4: MeterProvider с delta temporality
+## Task 5: HTTP gateway (`otelhttp`, route-middleware, `request.id`)
 
-**Description:** `otlpmetricgrpc` с temporality selector: Counter/Histogram (и их Observable-варианты
-Counter) → Delta, UpDownCounter/Gauge → Cumulative. `PeriodicReader` с интервалом 10s, если
-`OTEL_METRIC_EXPORT_INTERVAL` не задан. `otel.SetMeterProvider`.
-
-**Acceptance criteria:**
-- [x] Selector возвращает Delta для Counter/Histogram/ObservableCounter, Cumulative для UpDownCounter/ObservableUpDownCounter/ObservableGauge
-- [x] Интервал 10s по умолчанию, `OTEL_METRIC_EXPORT_INTERVAL` переопределяет
-- [x] Глобальный MeterProvider — SDK после `New`
-
-**Verification:**
-- [x] `task -d platform test` (table-driven по `metric.InstrumentKind`)
-
-**Dependencies:** Task 3
-
-**Files likely touched:**
-- `platform/telemetry/exporters.go`, `platform/telemetry/telemetry.go`
-- `platform/telemetry/exporters_test.go`
-
-**Estimated scope:** S
-
-## Task 5: LoggerProvider, общий Shutdown и покрытие
-
-**Description:** `otlploggrpc` + `sdklog.LoggerProvider` с batch-процессором и Resource,
-`global.SetLoggerProvider`, `LoggerProvider()` отдаёт его. `Shutdown` — `errors.Join` трёх провайдеров.
-Если `New` падает на середине — уже созданные провайдеры закрываются. Довести покрытие до ≥ 80%.
+**Description:** `httpserver.New` оборачивает роутер в `otelhttp.NewHandler` с фильтром `/swagger/`
+и регистрирует `middleware.Route` первым в chi. После `next` Route ставит `span.SetName("METHOD pattern")`,
+атрибут `http.route` и `http.route` в `otelhttp.Labeler`. `middleware.RequestID` добавляет
+`request.id` в активный span.
 
 **Acceptance criteria:**
-- [x] `LoggerProvider()` при `Enabled=true` — SDK-провайдер, зарегистрированный глобально
-- [x] `Shutdown` с endpoint на закрытый порт и `context.WithTimeout(…, 2s)` возвращается ≤ deadline
-- [x] `go test -cover ./telemetry/...` ≥ 80%
+- [ ] Unit (chi-маршрут `/api/v1/orders/{id}`, запрос `/api/v1/orders/42`): имя спана `GET /api/v1/orders/{id}`, `http.route` — шаблон в спане и в метрике `http.server.request.duration`
+- [ ] `/swagger/index.html` — без спана; ответ 500 → `Error`, 404 — нет; входящий `traceparent` продолжает трейс; `request.id` в спане
+- [ ] E2E: `POST /api/v1/orders` → один `TraceId` с корнем в gateway и детьми order/user/product
 
 **Verification:**
-- [x] `task -d platform test`
-- [x] `cd platform && go test -cover ./telemetry/...`
-- [x] `task -d platform lint`
+- [ ] `task -d platform test` (`httptest` + `tracetest.InMemoryExporter` + `sdkmetric.NewManualReader`)
+- [ ] `task -d platform lint`, `task -d services/gateway lint`
 
 **Dependencies:** Task 4
 
 **Files likely touched:**
-- `platform/telemetry/telemetry.go`, `platform/telemetry/exporters.go`
-- `platform/telemetry/telemetry_test.go`
-
-**Estimated scope:** S
-
-## Checkpoint A: пакет готов
-- [ ] `task -d platform test` и `task -d platform lint` зелёные, покрытие ≥ 80%
-- [ ] `go build ./...` во всех модулях go.work
-- [ ] Ревью API пакета с пользователем
-
-## Task 6: Shutdown-контекст с таймаутом в `main.go` всех сервисов
-
-**Description:** Сейчас `a.Close(ctx)` получает уже отменённый контекст `signal.NotifyContext`.
-Заменить на `context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)` (константа в `main.go`)
-во всех 5 сервисах. Поведение остальных closer'ов не меняется.
-
-**Acceptance criteria:**
-- [x] Во всех `services/*/cmd/main.go` `Close` вызывается с неотменённым контекстом с deadline 10s
-- [x] `Ctrl+C` завершает каждый сервис без ошибок `context canceled` в логах
-
-**Verification:**
-- [x] `task lint`
-- [x] `task watch-all` → `Ctrl+C` → все сервисы пишут `… stopped`, выход ≤ 10s
-
-**Dependencies:** None (выполнять до Task 7)
-
-**Files likely touched:**
-- `services/{gateway,order,user,product,notification}/cmd/main.go`
-
-**Estimated scope:** S (5 однотипных правок)
-
-## Task 7: Пилот — order-service
-
-**Description:** Секция `Telemetry{Enabled (OTEL_ENABLED, required), Endpoint (OTEL_EXPORTER_OTLP_ENDPOINT)}`
-в `config` с валидацией ozzo: `Endpoint` обязателен при `Enabled` (`validation.When`); на `Enabled`
-нет `validation.Required`, иначе `false` не пройдёт (риск R7). В `app.New` вызов `telemetry.New`
-сразу после `config.New`, `cl.Add(tel.Shutdown)` первым. `.env.example` (и локальный `.env`) —
-новые переменные.
-
-**Acceptance criteria:**
-- [x] `OTEL_ENABLED=true` без endpoint → сервис не стартует с ошибкой валидации; без `OTEL_ENABLED` → ошибка `required`
-- [x] `OTEL_ENABLED=false` проходит валидацию
-- [ ] С `OTEL_ENABLED=false` и `true` (`http://localhost:4317`) сервис стартует, gRPC-методы работают
-- [x] При `docker compose stop otel-collector` сервис работает; `Ctrl+C` ≤ `shutdownTimeout` (10s): при недоступном Collector выход занимает ровно таймаут (~10s), в логе одна ERROR — принято
-
-**Verification:**
-- [x] `task -d services/order lint`, `go build ./...`
-- [ ] `task svc-watch SVC=order` в обоих режимах, вызов метода через grpcui
-- [x] `Ctrl+C` при остановленном Collector — замер времени выхода (~10.05s)
-
-**Dependencies:** Task 5, Task 6
-
-**Files likely touched:**
-- `services/order/internal/config/config.go`
-- `services/order/internal/app/app.go`
-- `services/order/.env.example`
-
-**Estimated scope:** S
-
-## Task 8: user-service и product-service
-
-**Description:** Повторить Task 7 для user и product.
-
-**Acceptance criteria:**
-- [x] Оба сервиса стартуют с `OTEL_ENABLED=false` и `true`, `Shutdown` зарегистрирован первым
-- [x] `.env.example` содержат новые переменные
-
-**Verification:**
-- [x] `task -d services/user lint`, `task -d services/product lint`
-- [x] Запуск обоих в двух режимах, `Ctrl+C` ≤ 10s (Collector запущен: ~0.06s / ~0.18s)
-
-**Dependencies:** Task 7
-
-**Files likely touched:**
-- `services/{user,product}/internal/config/config.go`
-- `services/{user,product}/internal/app/app.go`
-- `services/{user,product}/.env.example`
+- `platform/http/httpserver/server.go`
+- `platform/http/middleware/route.go`, `platform/http/middleware/request_id.go`
+- `platform/http/middleware/route_test.go`
 
 **Estimated scope:** M
 
-## Task 9: gateway-service и notification-service
+## Task 6: Postgres (`otelpgx` tracer + `RecordStats`)
 
-**Description:** Повторить Task 7 для gateway (HTTP) и notification (Kafka-консьюмер).
-
-**Acceptance criteria:**
-- [x] Оба сервиса стартуют с `OTEL_ENABLED=false` и `true`, `Shutdown` зарегистрирован первым
-- [x] notification при `Ctrl+C` корректно закрывает консьюмер, затем telemetry (порядок closer)
-- [x] `.env.example` содержат новые переменные
-
-**Verification:**
-- [x] `task -d services/gateway lint`, `task -d services/notification lint`
-- [ ] Запуск в двух режимах, запрос через Swagger gateway, `Ctrl+C` ≤ 10s
-
-**Dependencies:** Task 7 (параллельно с Task 8)
-
-**Files likely touched:**
-- `services/{gateway,notification}/internal/config/config.go`
-- `services/{gateway,notification}/internal/app/app.go`
-- `services/{gateway,notification}/.env.example`
-
-**Estimated scope:** M
-
-## Checkpoint B: сервисы
-- [ ] `task lint` по всем модулям
-- [ ] `task watch-all` с `OTEL_ENABLED=true` и `false` — все 5 сервисов стартуют и завершаются ≤ 10s
-- [ ] Остановка Collector не роняет ни один сервис
-
-## Task 10: Карта, TODO, Success Criteria спека
-
-**Description:** Карта: `telemetry-sdk` → done. TODO.md — подпункт прогресса Observability.
-README не трогаем (решение: не захламлять; API описан godoc-комментариями пакета, переменные — в `.env.example`). Отметить Success Criteria в спеке; у критерия про WARN — пометка, что он закрыт unit-тестами, а e2e
-перенесён в `logs`/`tracing` (R1).
+**Description:** `postgres.New` выставляет `poolCfg.ConnConfig.Tracer = otelpgx.NewTracer(...)` без
+аргументов запроса. После успешного Ping вызывает `otelpgx.RecordStats(pool)`, при ошибке закрывает
+пул (Code Style из SPEC-metrics).
 
 **Acceptance criteria:**
-- [x] `SPEC-observability-map.md`: `telemetry-sdk` → done; Success Criteria спека отмечены
+- [ ] SQL-спаны с `db.query.text` без значений параметров — дети gRPC server-спанов order/user/product
+- [ ] Запросы внутри `TxManager.WithinTx` видны в трейсе под родительским спаном
+- [ ] Метрики пула (acquired/idle/total/max, acquire wait) для order/user/product/notification
 
 **Verification:**
-- [ ] Включить `OTEL_ENABLED=true` в одном сервисе по его `.env.example` и запустить
+- [ ] `task -d platform lint`, `go build ./...` во всех модулях
+- [ ] Ручная проверка на локальном Postgres (интеграционные тесты/testcontainers — Ask first): SQL к `otel_traces` и `otel_metrics_*`
 
-**Dependencies:** Task 8, Task 9
+**Dependencies:** Task 5
 
 **Files likely touched:**
-- `SPEC-observability-map.md`, `SPEC-telemetry-sdk.md`, `TODO.md`
+- `platform/postgres/postgres.go`
+- `platform/go.mod`, `platform/go.sum`
 
 **Estimated scope:** S
 
-## Checkpoint C: модуль завершён
-- [ ] Все Success Criteria в `SPEC-telemetry-sdk.md` отмечены
-- [ ] Ревью с пользователем → переход к `logs`/`tracing`/`metrics`
+## Checkpoint B: сквозной трейс
+- [ ] Успешное создание заказа — один `TraceId`: gateway HTTP → gateway gRPC client → order server → order pg + user/product gRPC → их pg; без «осиротевших» корней
+- [ ] Grafana (Query type Traces) открывает трейс водопадом, SQL-спаны под gRPC
+- [ ] Несуществующий user (`X-User-Id` с фиктивным UUID) → `StatusCode = Error` в order и gateway
+- [ ] grpcui (reflection) не создаёт спанов
+- [ ] Логи gateway и order по одному запросу — одинаковый непустой `TraceId`; в stdout `trace_id`/`span_id` рядом с `request_id`
+- [ ] Ревью с пользователем
+
+## Task 7: Kafka consumer (`kotel` tracer + meter, спан `process`)
+
+**Description:** `kafkaconsumer.New` создаёт `kotel.NewKotel(kotel.WithTracer(...), kotel.WithMeter(...))`
+и добавляет `kgo.WithHooks(...)`. Обработка записи выносится в `processRecord`: спан через
+`tracer.WithProcessingSpan(record)`, ошибка → `RecordError` + `codes.Error`, `defer span.End()`.
+Логика commit/rewind в `process` не меняется.
+
+**Acceptance criteria:**
+- [ ] Unit без брокера: на каждую запись один спан `process` с `messaging.destination.name`; ошибка хендлера → `Error`; ctx хендлера содержит этот спан
+- [ ] E2E: созданный заказ → в notification спан `process` с `messaging.destination.name = order.events.v1` (новый корень — связка с order в `async-propagation`)
+- [ ] Метрики `kotel` (records/bytes consumed) с `ServiceName='notification'`
+
+**Verification:**
+- [ ] `task -d platform test`, `task -d platform lint`, `task -d services/notification lint`
+
+**Dependencies:** Task 0
+
+**Files likely touched:**
+- `platform/kafka/kafkaconsumer/kafkaconsumer.go`
+- `platform/kafka/kafkaconsumer/kafkaconsumer_test.go`
+- `platform/go.mod`, `platform/go.sum`
+
+**Estimated scope:** M
+
+## Task 8: Runtime-метрики Go
+
+**Description:** `platform/telemetry/runtime.go`: при `Enabled=true` `telemetry.New` после создания
+MeterProvider запускает `runtime.Start(runtime.WithMeterProvider(mp))`. При `Enabled=false` ничего не делает.
+
+**Acceptance criteria:**
+- [ ] ManualReader: при `Enabled=true` есть goroutines/heap/GC-метрики, при `false` runtime не стартует
+- [ ] Покрытие `platform/telemetry` остаётся ≥ 80%
+- [ ] E2E: `SELECT DISTINCT ServiceName FROM otel.otel_metrics_gauge` (или `_sum`) с runtime-метриками — все 5 сервисов
+
+**Verification:**
+- [ ] `task -d platform test`, `cd platform && go test -cover ./telemetry/...`, `task -d platform lint`
+
+**Dependencies:** Task 0
+
+**Files likely touched:**
+- `platform/telemetry/runtime.go`, `platform/telemetry/telemetry.go`
+- `platform/telemetry/runtime_test.go`
+
+**Estimated scope:** S
+
+## Checkpoint C: инструментация завершена
+- [ ] `task lint`, `go build ./...` во всех модулях go.work, `task -d platform test`
+- [ ] Все 5 сервисов стартуют и завершаются в обоих режимах; остановка Collector их не роняет
+
+## Task 9: Каталог метрик + проверка кардинальности и temporality
+
+**Description:** Прогнать ~500 запросов на `POST /api/v1/orders` (успешные и ошибочные) через
+`ab -n 500 -c 10 -p body.json`, чтобы сгенерировать метрики. Это не нагрузочное тестирование:
+RPS и задержки не анализируются. По данным ClickHouse собрать `docs/observability/metrics.md`: имя,
+тип, единица, атрибуты, таблица, сервисы. Проверить кардинальность и temporality.
+
+**Acceptance criteria:**
+- [ ] Каталог покрывает все метрики из ClickHouse (`SELECT DISTINCT MetricName` по 4 таблицам) и только их
+- [ ] `uniqExact(Attributes)` на сервис < 1000; нет атрибутов с id, `request_id`, сырым путём
+- [ ] `AggregationTemporality = 1` (delta) у histogram и monotonic sum
+
+**Verification:**
+- [ ] SQL из SPEC-metrics Commands; результаты запросов приложены в описание коммита/PR
+
+**Dependencies:** Task 3, Task 6, Task 7, Task 8
+
+**Files likely touched:**
+- `docs/observability/metrics.md`
+
+**Estimated scope:** S
+
+## Task 10: Карта, TODO, Success Criteria трёх спеков
+
+**Description:** Карта: `logs`, `tracing`, `metrics` → done. TODO.md — подпункты прогресса Observability.
+Отметить Success Criteria трёх спеков. Формулировки про `/api/v1/orders/{id}` заменить на `POST /api/v1/orders` + unit-тест шаблона (решение R2).
+
+**Acceptance criteria:**
+- [ ] Все Success Criteria трёх спеков отмечены с фактическими результатами
+- [ ] Карта и TODO.md отражают статус
+
+**Verification:**
+- [ ] Ссылки в спеках/карте открываются; `git diff` — только документация
+
+**Dependencies:** Task 9
+
+**Files likely touched:**
+- `spec/SPEC-observability-map.md`, `spec/SPEC-logs.md`, `spec/SPEC-tracing.md`, `spec/SPEC-metrics.md`, `TODO.md`
+
+**Estimated scope:** S
+
+## Checkpoint D: модули завершены
+- [ ] Все Success Criteria трёх спеков отмечены
+- [ ] Ревью с пользователем → переход к `async-propagation`
