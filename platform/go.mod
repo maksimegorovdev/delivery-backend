@@ -4,6 +4,7 @@ go 1.27.0
 
 require (
 	buf.build/go/protovalidate v1.4.0
+	github.com/exaring/otelpgx v0.13.0
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/go-ozzo/ozzo-validation/v4 v4.4.1
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6
