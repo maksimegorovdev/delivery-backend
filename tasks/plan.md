@@ -32,7 +32,7 @@ platform/telemetry: Config + noop-путь (Enabled=false) + task test
     │                               ├── user + product
     │                               └── gateway + notification
     │                                       │
-    │                                       └── docs: README, карта, TODO, Success Criteria
+    │                                       └── docs: карта, TODO, Success Criteria
 ```
 
 Задачи пакета последовательны (каждая расширяет `New`). Таймаут shutdown не зависит от пакета, но
@@ -83,7 +83,7 @@ platform/telemetry: Config + noop-путь (Enabled=false) + task test
 - [ ] `task watch-all` с `OTEL_ENABLED=true` и `false` — все 5 сервисов стартуют и завершаются ≤ 10s
 
 ### Phase 3: Документация
-- [ ] Task 10: README, карта, TODO, Success Criteria спека
+- [ ] Task 10: Карта, TODO, Success Criteria спека
 
 ### Checkpoint C: модуль завершён
 - [ ] Все Success Criteria `SPEC-telemetry-sdk.md` отмечены, ревью с пользователем → переход к `logs`/`tracing`/`metrics`
