@@ -11,12 +11,14 @@ import (
 	"go.opentelemetry.io/otel/log"
 	lognoop "go.opentelemetry.io/otel/log/noop"
 	"go.opentelemetry.io/otel/propagation"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 // Telemetry владеет провайдерами OpenTelemetry, созданными в [New].
 type Telemetry struct {
 	tracerProvider *sdktrace.TracerProvider // nil при Enabled=false
+	meterProvider  *sdkmetric.MeterProvider // nil при Enabled=false
 	loggerProvider log.LoggerProvider
 }
 
@@ -46,8 +48,14 @@ func New(ctx context.Context, cfg Config) (*Telemetry, error) {
 		return nil, err
 	}
 
+	t.meterProvider, err = newMeterProvider(ctx, cfg, res)
+	if err != nil {
+		return nil, errors.Join(err, t.tracerProvider.Shutdown(ctx))
+	}
+
 	otel.SetErrorHandler(newErrorHandler(errorLogInterval, time.Now))
 	otel.SetTracerProvider(t.tracerProvider)
+	otel.SetMeterProvider(t.meterProvider)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
@@ -66,6 +74,9 @@ func (t *Telemetry) Shutdown(ctx context.Context) error {
 	var errs []error
 	if t.tracerProvider != nil {
 		errs = append(errs, t.tracerProvider.Shutdown(ctx))
+	}
+	if t.meterProvider != nil {
+		errs = append(errs, t.meterProvider.Shutdown(ctx))
 	}
 	return errors.Join(errs...)
 }

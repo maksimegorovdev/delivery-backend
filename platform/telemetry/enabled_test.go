@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/telemetry"
@@ -18,6 +19,7 @@ func newEnabled(t *testing.T) *telemetry.Telemetry {
 	t.Helper()
 
 	prevTracer := otel.GetTracerProvider()
+	prevMeter := otel.GetMeterProvider()
 	prevProp := otel.GetTextMapPropagator()
 
 	tel, err := telemetry.New(context.Background(), telemetry.Config{
@@ -30,13 +32,22 @@ func newEnabled(t *testing.T) *telemetry.Telemetry {
 	}
 
 	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 		defer cancel()
 		_ = tel.Shutdown(ctx)
 		otel.SetTracerProvider(prevTracer)
+		otel.SetMeterProvider(prevMeter)
 		otel.SetTextMapPropagator(prevProp)
 	})
 	return tel
+}
+
+func TestNew_Enabled_RegistersMeterProvider(t *testing.T) {
+	newEnabled(t)
+
+	if _, ok := otel.GetMeterProvider().(*sdkmetric.MeterProvider); !ok {
+		t.Errorf("глобальный MeterProvider = %T, want *sdkmetric.MeterProvider", otel.GetMeterProvider())
+	}
 }
 
 func TestNew_Enabled_RegistersTracerProviderAndPropagator(t *testing.T) {
