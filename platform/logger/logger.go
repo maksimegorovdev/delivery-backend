@@ -48,5 +48,5 @@ func New(opts ...Option) *slog.Logger {
 		handler = slog.NewTextHandler(cfg.writer, handlerOpts)
 	}
 
-	return slog.New(NewCtxHandler(handler))
+	return slog.New(NewCtxHandler(newTraceHandler(handler)))
 }

@@ -35,13 +35,13 @@ v0.72.0, `otelpgx` v0.13.0, `kotel` v1.7.1 в `platform`. Посмотреть, 
 Без span вывод не меняется. Тесты пакета `logger` — с нуля.
 
 **Acceptance criteria:**
-- [ ] С валидным SpanContext в ctx stdout содержит `trace_id=<32 hex>` и `span_id=<16 hex>`, без него — не содержит
-- [ ] Без span вывод байт-в-байт совпадает с golden-строкой текущего формата (text и json)
-- [ ] `request_id` выводится как раньше, `WithAttrs`/`WithGroup` сохраняют обёртку
+- [x] С валидным SpanContext в ctx stdout содержит `trace_id=<32 hex>` и `span_id=<16 hex>`, без него — не содержит
+- [x] Без span вывод байт-в-байт совпадает с golden-строкой текущего формата (text и json)
+- [x] `request_id` выводится как раньше, `WithAttrs`/`WithGroup` сохраняют обёртку
 
 **Verification:**
-- [ ] `task -d platform test` (`bytes.Buffer`, `trace.ContextWithSpanContext` с фиксированным SpanContext)
-- [ ] `task -d platform lint`
+- [x] `task -d platform test` (`bytes.Buffer`, `trace.ContextWithSpanContext` с фиксированным SpanContext)
+- [x] `task -d platform lint`
 
 **Dependencies:** Task 0
 
