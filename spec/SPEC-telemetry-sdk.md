@@ -129,7 +129,7 @@ func (t *Telemetry) Shutdown(ctx context.Context) error {
 
 - [x] `task -d platform test` зелёный, покрытие `platform/telemetry` ≥ 80% (91.1%).
 - [x] Все 5 сервисов собираются и стартуют через `task watch-all` с `OTEL_ENABLED=true` и с `false`.
-- [x] Остановка Collector (`docker compose stop otel-collector`) не роняет сервисы; в логах — `WARN` об ошибке экспорта, не чаще раза в N секунд. _Закрыто unit-тестами error handler; e2e-проверка WARN в логах перенесена в `logs`/`tracing` (R1)._
+- [x] Остановка Collector (`docker compose stop otel-collector`) не роняет сервисы; в логах — `WARN` об ошибке экспорта, не чаще раза в N секунд. _Закрыто unit-тестами error handler; e2e подтверждено 2026-10-27: MeterProvider экспортирует и без инструментации, в логах всех 5 сервисов — `WARN telemetry: export error`._
 - [x] `Ctrl+C` завершает сервис ≤ 10s даже при недоступном Collector.
 - [x] `.env.example` всех сервисов содержат новые переменные.
 
