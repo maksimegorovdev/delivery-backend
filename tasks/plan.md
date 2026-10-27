@@ -64,7 +64,7 @@ Task 0: spike — совместимость версий contrib с otel v1.47 
 - [x] Task 0: Spike — версии contrib-модулей совместимы с otel v1.47 (без коммита)
 
 ### Phase 1: Логи
-- [ ] Task 1: stdout-логи с `trace_id`/`span_id`
+- [x] Task 1: stdout-логи с `trace_id`/`span_id`
 - [ ] Task 2: OTel fan-out в `logger` + пилот gateway
 - [ ] Task 3: OTel-логи в order, user, product, notification
 
