@@ -135,11 +135,11 @@ Counter) → Delta, UpDownCounter/Gauge → Cumulative. `PeriodicReader` с ин
 
 **Acceptance criteria:**
 - [x] Во всех `services/*/cmd/main.go` `Close` вызывается с неотменённым контекстом с deadline 10s
-- [ ] `Ctrl+C` завершает каждый сервис без ошибок `context canceled` в логах
+- [x] `Ctrl+C` завершает каждый сервис без ошибок `context canceled` в логах
 
 **Verification:**
 - [x] `task lint`
-- [ ] `task watch-all` → `Ctrl+C` → все сервисы пишут `… stopped`, выход ≤ 10s
+- [x] `task watch-all` → `Ctrl+C` → все сервисы пишут `… stopped`, выход ≤ 10s
 
 **Dependencies:** None (выполнять до Task 7)
 
@@ -181,12 +181,12 @@ Counter) → Delta, UpDownCounter/Gauge → Cumulative. `PeriodicReader` с ин
 **Description:** Повторить Task 7 для user и product.
 
 **Acceptance criteria:**
-- [ ] Оба сервиса стартуют с `OTEL_ENABLED=false` и `true`, `Shutdown` зарегистрирован первым
+- [x] Оба сервиса стартуют с `OTEL_ENABLED=false` и `true`, `Shutdown` зарегистрирован первым
 - [x] `.env.example` содержат новые переменные
 
 **Verification:**
 - [x] `task -d services/user lint`, `task -d services/product lint`
-- [ ] Запуск обоих в двух режимах, `Ctrl+C` ≤ 10s
+- [x] Запуск обоих в двух режимах, `Ctrl+C` ≤ 10s (Collector запущен: ~0.06s / ~0.18s)
 
 **Dependencies:** Task 7
 
@@ -202,8 +202,8 @@ Counter) → Delta, UpDownCounter/Gauge → Cumulative. `PeriodicReader` с ин
 **Description:** Повторить Task 7 для gateway (HTTP) и notification (Kafka-консьюмер).
 
 **Acceptance criteria:**
-- [ ] Оба сервиса стартуют с `OTEL_ENABLED=false` и `true`, `Shutdown` зарегистрирован первым
-- [ ] notification при `Ctrl+C` корректно закрывает консьюмер, затем telemetry (порядок closer)
+- [x] Оба сервиса стартуют с `OTEL_ENABLED=false` и `true`, `Shutdown` зарегистрирован первым
+- [x] notification при `Ctrl+C` корректно закрывает консьюмер, затем telemetry (порядок closer)
 - [x] `.env.example` содержат новые переменные
 
 **Verification:**
