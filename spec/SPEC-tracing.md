@@ -110,7 +110,7 @@ span.End()
 - [ ] `task -d platform test` зелёный.
 - [ ] Создание заказа даёт в `otel_traces` один `TraceId` со спанами от `gateway`, `order`, `user`, `product`; иерархия корректна (нет «осиротевших» корней, кроме ожидаемого корня в gateway).
 - [ ] В Grafana (Query type Traces) трейс заказа открывается водопадом, SQL-спаны видны под gRPC-спанами.
-- [ ] Обработка события в notification даёт спан `process` с `messaging.destination.name = order.events.v1`.
+- [x] Обработка события в notification даёт спан `process` с `messaging.source.name = order.events.v1` (`kotel` v1.7.1 пишет semconv v1.18, атрибута `messaging.destination.name` в нём нет).
 - [ ] Ошибка (несуществующий user) → спаны с `StatusCode = Error` в order и gateway.
 - [ ] Вызовы grpcui (reflection) не создают спанов.
 

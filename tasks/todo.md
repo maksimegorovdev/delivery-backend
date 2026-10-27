@@ -190,12 +190,12 @@ v0.72.0, `otelpgx` v0.13.0, `kotel` v1.7.1 в `platform`. Посмотреть, 
 Логика commit/rewind в `process` не меняется.
 
 **Acceptance criteria:**
-- [ ] Unit без брокера: на каждую запись один спан `process` с `messaging.destination.name`; ошибка хендлера → `Error`; ctx хендлера содержит этот спан
-- [ ] E2E: созданный заказ → в notification спан `process` с `messaging.destination.name = order.events.v1` (новый корень — связка с order в `async-propagation`)
-- [ ] Метрики `kotel` (records/bytes consumed) с `ServiceName='notification'`
+- [x] Unit без брокера: на каждую запись один спан `process` с `messaging.source.name` (kotel v1.7.1 пишет semconv v1.18, а не `messaging.destination.name`); ошибка хендлера → `Error`; ctx хендлера содержит этот спан и сохраняет отмену родителя
+- [x] E2E: созданный заказ → в notification спан `order.events.v1 process` (Consumer, `messaging.source.name = order.events.v1`, `messaging.operation = process`, `messaging.kafka.consumer.group = notification`) — ребёнок спана `receive` от kotel; `TraceId` новый, отдельный от трейса order (связка с order — в `async-propagation`)
+- [x] Метрики `kotel` (records/bytes consumed) с `ServiceName='notification'`: в `otel_metrics_sum` — `messaging.kafka.fetch_records.count`, `fetch_bytes.count`, `read_bytes.count`, `write_bytes`, `connects.count`, `disconnects.count`
 
 **Verification:**
-- [ ] `task -d platform test`, `task -d platform lint`, `task -d services/notification lint`
+- [x] `task -d platform test`, `task -d platform lint`, `task -d services/notification lint`
 
 **Dependencies:** Task 0
 
