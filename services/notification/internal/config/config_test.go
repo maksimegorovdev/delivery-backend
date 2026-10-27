@@ -64,9 +64,9 @@ func TestNew_TelemetryValid(t *testing.T) {
 			name: "enabled с endpoint",
 			env: map[string]string{
 				"OTEL_ENABLED":                "true",
-				"OTEL_EXPORTER_OTLP_ENDPOINT": "localhost:4317",
+				"OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4317",
 			},
-			want: config.Telemetry{Enabled: true, Endpoint: "localhost:4317"},
+			want: config.Telemetry{Enabled: true, Endpoint: "http://localhost:4317"},
 		},
 	}
 

@@ -159,7 +159,7 @@ Counter) → Delta, UpDownCounter/Gauge → Cumulative. `PeriodicReader` с ин
 **Acceptance criteria:**
 - [x] `OTEL_ENABLED=true` без endpoint → сервис не стартует с ошибкой валидации; без `OTEL_ENABLED` → ошибка `required`
 - [x] `OTEL_ENABLED=false` проходит валидацию
-- [ ] С `OTEL_ENABLED=false` и `true` (`localhost:4317`) сервис стартует, gRPC-методы работают
+- [ ] С `OTEL_ENABLED=false` и `true` (`http://localhost:4317`) сервис стартует, gRPC-методы работают
 - [x] При `docker compose stop otel-collector` сервис работает; `Ctrl+C` ≤ `shutdownTimeout` (10s): при недоступном Collector выход занимает ровно таймаут (~10s), в логе одна ERROR — принято
 
 **Verification:**
