@@ -62,6 +62,7 @@ func New(ctx context.Context) (_ *App, err error) {
 	log := logger.New(
 		logger.WithLevel(cfg.Log.Level),
 		logger.WithFormat(cfg.Log.Format),
+		logger.WithLoggerProvider(tel.LoggerProvider()),
 	).With(
 		slog.String("app_name", cfg.App.Name),
 	)

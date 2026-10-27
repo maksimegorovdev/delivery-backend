@@ -82,12 +82,12 @@ v0.72.0, `otelpgx` v0.13.0, `kotel` v1.7.1 в `platform`. Посмотреть, 
 **Description:** Повторить строку из Task 2 в `app.go` четырёх сервисов.
 
 **Acceptance criteria:**
-- [ ] `SELECT DISTINCT ServiceName FROM otel.otel_logs` — все 5 сервисов
-- [ ] С `OTEL_ENABLED=false` все сервисы логируют только в stdout, без ошибок
+- [x] `SELECT DISTINCT ServiceName FROM otel.otel_logs` — все 5 сервисов (gateway, notification, order, product, user)
+- [x] С `OTEL_ENABLED=false` все сервисы логируют только в stdout, без ошибок
 
 **Verification:**
-- [ ] `task lint`
-- [ ] Запуск всех 5 сервисов в двух режимах, SQL выше
+- [x] `task lint` (0 issues во всех модулях; в order `newLogger` вынесен из `New` из-за funlen 101 > 100)
+- [x] Запуск всех 5 сервисов в двух режимах, SQL выше
 
 **Dependencies:** Task 2
 

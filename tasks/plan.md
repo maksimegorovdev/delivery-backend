@@ -65,8 +65,8 @@ Task 0: spike — совместимость версий contrib с otel v1.47 
 
 ### Phase 1: Логи
 - [x] Task 1: stdout-логи с `trace_id`/`span_id`
-- [ ] Task 2: OTel fan-out в `logger` + пилот gateway
-- [ ] Task 3: OTel-логи в order, user, product, notification
+- [x] Task 2: OTel fan-out в `logger` + пилот gateway
+- [x] Task 3: OTel-логи в order, user, product, notification
 
 ### Checkpoint A: логи
 - [ ] `task -d platform test`/`lint` зелёные, покрытие `platform/logger` ≥ 80%
