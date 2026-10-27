@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/plugin/kotel"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -27,6 +30,7 @@ type Consumer struct {
 	maxPollRecords int
 	retryBackoff   time.Duration
 	clientOpts     []kgo.Opt
+	tracer         *kotel.Tracer
 }
 
 func New(brokers []string, group string, topics []string, opts ...Option) (*Consumer, error) {
@@ -40,7 +44,15 @@ func New(brokers []string, group string, topics []string, opts ...Option) (*Cons
 		opt(c)
 	}
 
+	// Провайдеры берутся из глобальных otel: при отключённой телеметрии они noop.
+	c.tracer = kotel.NewTracer(kotel.ConsumerGroup(group))
+	hooks := kotel.NewKotel(
+		kotel.WithTracer(c.tracer),
+		kotel.WithMeter(kotel.NewMeter()),
+	).Hooks()
+
 	clientOpts := slices.Concat(c.clientOpts, []kgo.Opt{
+		kgo.WithHooks(hooks...),
 		kgo.SeedBrokers(brokers...),
 		kgo.ConsumerGroup(group),
 		kgo.ConsumeTopics(topics...),
@@ -108,7 +120,7 @@ func (c *Consumer) process(ctx context.Context, fetches kgo.Fetches, handler Han
 
 	fetches.EachPartition(func(partition kgo.FetchTopicPartition) {
 		for _, record := range partition.Records {
-			if err := handler.Handle(ctx, toMessage(record)); err != nil {
+			if err := c.processRecord(ctx, record, handler); err != nil {
 				if _, ok := rewind[record.Topic]; !ok {
 					rewind[record.Topic] = make(map[int32]kgo.EpochOffset)
 				}
@@ -133,6 +145,22 @@ func (c *Consumer) process(ctx context.Context, fetches kgo.Fetches, handler Han
 	}
 
 	return len(rewind) > 0
+}
+
+// processRecord вызывает handler внутри спана process. Спан создаётся от контекста записи
+// (traceparent из заголовков, если он есть), а в ctx хендлера кладётся поверх ctx консьюмера,
+// чтобы отмена и значения вызывающего сохранялись. Ошибка хендлера возвращается как есть.
+func (c *Consumer) processRecord(ctx context.Context, record *kgo.Record, handler Handler) error {
+	_, span := c.tracer.WithProcessSpan(record)
+	defer span.End()
+
+	err := handler.Handle(trace.ContextWithSpan(ctx, span), toMessage(record))
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	}
+
+	return err
 }
 
 // wait ждёт retryBackoff; false, если контекст отменён раньше.
