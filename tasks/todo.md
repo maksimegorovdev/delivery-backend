@@ -17,7 +17,7 @@
 
 **Verification:**
 - [x] `task -d platform test`
-- [ ] `task -d platform lint`
+- [x] `task -d platform lint`
 - [x] `go build ./...` во всех модулях go.work (риск R6)
 
 **Dependencies:** None
@@ -112,7 +112,7 @@ Counter) → Delta, UpDownCounter/Gauge → Cumulative. `PeriodicReader` с ин
 **Verification:**
 - [x] `task -d platform test`
 - [x] `cd platform && go test -cover ./telemetry/...`
-- [ ] `task -d platform lint`
+- [x] `task -d platform lint`
 
 **Dependencies:** Task 4
 
@@ -138,7 +138,7 @@ Counter) → Delta, UpDownCounter/Gauge → Cumulative. `PeriodicReader` с ин
 - [ ] `Ctrl+C` завершает каждый сервис без ошибок `context canceled` в логах
 
 **Verification:**
-- [ ] `task lint`
+- [x] `task lint`
 - [ ] `task watch-all` → `Ctrl+C` → все сервисы пишут `… stopped`, выход ≤ 10s
 
 **Dependencies:** None (выполнять до Task 7)
