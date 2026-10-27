@@ -60,5 +60,5 @@ func (m *TxManager) WithinTx(ctx context.Context, fn func(ctx context.Context) e
 	if commitErr := tx.Commit(ctx); commitErr != nil {
 		return pgerr.Map(commitErr)
 	}
-	return err
+	return nil
 }
