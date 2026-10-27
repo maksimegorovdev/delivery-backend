@@ -204,10 +204,10 @@ Counter) → Delta, UpDownCounter/Gauge → Cumulative. `PeriodicReader` с ин
 **Acceptance criteria:**
 - [ ] Оба сервиса стартуют с `OTEL_ENABLED=false` и `true`, `Shutdown` зарегистрирован первым
 - [ ] notification при `Ctrl+C` корректно закрывает консьюмер, затем telemetry (порядок closer)
-- [ ] `.env.example` содержат новые переменные
+- [x] `.env.example` содержат новые переменные
 
 **Verification:**
-- [ ] `task -d services/gateway lint`, `task -d services/notification lint`
+- [x] `task -d services/gateway lint`, `task -d services/notification lint`
 - [ ] Запуск в двух режимах, запрос через Swagger gateway, `Ctrl+C` ≤ 10s
 
 **Dependencies:** Task 7 (параллельно с Task 8)

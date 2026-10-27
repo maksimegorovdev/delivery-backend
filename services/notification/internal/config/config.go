@@ -8,10 +8,11 @@ import (
 )
 
 type Config struct {
-	App   App
-	Log   Log
-	PG    PG
-	Kafka Kafka
+	App       App
+	Log       Log
+	PG        PG
+	Kafka     Kafka
+	Telemetry Telemetry
 }
 
 func (c Config) Validate() error {
@@ -20,6 +21,8 @@ func (c Config) Validate() error {
 		validation.Field(&c.Log, validation.Required),
 		validation.Field(&c.PG, validation.Required),
 		validation.Field(&c.Kafka, validation.Required),
+		// Без Required: нулевая Telemetry{false, ""} — валидный выключенный режим.
+		validation.Field(&c.Telemetry),
 	)
 }
 
@@ -68,6 +71,18 @@ func (k Kafka) Validate() error {
 		validation.Field(&k.Brokers, validation.Required),
 		validation.Field(&k.ConsumerGroup, validation.Required),
 		validation.Field(&k.Topics, validation.Required),
+	)
+}
+
+type Telemetry struct {
+	Enabled  bool   `env:"OTEL_ENABLED,required"`
+	Endpoint string `env:"OTEL_EXPORTER_OTLP_ENDPOINT"`
+}
+
+func (t Telemetry) Validate() error {
+	return validation.ValidateStruct(&t,
+		// Required на Enabled запрещён: false считается пустым значением.
+		validation.Field(&t.Endpoint, validation.When(t.Enabled, validation.Required)),
 	)
 }
 

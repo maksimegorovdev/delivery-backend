@@ -12,6 +12,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/http/httpserver"
 	"github.com/maksimegorovdev/delivery-backend/platform/http/middleware"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
+	"github.com/maksimegorovdev/delivery-backend/platform/telemetry"
 
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/client"
 	"github.com/maksimegorovdev/delivery-backend/services/gateway/internal/config"
@@ -27,7 +28,7 @@ type App struct {
 	closer     *closer.Closer
 }
 
-func New(_ context.Context) (_ *App, err error) {
+func New(ctx context.Context) (_ *App, err error) {
 	cl := closer.New()
 	defer func() {
 		if err != nil {
@@ -40,6 +41,13 @@ func New(_ context.Context) (_ *App, err error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Telemetry
+	tel, err := newTelemetry(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	cl.Add(tel.Shutdown)
 
 	// Logger
 	log := logger.New(
@@ -93,6 +101,14 @@ func New(_ context.Context) (_ *App, err error) {
 	}
 
 	return app, nil
+}
+
+func newTelemetry(ctx context.Context, cfg *config.Config) (*telemetry.Telemetry, error) {
+	return telemetry.New(ctx, telemetry.Config{
+		Enabled:     cfg.Telemetry.Enabled,
+		ServiceName: cfg.App.Name,
+		Endpoint:    cfg.Telemetry.Endpoint,
+	})
 }
 
 func (a *App) Run(ctx context.Context) error {
