@@ -48,3 +48,15 @@
 - OpenTelemetry Collector — приём OTLP и запись в ClickHouse
 - ClickHouse — хранилище логов, трейсов и метрик
 - Grafana — просмотр трейсов и логов через ClickHouse-датасорс, provisioning
+
+## Телеметрия сервисов
+
+Каждый сервис читает две переменные (см. `.env.example` сервиса):
+
+- `OTEL_ENABLED` — `true`/`false`, обязательна
+- `OTEL_EXPORTER_OTLP_ENDPOINT` — адрес Collector'а, например `localhost:4317` (обязателен при `OTEL_ENABLED=true`)
+
+Чтобы включить экспорт: поднять стек (`docker compose up -d otel-collector clickhouse grafana`),
+выставить `OTEL_ENABLED=true` в `.env` сервиса и запустить его (`task svc-watch SVC=<name>`).
+Подробности — в [platform/README.md](platform/README.md#telemetry).
+

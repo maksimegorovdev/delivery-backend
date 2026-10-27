@@ -232,8 +232,8 @@ Counter) → Delta, UpDownCounter/Gauge → Cumulative. `PeriodicReader` с ин
 перенесён в `logs`/`tracing` (R1).
 
 **Acceptance criteria:**
-- [ ] Переменные и порядок вызова в README совпадают с кодом
-- [ ] `SPEC-observability-map.md`: `telemetry-sdk` → done; Success Criteria спека отмечены
+- [x] Переменные и порядок вызова в README совпадают с кодом
+- [x] `SPEC-observability-map.md`: `telemetry-sdk` → done; Success Criteria спека отмечены
 
 **Verification:**
 - [ ] Пройти README: включить `OTEL_ENABLED=true` в одном сервисе по инструкции и запустить

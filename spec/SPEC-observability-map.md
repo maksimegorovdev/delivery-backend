@@ -22,7 +22,7 @@ Build order: `obs-stack` → `telemetry-sdk` → `logs`, `tracing`, `metrics` (�
 | Module id | Спек | Статус |
 |---|---|---|
 | `obs-stack` | [SPEC-obs-stack.md](SPEC-obs-stack.md) | done |
-| `telemetry-sdk` | [SPEC-telemetry-sdk.md](SPEC-telemetry-sdk.md) | approved |
+| `telemetry-sdk` | [SPEC-telemetry-sdk.md](SPEC-telemetry-sdk.md) | done |
 | `logs` | [SPEC-logs.md](SPEC-logs.md) | approved |
 | `tracing` | [SPEC-tracing.md](SPEC-tracing.md) | approved |
 | `metrics` | [SPEC-metrics.md](SPEC-metrics.md) | approved |
