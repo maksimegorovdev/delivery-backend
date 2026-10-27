@@ -15,6 +15,8 @@ import (
 
 // newEnabled создаёт Telemetry с Enabled=true и возвращает глобальное состояние OTel
 // к исходному после теста. Collector не нужен: gRPC-соединение ленивое.
+// Глобальный LoggerProvider не восстанавливается: повторная установка дефолтного
+// делегата otel пишет предупреждение, а следующий newEnabled всё равно перезапишет его.
 func newEnabled(t *testing.T) *telemetry.Telemetry {
 	t.Helper()
 
