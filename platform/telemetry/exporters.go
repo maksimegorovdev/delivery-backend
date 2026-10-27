@@ -6,8 +6,10 @@ import (
 	"os"
 	"time"
 
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -51,6 +53,22 @@ func newMeterProvider(ctx context.Context, cfg Config, res *resource.Resource) (
 	return sdkmetric.NewMeterProvider(
 		sdkmetric.WithReader(newPeriodicReader(exp)),
 		sdkmetric.WithResource(res),
+	), nil
+}
+
+// newLoggerProvider создаёт LoggerProvider с OTLP gRPC экспортёром (без TLS) и batch-процессором.
+func newLoggerProvider(ctx context.Context, cfg Config, res *resource.Resource) (*sdklog.LoggerProvider, error) {
+	exp, err := otlploggrpc.New(ctx,
+		otlploggrpc.WithEndpoint(cfg.Endpoint),
+		otlploggrpc.WithInsecure(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("telemetry: log exporter: %w", err)
+	}
+
+	return sdklog.NewLoggerProvider(
+		sdklog.WithProcessor(sdklog.NewBatchProcessor(exp)),
+		sdklog.WithResource(res),
 	), nil
 }
 
