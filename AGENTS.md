@@ -6,6 +6,10 @@
 
 Спеки сохранять в папку `spec/`, а не в корень.
 
+## Коммиты
+
+Не делай `git commit` самостоятельно. После выполнения задачи останови работу, покажи краткое резюме изменений и жди подтверждения. Коммит только по явной команде пользователя. Это правило действует и для скиллов (например, `build`): их шаг «commit» пропускай, пока пользователь не подтвердит.
+
 ## Go development
 
 Before any Go coding, review, debugging, troubleshooting, or setup task, load the `golang-how-to` skill first — it routes to whichever other Go skills the task needs.
