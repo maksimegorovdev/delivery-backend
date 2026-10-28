@@ -25,6 +25,7 @@
 - [ ] kafkaconsumer: таймаут на Handle (WithHandleTimeout) и согласовать maxPollRecords с rebalance timeout
 - [ ] kafkaconsumer: параллельная обработка партиций (горутина на партицию, порядок внутри партиции сохраняется), сейчас EachPartition идёт последовательно
 - [ ] kafkaconsumer: non-blocking retry (retry-топики) для событий, где порядок не важен, политика выбирается опцией; по умолчанию остаётся порядок
+- [ ] kafkaconsumer: лимит ретраев и DLQ — сейчас «ядовитое» сообщение (например, невалидный payload) ретраится бесконечно и блокирует партицию; снимается только `rpk group seek` при остановленном консьюмере
 - [ ] kafkaconsumer: валидация опций в New (maxPollRecords, retryBackoff > 0, nil в WithErrorHandler), recover паники в Handle
 - [ ] kafkaconsumer: kgo.ErrDataLoss не фатальна — сообщать в onError, а не завершать Run; метрики и лаг консьюмера
 - [ ] Тесты unit, интеграционные, e2e

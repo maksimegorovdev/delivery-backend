@@ -84,6 +84,10 @@ func (r *OutboxRepo) Save(ctx context.Context, event domain.OutboxEvent) error {
 ## Boundaries
 
 - **Always:** миграции только новыми файлами; конфиг коннектора применять через `task connect-register`.
+- **Always:** порядок выкатки — миграция `000003` → код order → `task connect-register`; откат — в обратном порядке:
+  конфиг коннектора без `traceparent`/`tracestate` → код order → `migrate down`. Новый `Save` на схеме без колонок
+  ломает каждый INSERT в outbox; коннектор ссылается на колонки в `additional.placement` (поведение EventRouter
+  при отсутствующей колонке не проверялось — не полагаться на него).
 - **Ask first:** OTel Java agent / tracing interceptor в Debezium; спан «outbox write» вручную; изменение схемы payload события.
 - **Never:** менять применённые миграции `000001`/`000002`; класть trace context в payload события (это контракт для потребителей).
 
@@ -93,8 +97,11 @@ func (r *OutboxRepo) Save(ctx context.Context, event domain.OutboxEvent) error {
 - [x] Сообщение в `order.events.v1` содержит заголовки `event-type` и `traceparent`; значение — сырая строка `00-<trace>-<span>-01`, без `header.converter`.
 - [x] Трейс создания заказа содержит спаны `gateway`, `order`, `user`, `product` и `notification`; спан notification — потомок спана order.
   Факт: `TraceId = f23a9f094226326f4a4307e1ba916e6c`, `ParentSpanId` у `order.events.v1 receive` = `df7f0e63af25024f` (серверный спан order `CreateOrder`), `process` — дочерний к `receive`.
-- [ ] Логи notification, связанные с событием, имеют тот же `TraceId`.
-  Не проверено: notification не пишет логов при обработке события (в `otel_logs` только `kafka consumer started/stopped`). Механизм связки логов с трейсом проверен в модуле `logs`.
+- [x] Логи notification, связанные с событием, имеют тот же `TraceId`.
+  Успешная обработка не логируется (видна в спане `process`), поэтому проверено на ошибке хендлера: ручной INSERT
+  в `outbox_events` с `traceparent = 00-9649bf82881bdece0bff1249575945a0-cd05d830c2390f66-01` и невалидным payload
+  (`{"order_id": 123}`). В `otel_logs` лог notification `handle message` (ERROR) с `TraceId = 9649bf82881bdece0bff1249575945a0`
+  и `SpanId` спана `process`; `ParentSpanId` у `receive` = `cd05d830c2390f66`.
 - [x] Событие без `traceparent` обрабатывается без ошибок (ручной INSERT и `OTEL_ENABLED=false` в order — новый корневой трейс).
 
 ## Open Questions
