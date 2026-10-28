@@ -63,7 +63,7 @@ Task 1: миграция 000003 + коннектор (ручной INSERT → з
 ### Checkpoint B: сквозной трейс gateway → notification
 
 ### Phase 3: Закрытие модуля
-- [ ] Task 3: Success Criteria спека, карта, TODO.md
+- [x] Task 3: Success Criteria спека, карта, TODO.md
 
 ### Checkpoint C: модуль завершён
 

@@ -89,11 +89,13 @@ func (r *OutboxRepo) Save(ctx context.Context, event domain.OutboxEvent) error {
 
 ## Success Criteria
 
-- [ ] Миграция `000003` применяется и откатывается.
-- [ ] Сообщение в `order.events.v1` содержит заголовки `event-type` и `traceparent`.
-- [ ] Трейс создания заказа содержит спаны `gateway`, `order`, `user`, `product` и `notification`; спан notification — потомок спана order.
+- [x] Миграция `000003` применяется и откатывается (`down 1` убирает обе колонки, повторный `up` возвращает).
+- [x] Сообщение в `order.events.v1` содержит заголовки `event-type` и `traceparent`; значение — сырая строка `00-<trace>-<span>-01`, без `header.converter`.
+- [x] Трейс создания заказа содержит спаны `gateway`, `order`, `user`, `product` и `notification`; спан notification — потомок спана order.
+  Факт: `TraceId = f23a9f094226326f4a4307e1ba916e6c`, `ParentSpanId` у `order.events.v1 receive` = `df7f0e63af25024f` (серверный спан order `CreateOrder`), `process` — дочерний к `receive`.
 - [ ] Логи notification, связанные с событием, имеют тот же `TraceId`.
-- [ ] Событие без `traceparent` обрабатывается без ошибок.
+  Не проверено: notification не пишет логов при обработке события (в `otel_logs` только `kafka consumer started/stopped`). Механизм связки логов с трейсом проверен в модуле `logs`.
+- [x] Событие без `traceparent` обрабатывается без ошибок (ручной INSERT и `OTEL_ENABLED=false` в order — новый корневой трейс).
 
 ## Open Questions
 
