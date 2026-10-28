@@ -89,13 +89,13 @@ if pattern := chi.RouteContext(r.Context()).RoutePattern(); pattern != "" {
 
 ## Success Criteria
 
-- [ ] `task -d platform test` зелёный.
-- [ ] Для всех 5 сервисов в ClickHouse есть runtime-метрики (`SELECT DISTINCT ServiceName FROM otel.otel_metrics_gauge`… включает все 5).
-- [ ] `http.server.request.duration` с `http.route` вида `/api/v1/orders/{id}`.
-- [ ] gRPC-метрики длительности для order/user/product (server) и gateway/order (client).
-- [ ] Метрики пула pgx для order/user/product/notification.
-- [ ] `AggregationTemporality` = delta для histogram/sum-counter.
-- [ ] `docs/observability/metrics.md` заполнен и соответствует ClickHouse.
+- [x] `task -d platform test` зелёный.
+- [x] Для всех 5 сервисов в ClickHouse есть runtime-метрики (`go.*` лежат в `otel_metrics_sum`, а не в `gauge`; `go.goroutine.count` — gateway, notification, order, product, user).
+- [x] `http.server.request.duration` с шаблонным `http.route`: в ClickHouse — `POST /api/v1/orders` (`http.route = /api/v1/orders`); шаблон с параметром `/api/v1/orders/{id}` проверен unit-тестом на chi-маршруте (решение R2: `GET /api/v1/orders/{id}` в gateway нет).
+- [x] gRPC-метрики длительности для order/user/product (server) и gateway/order (client): `rpc.server.call.duration`, `rpc.client.call.duration`.
+- [x] Метрики пула pgx для order/user/product/notification (`pgxpool.*`, `db.client.operation.duration`).
+- [x] `AggregationTemporality` = delta для histogram/sum-counter (`1`; non-monotonic sum — cumulative `2`).
+- [x] `docs/observability/metrics.md` заполнен и соответствует ClickHouse (gauge 1, sum 26, histogram 6).
 
 ## Open Questions
 

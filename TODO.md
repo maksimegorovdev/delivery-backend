@@ -32,6 +32,11 @@
 - [ ] Observability (трейсы, метрики, логи). Попробовать внедрить для логов ClickHouse
   - [x] obs-stack: ClickHouse, OTel Collector, Grafana в docker-compose
   - [x] telemetry-sdk: `platform/telemetry`, `OTEL_*` во всех сервисах
+  - [x] logs: fan-out slog → stdout + OTel, `trace_id`/`span_id`
+  - [x] tracing: `otelhttp`, `otelgrpc`, `otelpgx`, `kotel` (водопад в Grafana — проверить вручную)
+  - [x] metrics: RED + runtime Go, каталог `docs/observability/metrics.md`
+  - [ ] async-propagation: `traceparent` через outbox → Debezium → Kafka → notification
+  - [ ] dashboards: Grafana as code
 - [ ] Logger логирование ошибок по стеку
 - [ ] Доработка пакетов http, grpc, pgx, redis, kafka итд насчет кол-ва соединенией, timeout
 - [ ] CHECK в миграциях БД до конца проставить, разобраться с этим (пока делаю минимально)
