@@ -830,6 +830,337 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "id": 104,
+      "panels": [],
+      "title": "Kafka (notification)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Delta messaging.kafka.fetch_records.count / $__interval_s по topic.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 44
+      },
+      "id": 12,
+      "title": "Kafka: fetch records /s",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, Attributes['topic'] AS series,\n  sum(Value) / $__interval_s AS records_per_s\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'messaging.kafka.fetch_records.count' AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Сумма delta messaging.kafka.read_errors.count за выбранный диапазон. 0 — штатное значение.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "none",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 12,
+        "y": 44
+      },
+      "id": 13,
+      "title": "Kafka: read errors за окно",
+      "type": "stat",
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT sum(Value) AS read_errors\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'messaging.kafka.read_errors.count' AND ServiceName IN (${service:singlequote})",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "id": 105,
+      "panels": [],
+      "title": "Runtime (Go)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "go.goroutine.count: последнее значение в интервале (argMax), не сумма.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "none",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 53
+      },
+      "id": 14,
+      "title": "Goroutines",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS series, argMax(Value, TimeUnix) AS goroutines\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'go.goroutine.count' AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "go.memory.used по go.memory.type (stack/other) и go.memory.gc.goal. Cumulative non-monotonic: argMax за интервал.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 53
+      },
+      "id": 15,
+      "title": "Память: used и GC goal",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, concat(ServiceName, ' · ', Attributes['go.memory.type']) AS series,\n  argMax(Value, TimeUnix) AS used\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'go.memory.used' AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, concat(ServiceName, ' · gc goal') AS series,\n  argMax(Value, TimeUnix) AS gc_goal\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'go.memory.gc.goal' AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nORDER BY time",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Delta go.memory.allocated / $__interval_s.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "Bps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 53
+      },
+      "id": 16,
+      "title": "Скорость аллокаций",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS series, sum(Value) / $__interval_s AS alloc_bytes_per_s\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'go.memory.allocated' AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        }
+      ]
     }
   ],
   "refresh": "30s",
@@ -880,5 +1211,5 @@
   "timezone": "",
   "title": "Delivery / Services Overview",
   "uid": "delivery-services-overview",
-  "version": 1
+  "version": 2
 }
