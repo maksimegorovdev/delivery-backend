@@ -59,13 +59,7 @@ func New(ctx context.Context) (_ *App, err error) {
 	cl.Add(tel.Shutdown)
 
 	// Logger
-	log := logger.New(
-		logger.WithLevel(cfg.Log.Level),
-		logger.WithFormat(cfg.Log.Format),
-		logger.WithLoggerProvider(tel.LoggerProvider()),
-	).With(
-		slog.String("app_name", cfg.App.Name),
-	)
+	log := newLogger(cfg, tel)
 	slog.SetDefault(log)
 
 	// Postgres
@@ -135,6 +129,16 @@ func newTelemetry(ctx context.Context, cfg *config.Config) (*telemetry.Telemetry
 		ServiceName: cfg.App.Name,
 		Endpoint:    cfg.Telemetry.Endpoint,
 	})
+}
+
+func newLogger(cfg *config.Config, tel *telemetry.Telemetry) *slog.Logger {
+	return logger.New(
+		logger.WithLevel(cfg.Log.Level),
+		logger.WithFormat(cfg.Log.Format),
+		logger.WithLoggerProvider(tel.LoggerProvider()),
+	).With(
+		slog.String("app_name", cfg.App.Name),
+	)
 }
 
 func (a *App) Run(ctx context.Context) error {
