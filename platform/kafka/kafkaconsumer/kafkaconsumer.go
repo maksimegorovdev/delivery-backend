@@ -147,9 +147,11 @@ func (c *Consumer) process(ctx context.Context, fetches kgo.Fetches, handler Han
 	return len(rewind) > 0
 }
 
-// processRecord вызывает handler внутри спана process. Спан создаётся от контекста записи
-// (traceparent из заголовков, если он есть), а в ctx хендлера кладётся поверх ctx консьюмера,
-// чтобы отмена и значения вызывающего сохранялись. Ошибка хендлера возвращается как есть.
+// processRecord вызывает handler внутри спана process. Родитель спана — спан receive,
+// который kotel создаёт при буферизации записи как продолжение traceparent из заголовков
+// (без traceparent receive — корень трейса). Спан кладётся в ctx хендлера поверх ctx
+// консьюмера, чтобы отмена и значения вызывающего сохранялись. Ошибка хендлера
+// возвращается как есть.
 func (c *Consumer) processRecord(ctx context.Context, record *kgo.Record, handler Handler) error {
 	_, span := c.tracer.WithProcessSpan(record)
 	defer span.End()
