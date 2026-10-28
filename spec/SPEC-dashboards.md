@@ -2,8 +2,8 @@
 
 > Модуль карты [SPEC-observability-map.md](SPEC-observability-map.md). Зависит от `logs`, `tracing`, `metrics`.
 >
-> ⚠️ **Предварительный спек.** SQL-запросы панелей зависят от реальных имён метрик и атрибутов.
-> Перед планом спек уточняется по `docs/observability/metrics.md` (модуль `metrics`) и данным в ClickHouse.
+> Уточнён 2026-10-28 по [docs/observability/metrics.md](../docs/observability/metrics.md), данным в ClickHouse
+> и содержимому плагина `grafana-clickhouse-datasource` 4.23.2 в контейнере Grafana.
 
 ## Objective
 
@@ -13,26 +13,45 @@
 ### Acceptance criteria
 
 1. **Готовые OTel-дашборды плагина** (`grafana-clickhouse-datasource` 4.23.2) провиженятся из файлов, а не импортируются кнопкой:
-   - OpenTelemetry Logs Explorer;
-   - OpenTelemetry Traces Explorer (поиск трейсов, service map);
-   - OpenTelemetry Service Dashboard (RED по спанам, ошибки, медленные операции, логи сервиса).
-   JSON берётся из исходников плагина зафиксированной версии, uid датасорса подставлен.
-2. **Свой дашборд «Delivery / Services Overview»** на метриках (`otel_metrics_*`), переменные `service`, `$__interval`:
-   - HTTP gateway: RPS, error rate (5xx), p50/p95/p99 по `http.route`;
-   - gRPC server: RPS, error rate (код ≠ OK), p95 по `rpc.method` для order/user/product;
-   - gRPC client: p95 вызовов gateway→order, order→user/product;
-   - Postgres: p95 запросов, утилизация пула (acquired / max), ожидание acquire;
-   - Kafka: consumed records/s по топику в notification;
-   - Runtime: goroutines, heap, GC pause по сервису.
-3. **Переходы:** из лога с `TraceId` — в трейс (OTel-режим датасорса); из трейса — к логам этого трейса;
-   из панелей Services Overview — data link в Service Dashboard для выбранного сервиса.
-4. Дашборды в папке Grafana «Delivery», редактируемы в UI, но источник правды — файлы в репозитории
-   (изменения из UI экспортируются в JSON и коммитятся).
-5. Перцентили считаются по delta-гистограммам (`otel_metrics_histogram`: `BucketCounts`, `ExplicitBounds`) за окно `$__interval`.
+   - OpenTelemetry Logs Explorer (`otel-logs-explorer`);
+   - OpenTelemetry Traces Explorer (`otel-traces-explorer`: поиск трейсов, service map);
+   - OpenTelemetry Service Dashboard (`otel-service-dashboard`: RED по спанам server/client/internal/async, ошибки,
+     медленные операции, логи сервиса).
+
+   JSON берётся из `/var/lib/grafana/plugins/grafana-clickhouse-datasource/dashboards/` образа с плагином 4.23.2.
+   File-provisioning не разрешает `__inputs`, поэтому `${DS_GRAFANA_CLICKHOUSE_DATASOURCE}` заменяется на uid `clickhouse`,
+   блок `__inputs` удаляется. Других правок в JSON плагина нет; uid дашбордов плагина сохраняются (на них ссылаются
+   их собственные data links).
+2. **Свой дашборд «Delivery / Services Overview»** (`delivery-services-overview`) на метриках (`otel_metrics_*`).
+   Он даёт то, чего нет в Service Dashboard плагина: обзор всех сервисов сразу и метрики, которых нет в спанах.
+   - **RED-сводка (HTTP + gRPC server):** по сервису — RPS, error rate, p95.
+     - gateway: `http.server.request.duration`, ошибка — `http.response.status_code >= 500`; разбивка по `http.route`;
+     - order/user/product: `rpc.server.call.duration`, ошибка — `rpc.response.status_code != 'OK'`; разбивка по `rpc.method`.
+     - Data link с панелей сводки → `/d/otel-service-dashboard?var-service=<сервис>` с текущим диапазоном времени.
+   - **Postgres** (order/user/product/notification): p95 `db.client.operation.duration` по `pgx.operation.type`;
+     утилизация пула `pgxpool.acquired_connections / pgxpool.max_connections`; время ожидания acquire
+     (`pgxpool.acquire_duration`, `pgxpool.empty_acquire_wait_time`, `ns`) и число пустых acquire (`pgxpool.empty_acquire`).
+   - **Kafka** (notification): `messaging.kafka.fetch_records.count` в секунду по `topic`; `messaging.kafka.read_errors.count`.
+   - **Runtime** (все сервисы): `go.goroutine.count`; `go.memory.used` по `go.memory.type` (`stack`/`other`)
+     и `go.memory.gc.goal`; скорость аллокаций `go.memory.allocated` (By/s).
+
+   gRPC client (gateway→order, order→user/product/address) на дашборд не выносится: он есть в Service Dashboard (client spans).
+   Метрики GC pause в каталоге нет: вместо неё — `gc.goal` и скорость аллокаций.
+3. **Переходы — штатные средства OTel-режима датасорса** (`otelEnabled` для logs и traces уже включён):
+   из лога с `TraceId` — в трейс (Explore), из трейса — к логам этого трейса. JSON плагина под переходы не правится.
+   Из Services Overview — data link в Service Dashboard выбранного сервиса (AC2).
+4. Дашборды в папке Grafana «Delivery» (`folderUid: delivery`), редактируемы в UI (`allowUiUpdates: true`), но источник
+   правды — файлы в репозитории (изменения из UI экспортируются в JSON и коммитятся).
+5. **Правила агрегации по temporality** (см. каталог метрик):
+   - histogram и monotonic sum — **delta**: значение за окно = `sum(...)`, скорость = `sum(...) / $__interval_s`;
+   - non-monotonic sum (goroutines, `go.memory.*`, `pgxpool.*_connections`) и gauge — **cumulative**/мгновенное:
+     последнее значение в окне `argMax(Value, TimeUnix)` на `ServiceName` (+ атрибуты), а не сумма.
+   - Перцентили — по delta-гистограммам: `sumForEach(BucketCounts)` за окно `$__interval`, индекс бакета через
+     `arrayCumSum`, линейная интерполяция внутри бакета между `ExplicitBounds`.
 
 ## Tech Stack
 
-Grafana `13.2.4`, `grafana-clickhouse-datasource` `4.23.2`, ClickHouse SQL. Без новых зависимостей.
+Grafana `13.2.4`, `grafana-clickhouse-datasource` `4.23.2`, ClickHouse SQL. Без новых зависимостей и без изменений Go-кода.
 
 ## Commands
 
@@ -41,25 +60,29 @@ task compose-up                     # Grafana подхватывает дашб�
 docker compose restart grafana      # перечитать JSON после изменений (или updateIntervalSeconds в провайдере)
 task watch-all                      # данные для панелей
 open http://localhost:3001/dashboards/f/delivery
+curl -s 'localhost:3001/api/search?folderUIDs=delivery' | jq -r '.[].uid'
+docker logs grafana 2>&1 | grep -i provisioning
 ```
 
 ## Project Structure
 
 ```
 deploy/grafana/dashboards/
-  otel-logs-explorer.json        → из плагина 4.23.2
-  otel-traces-explorer.json      → из плагина 4.23.2
-  otel-service.json              → из плагина 4.23.2
-  services-overview.json         → свой RED-дашборд
-deploy/grafana/provisioning/dashboards/dashboards.yaml → папка «Delivery», путь к JSON
+  otel-logs-explorer.json        → из плагина 4.23.2 (uid otel-logs-explorer)
+  otel-traces-explorer.json      → из плагина 4.23.2 (uid otel-traces-explorer)
+  otel-service-dashboard.json    → из плагина 4.23.2 (uid otel-service-dashboard)
+  services-overview.json         → свой дашборд (uid delivery-services-overview)
+  README.md                      → откуда взяты JSON плагина, как обновлять, как экспортировать правки из UI
+deploy/grafana/provisioning/dashboards/dashboards.yaml → folder «Delivery», folderUid delivery, путь к JSON
 ```
 
 ## Code Style
 
-- JSON дашбордов форматируется (2 пробела), uid дашбордов и датасорса фиксированы (`delivery-services-overview`, `clickhouse`).
-- SQL панелей — через макросы плагина (`$__timeFilter`, `$__timeInterval`), без захардкоженных интервалов.
+- JSON дашбордов форматируется (2 пробела, `jq .`), uid дашбордов и датасорса фиксированы (`delivery-services-overview`, `clickhouse`).
+- SQL панелей — через макросы плагина (`$__timeFilter`, `$__timeInterval`, `$__interval_s`), без захардкоженных интервалов.
+- Переменные Services Overview: `service` (multi, из `otel_metrics_sum`, `go.goroutine.count`), фильтр `ServiceName IN (${service:singlequote})`.
 
-Пример панели RPS (уточняется по фактическим именам метрик):
+Пример панели RPS:
 
 ```sql
 SELECT $__timeInterval(TimeUnix) AS t,
@@ -73,31 +96,55 @@ GROUP BY t, route
 ORDER BY t
 ```
 
+Пример p95 по бакетам (верхняя граница бакета; в панели — с интерполяцией):
+
+```sql
+WITH b AS (
+  SELECT ServiceName, any(ExplicitBounds) AS bounds, sumForEach(BucketCounts) AS counts
+  FROM otel.otel_metrics_histogram
+  WHERE $__timeFilter(TimeUnix) AND MetricName = 'rpc.server.call.duration'
+  GROUP BY ServiceName
+)
+SELECT ServiceName,
+       arrayFirstIndex(c -> c >= 0.95 * arraySum(counts), arrayCumSum(counts)) AS idx,
+       bounds[least(idx, length(bounds))] AS p95_s
+FROM b
+```
+
 ## Testing Strategy
 
 | Уровень | Что | Как |
 |---|---|---|
-| Provisioning | все 4 дашборда загружены без ошибок | `curl localhost:3001/api/search?folderUIDs=delivery`; логи Grafana без `provisioning` ошибок |
-| Ручная | каждая панель показывает данные под нагрузкой | `task watch-all` + генерация запросов, просмотр за 15 мин |
-| Ручная | переходы лог → трейс → логи работают | клик по TraceId в Logs Explorer |
-| Сверка | p95 на панели ≈ p95 из прямого SQL по `otel_traces` (`quantile(0.95)(Duration)`) | Grafana Explore → SQL Editor |
+| Provisioning | все 4 дашборда загружены в папку `delivery` без ошибок | `curl localhost:3001/api/search?folderUIDs=delivery`; логи Grafana без ошибок `provisioning` |
+| Ручная | каждая панель Services Overview показывает данные под нагрузкой | `task watch-all` + `ab` на `POST /api/v1/orders` (успех и 404), просмотр за 15 мин |
+| Ручная | готовые дашборды плагина работают с `clickhouse` без выбора датасорса вручную | открыть каждый, панели без ошибок |
+| Ручная | переходы лог → трейс → логи | Logs Explorer / Explore: клик по `TraceId`, из трейса — «логи» |
+| Ручная | data link Services Overview → Service Dashboard | клик по сервису, `var-service` подставлен |
+| Сверка | p95 на панели ≈ `quantile(0.95)(Duration)` по `otel_traces` (`SpanKind='Server'`) в пределах бакета | Grafana Explore → SQL Editor |
 
 ## Boundaries
 
-- **Always:** коммитить JSON после правок в UI; фиксировать версию плагина, из которой взяты готовые дашборды.
-- **Ask first:** алерты (вне скоупа итерации); materialized views/агрегирующие таблицы в ClickHouse для ускорения панелей; дашборды бизнес-метрик.
+- **Always:** коммитить JSON после правок в UI; фиксировать версию плагина, из которой взяты готовые дашборды (README).
+- **Ask first:** алерты (вне скоупа итерации); materialized views/агрегирующие таблицы в ClickHouse для ускорения панелей;
+  дашборды бизнес-метрик; правки JSON плагина сверх подстановки датасорса; изменение бакетов гистограмм в Go-коде.
 - **Never:** держать дашборды только в volume Grafana без файлов в репозитории.
 
 ## Success Criteria
 
 - [ ] После чистого `task compose-up` в папке «Delivery» 4 дашборда без ошибок provisioning.
 - [ ] Все панели Services Overview показывают данные при запущенных сервисах и нагрузке.
-- [ ] Из лога в Logs Explorer открывается связанный трейс; из трейса — его логи.
+- [ ] Из лога открывается связанный трейс; из трейса — его логи (штатно, OTel-режим датасорса).
 - [ ] Из Services Overview есть переход в Service Dashboard выбранного сервиса.
 - [ ] p95 на панели совпадает со сверочным SQL в пределах точности бакетов.
 
-## Open Questions
+## Известные ограничения
 
-1. Подтвердить набор панелей Services Overview после модуля `metrics` (по фактическому каталогу метрик).
-2. Если готовые дашборды плагина уже покрывают RED по спанам достаточно — возможно, Services Overview стоит ограничить
-   тем, чего в них нет (pgx pool, runtime, Kafka). Решим на этапе уточнения.
+- Бакеты гистограмм крупные (`rpc.*`: `[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, …]`), p95 точен до бакета. Точнее — только
+  через View с `ExplicitBounds` в Go-коде (вне скоупа).
+- Метрики GC pause в рантайм-инструментации нет.
+
+## Решённые вопросы
+
+1. Набор панелей подтверждён по каталогу метрик (AC2).
+2. Services Overview = RED-сводка по всем сервисам + то, чего нет в плагине (pgx, Kafka, runtime); gRPC client не дублируется.
+3. Переходы лог ↔ трейс — штатные средства датасорса, JSON плагина не дорабатывается.

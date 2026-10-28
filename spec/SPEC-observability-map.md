@@ -27,7 +27,7 @@ Build order: `obs-stack` → `telemetry-sdk` → `logs`, `tracing`, `metrics` (�
 | `tracing` | [SPEC-tracing.md](SPEC-tracing.md) | done |
 | `metrics` | [SPEC-metrics.md](SPEC-metrics.md) | done |
 | `async-propagation` | [SPEC-async-propagation.md](SPEC-async-propagation.md) | done |
-| `dashboards` | [SPEC-dashboards.md](SPEC-dashboards.md) | draft (предварительный) |
+| `dashboards` | [SPEC-dashboards.md](SPEC-dashboards.md) | ready (уточнён 2026-10-28) |
 
 ## Принятые решения
 
