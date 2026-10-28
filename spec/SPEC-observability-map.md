@@ -24,7 +24,7 @@ Build order: `obs-stack` → `telemetry-sdk` → `logs`, `tracing`, `metrics` (�
 | `obs-stack` | [SPEC-obs-stack.md](SPEC-obs-stack.md) | done |
 | `telemetry-sdk` | [SPEC-telemetry-sdk.md](SPEC-telemetry-sdk.md) | done |
 | `logs` | [SPEC-logs.md](SPEC-logs.md) | done |
-| `tracing` | [SPEC-tracing.md](SPEC-tracing.md) | done (кроме ручной проверки водопада в Grafana) |
+| `tracing` | [SPEC-tracing.md](SPEC-tracing.md) | done |
 | `metrics` | [SPEC-metrics.md](SPEC-metrics.md) | done |
 | `async-propagation` | [SPEC-async-propagation.md](SPEC-async-propagation.md) | approved |
 | `dashboards` | [SPEC-dashboards.md](SPEC-dashboards.md) | draft (предварительный) |

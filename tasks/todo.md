@@ -175,8 +175,8 @@ v0.72.0, `otelpgx` v0.13.0, `kotel` v1.7.1 в `platform`. Посмотреть, 
 **Estimated scope:** S
 
 ## Checkpoint B: сквозной трейс
-- [ ] Успешное создание заказа — один `TraceId`: gateway HTTP → gateway gRPC client → order server → order pg + user/product gRPC → их pg; без «осиротевших» корней
-- [ ] Grafana (Query type Traces) открывает трейс водопадом, SQL-спаны под gRPC
+- [x] Успешное создание заказа — один `TraceId`: gateway HTTP → gateway gRPC client → order server → order pg + user/product gRPC → их pg; без «осиротевших» корней
+- [x] Grafana (Query type Traces) открывает трейс водопадом, SQL-спаны под gRPC
 - [ ] Несуществующий user (`X-User-Id` с фиктивным UUID) → `StatusCode = Error` в order и gateway
 - [ ] grpcui (reflection) не создаёт спанов
 - [ ] Логи gateway и order по одному запросу — одинаковый непустой `TraceId`; в stdout `trace_id`/`span_id` рядом с `request_id`
@@ -259,7 +259,7 @@ RPS и задержки не анализируются. По данным Click
 Отметить Success Criteria трёх спеков. Формулировки про `/api/v1/orders/{id}` заменить на `POST /api/v1/orders` + unit-тест шаблона (решение R2).
 
 **Acceptance criteria:**
-- [ ] Все Success Criteria трёх спеков отмечены с фактическими результатами (кроме одного: водопад трейса в Grafana UI — ждёт ручной проверки, Checkpoint B)
+- [x] Все Success Criteria трёх спеков отмечены с фактическими результатами
 - [x] Карта и TODO.md отражают статус
 
 **Verification:**

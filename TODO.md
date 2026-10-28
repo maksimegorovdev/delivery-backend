@@ -33,7 +33,7 @@
   - [x] obs-stack: ClickHouse, OTel Collector, Grafana в docker-compose
   - [x] telemetry-sdk: `platform/telemetry`, `OTEL_*` во всех сервисах
   - [x] logs: fan-out slog → stdout + OTel, `trace_id`/`span_id`
-  - [x] tracing: `otelhttp`, `otelgrpc`, `otelpgx`, `kotel` (водопад в Grafana — проверить вручную)
+  - [x] tracing: `otelhttp`, `otelgrpc`, `otelpgx`, `kotel` (водопад в Grafana проверен)
   - [x] metrics: RED + runtime Go, каталог `docs/observability/metrics.md`
   - [ ] async-propagation: `traceparent` через outbox → Debezium → Kafka → notification
   - [ ] dashboards: Grafana as code
