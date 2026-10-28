@@ -33,7 +33,7 @@ E2E-запросы к ClickHouse: `docker exec clickhouse clickhouse-client -q "
 **Estimated scope:** S
 
 ## Checkpoint A: заголовки доходят до notification
-- [ ] Формат заголовка подтверждён (иначе — решение с `header.converter` согласовано с пользователем)
+- [x] Формат заголовка подтверждён (иначе — решение с `header.converter` согласовано с пользователем)
 - [ ] Ревью с пользователем
 
 ## Task 2: `OutboxRepo.Save` пишет `traceparent`/`tracestate`
@@ -45,14 +45,14 @@ E2E-запросы к ClickHouse: `docker exec clickhouse clickhouse-client -q "
 table-driven, без глобального пропагатора.
 
 **Acceptance criteria:**
-- [ ] При активном span в ctx `traceparent` = `00-<TraceID>-<SpanID>-<flags>` этого span'а, `tracestate` передаётся при наличии и `nil` при отсутствии; без span оба `nil`
-- [ ] Создание заказа через gateway: один `TraceId` у спанов gateway, order, user, product и notification; `ParentSpanId` у `receive` = `SpanId` серверного спана order `CreateOrder`
-- [ ] С `OTEL_ENABLED=false` в order заказ создаётся, колонки `NULL`, notification обрабатывает событие новым корнем (AC5)
+- [x] При активном span в ctx `traceparent` = `00-<TraceID>-<SpanID>-<flags>` этого span'а, `tracestate` передаётся при наличии и `nil` при отсутствии; без span оба `nil`
+- [x] Создание заказа через gateway: один `TraceId` у спанов gateway, order, user, product и notification; `ParentSpanId` у `receive` = `SpanId` серверного спана order `CreateOrder`
+- [x] С `OTEL_ENABLED=false` в order заказ создаётся, колонки `NULL`, notification обрабатывает событие новым корнем (AC5)
 
 **Verification:**
-- [ ] `cd services/order && go test -race ./...` зелёный; `task -d services/order lint` зелёный; `task -d services/order tidy` — `otel` стал прямой зависимостью, других изменений go.mod нет
-- [ ] `go build ./...` во всех модулях go.work
-- [ ] E2E: `POST /api/v1/orders` → `SELECT traceparent FROM outbox_events ORDER BY created_at DESC LIMIT 1` не NULL; SQL по `TraceId` в `otel.otel_traces` и `otel.otel_logs` (логи notification с тем же `TraceId`, AC6)
+- [x] `cd services/order && go test -race ./...` зелёный; `task -d services/order lint` зелёный; `task -d services/order tidy` — `otel` стал прямой зависимостью, других изменений go.mod нет
+- [x] `go build ./...` во всех модулях go.work
+- [x] E2E: `POST /api/v1/orders` → `SELECT traceparent FROM outbox_events ORDER BY created_at DESC LIMIT 1` не NULL; SQL по `TraceId` в `otel.otel_traces` и `otel.otel_logs` (логи notification с тем же `TraceId`, AC6 — не проверено: notification не пишет логов при обработке события, в `otel_logs` только `kafka consumer started/stopped`)
 
 **Dependencies:** Task 1
 
@@ -64,8 +64,8 @@ table-driven, без глобального пропагатора.
 **Estimated scope:** S
 
 ## Checkpoint B: сквозной трейс gateway → notification
-- [ ] Grafana (Query type Traces) показывает водопад от gateway до notification `process` с пробелом на CDC
-- [ ] Ревью с пользователем
+- [x] Grafana (Query type Traces) показывает водопад от gateway до notification `process` с пробелом на CDC
+- [x] Ревью с пользователем
 
 ## Task 3: Success Criteria спека, карта, TODO.md
 
