@@ -73,7 +73,7 @@ table-driven, без глобального пропагатора.
 (TraceId, формат заголовка). В карте `async-propagation` → done. В `TODO.md` отметить подпункт async-propagation.
 
 **Acceptance criteria:**
-- [x] Success Criteria спека отмечены с фактами (4 из 5; логи notification не проверены — нет логов при обработке события)
+- [x] Все 5 Success Criteria спека отмечены с фактами (логи notification — через ошибку хендлера)
 - [x] Карта и TODO.md отражают статус
 
 **Verification:**
