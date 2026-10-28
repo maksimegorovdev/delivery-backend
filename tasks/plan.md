@@ -1,83 +1,74 @@
-# Implementation Plan: async-propagation
+# Implementation Plan: dashboards
 
-> Спек: [SPEC-async-propagation.md](../spec/SPEC-async-propagation.md) · Карта: [SPEC-observability-map.md](../spec/SPEC-observability-map.md)
-> Задачи: [todo.md](todo.md) · Предыдущий модуль: [archive/logs-tracing-metrics-plan.md](archive/logs-tracing-metrics-plan.md)
+> Спек: [SPEC-dashboards.md](../spec/SPEC-dashboards.md) · Задачи: [todo.md](todo.md)
 
 ## Overview
 
-Трейс создания заказа продолжается в notification: order кладёт W3C trace context в строку
-`outbox_events`, Debezium EventRouter переносит его в заголовки Kafka-сообщения, а `kotel` в notification
-продолжает трейс. Код меняется только в order: миграция `000003` и `OutboxRepo.Save`. Также меняется конфиг
-коннектора. Notification и `platform/kafka` не трогаем, потому что консьюмер уже готов принять контекст.
-
-## Что уже есть (проверено в коде)
-
-- `platform/telemetry` ставит глобальный пропагатор `TraceContext + Baggage`.
-- `kotel.NewTracer` без `TracerPropagator` берёт `otel.GetTextMapPropagator()` и извлекает контекст из
-  заголовков записи (`kotel/tracer.go:91,289`). `processRecord` создаёт `process` дочерним к `receive`
-  (`platform/kafka/kafkaconsumer/kafkaconsumer.go:160`). AC4 и AC6 на стороне консьюмера закрываются
-  без изменений кода, нужна только e2e-проверка.
-- `OutboxRepo.Save` вызывается в `WithinTx` из `service.CreateOrder`. В `ctx` лежит серверный
-  gRPC-спан order (otelpgx не кладёт спан запроса в ctx вызывающего). Значит родителем `receive`
-  станет спан `order.v1.OrderService/CreateOrder`, а SQL-спан `INSERT outbox_events` будет ему «братом».
-  Для AC4 этого достаточно: это спан order, в рамках которого сделан INSERT.
+Grafana dashboards as code: три готовых OTel-дашборда плагина `grafana-clickhouse-datasource` 4.23.2
+и свой «Delivery / Services Overview» на метриках. Всё лежит в папке «Delivery» и провиженится из
+`deploy/grafana/dashboards`. Go-код не меняется. Всё делается через JSON, YAML провайдера и SQL панелей.
 
 ## Architecture Decisions
 
-- **Срез 1 — инфраструктурный путь без Go-кода.** Миграция и коннектор проверяются ручным `INSERT`
-  с известным `traceparent`. Это выносит главный риск (как Debezium кодирует заголовок и как ведёт
-  себя с NULL) в начало, до правок Go.
-- **Построение аргументов выносится в функцию `traceContext(ctx, propagator) (traceparent, tracestate *string)`.**
-  `Save` передаёт `otel.GetTextMapPropagator()`, а unit-тест — `propagation.TraceContext{}`.
-  Тест не мутирует глобальное состояние и может идти с `t.Parallel()`. Пустое значение превращается в `nil`,
-  то есть SQL `NULL`. Это `nullIfEmpty` из спека, свёрнутый внутрь функции.
-- **`baggage` не сохраняется.** Композитный пропагатор кладёт в carrier и `baggage`. Спек сохраняет
-  только `traceparent`/`tracestate`, а gateway входящий baggage и так не доверяет. Лишний ключ carrier'а игнорируется.
-- **`migrate-down` в Taskfile откатывает все миграции.** Откат `000003` проверяем через
-  `bin/migrate ... down 1`, а не `task migrate-down`, иначе снесутся таблицы заказов.
-- **`go.opentelemetry.io/otel` в order становится прямой зависимостью** (сейчас `// indirect`):
-  нужен `go mod tidy`/`task tidy`. Новых модулей не появляется.
+- **JSON плагина берётся из контейнера.** Источник — `/var/lib/grafana/plugins/grafana-clickhouse-datasource/dashboards/`
+  в образе с 4.23.2. Версия гарантирована `GF_PLUGINS_PREINSTALL_SYNC`. Единственная правка: `${DS_GRAFANA_CLICKHOUSE_DATASOURCE}` → `clickhouse`
+  и удаление `__inputs`, потому что file-provisioning не разрешает inputs. Uid дашбордов плагина не меняются: на них
+  ссылаются data links внутри плагина и наш Services Overview.
+- **Services Overview не дублирует Service Dashboard.** На нём RED-сводка по всем сервисам (HTTP gateway, gRPC server)
+  и то, чего нет в спанах: пул pgx, Kafka, runtime. gRPC client остаётся только в Service Dashboard.
+- **Переходы лог ↔ трейс — штатные.** Их даёт OTel-режим датасорса (`otelEnabled` уже в `clickhouse.yaml`). Если не заработает,
+  первым делом правится конфиг датасорса, а не JSON плагина.
+- **Агрегация зависит от temporality.** Delta (histogram, monotonic sum) суммируется. Cumulative и gauge берутся через
+  `argMax(Value, TimeUnix)`. p95 считается по `sumForEach(BucketCounts)` + `arrayCumSum` с интерполяцией. Прототип
+  проверен на текущих данных и согласуется с `quantile(0.95)` по спанам.
+- **Вертикальные срезы.** Каждая задача заканчивается дашбордом, который загружается и показывает данные. Services Overview
+  растёт по строкам (rows): RED → Postgres → Kafka + Runtime.
 
 ## Dependency Graph
 
 ```
-Task 1: миграция 000003 + коннектор (ручной INSERT → заголовки → notification)
+dashboards.yaml (folder «Delivery»)
     │
-    └── Task 2: OutboxRepo.Save инжектит контекст + unit-тест → e2e сквозной трейс
-            │
-            └── Task 3: Success Criteria, карта, TODO
+    ├── 3 дашборда плагина (Task 1)
+    │       ├── Переходы лог ↔ трейс (Task 2)
+    │       └── data link из Services Overview → otel-service-dashboard (Task 3)
+    │
+    └── services-overview.json
+            ├── RED-сводка + переменная service + data link (Task 3)
+            ├── Postgres (Task 4)
+            └── Kafka + Runtime (Task 5)
 ```
 
-Задачи строго последовательны: колонок до Task 1 нет, а e2e Task 2 опирается на коннектор.
+Tasks 4 и 5 не зависят друг от друга, но правят один JSON, поэтому их лучше делать последовательно.
 
 ## Task List
 
-### Phase 1: Инфраструктурный путь
-- [x] Task 1: Миграция `000003` + `additional.placement` в коннекторе
+### Phase 1: Готовые дашборды и переходы
+- [x] Task 1: Provisioning в папку «Delivery» + 3 дашборда плагина
+- [ ] Task 2: Переходы лог → трейс → логи штатными средствами
 
-### Checkpoint A: заголовки доходят до notification
+### Checkpoint A
+- [ ] 3 дашборда в `delivery`, переходы работают, ревью с пользователем
 
-### Phase 2: Инжект в order
-- [x] Task 2: `OutboxRepo.Save` пишет `traceparent`/`tracestate`
+### Phase 2: Services Overview
+- [ ] Task 3: Services Overview — RED-сводка, p95 по бакетам, data link в Service Dashboard
+- [ ] Task 4: Services Overview — Postgres
+- [ ] Task 5: Services Overview — Kafka и Runtime
 
-### Checkpoint B: сквозной трейс gateway → notification
-
-### Phase 3: Закрытие модуля
-- [x] Task 3: Success Criteria спека, карта, TODO.md
-
-### Checkpoint C: модуль завершён
+### Checkpoint B (Complete)
+- [ ] Success Criteria спека закрыты, статус в карте `done`, ревью с пользователем
 
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Debezium кладёт значение заголовка не сырыми байтами (например, JSON-строкой в кавычках), и `kotel` не распарсит `traceparent` | High | Task 1 проверяет байты заголовка в Redpanda Console/`rpk` до Go-кода. Если формат не тот — задать `header.converter` (`SimpleHeaderConverter`/`StringConverter`) в конфиге коннектора; вопрос к пользователю, если нужен иной путь |
-| Колонка `NULL` даёт заголовок с null-значением или ломает EventRouter | Med | Task 1 проверяет ручной INSERT без `traceparent`: сообщение доходит, notification обрабатывает его новым корнем (AC5) |
-| Изменение конфига коннектора перезапускает задачу и пропускает/дублирует события | Low | `PUT /config` сохраняет offset'ы коннектора. Идемпотентности в notification пока нет (отдельный пункт TODO.md), но дубли на dev-стенде допустимы. Проверяем статус `RUNNING` |
-| `task migrate-down` откатывает всё | Med | Откат только `down 1` напрямую через `bin/migrate` |
-| Пробел на водопаде длиной в задержку CDC | Low | Осознанный компромисс из спека, OTel Java agent — Ask first |
+| Штатный переход трейс → логи требует настройки датасорса (имя колонки TraceId, `logs` в trace config) | Med | Task 2 в начале плана. Правка — в `clickhouse.yaml`. Если штатно не получится, возвращаюсь к пользователю с вариантами (data links в JSON) |
+| Дашборды плагина ссылаются на `${datasource}` с `current` = input — после замены переменная может не выбраться | Med | Подставить `clickhouse` и в `current`, проверить, что панели работают без выбора вручную |
+| Крупные бакеты `rpc.*` → p95 грубый | Low | Интерполяция внутри бакета. Критерий сверки — «в пределах бакета». Изменение бакетов в Go — вне скоупа (Ask first) |
+| `sumForEach` ломается при разных `ExplicitBounds` у одной метрики | Low | Группировка по `MetricName` (+ сервис). Бакеты одинаковы в рамках метрики. Проверка `uniqExact(ExplicitBounds)` в Task 3 |
+| Тяжёлые SQL на сыром `otel_metrics_*` | Low | Объём dev-данных мал. MV/агрегаты — Ask first |
+| Правки из UI теряются в volume `grafana-data` | Low | README: экспорт JSON → `jq .` → коммит |
 
 ## Open Questions
 
-- Нет блокирующих. Если в Task 1 выяснится, что нужен `header.converter`, это правка того же
-  `order-outbox.json` в рамках спека. Если нужен interceptor в Debezium — Ask first.
+Нет. Вопросы спека решены 2026-10-28 (см. «Решённые вопросы» в спеке).

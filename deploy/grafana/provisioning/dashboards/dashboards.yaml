@@ -3,6 +3,9 @@ apiVersion: 1
 providers:
   - name: delivery
     type: file
+    folder: Delivery
+    folderUid: delivery
     allowUiUpdates: true
+    updateIntervalSeconds: 30
     options:
       path: /etc/grafana/dashboards
