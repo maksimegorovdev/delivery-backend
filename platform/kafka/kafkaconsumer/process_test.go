@@ -78,7 +78,7 @@ func TestProcessRecord_HandlerErrorMarksSpan(t *testing.T) {
 
 	c, exporter := newTestConsumer(t)
 	record := &kgo.Record{Topic: "order.events.v1"}
-	wantErr := errors.New("boom")
+	wantErr := errors.New("boom: email=user@example.com")
 
 	err := c.processRecord(context.Background(), record, handlerFunc(func(context.Context, Message) error {
 		return wantErr
@@ -91,11 +91,16 @@ func TestProcessRecord_HandlerErrorMarksSpan(t *testing.T) {
 	if len(spans) != 1 {
 		t.Fatalf("spans = %d, want 1", len(spans))
 	}
-	if spans[0].Status.Code != codes.Error {
-		t.Errorf("Status = %v, want Error", spans[0].Status.Code)
+	span := spans[0]
+	if span.Status.Code != codes.Error || span.Status.Description != handlerFailed {
+		t.Errorf("Status = %v %q, want Error %q", span.Status.Code, span.Status.Description, handlerFailed)
 	}
-	if len(spans[0].Events) == 0 || spans[0].Events[0].Name != "exception" {
-		t.Errorf("Events = %v, want событие exception от RecordError", spans[0].Events)
+	if v, ok := attrValue(span.Attributes, errorTypeKey); !ok || v.AsString() != "*errors.errorString" {
+		t.Errorf("%s = %v (found=%v), want *errors.errorString", errorTypeKey, v, ok)
+	}
+	// Текст ошибки может нести данные из payload и не должен попадать в спан.
+	if len(span.Events) != 0 {
+		t.Errorf("Events = %v, want нет событий с текстом ошибки", span.Events)
 	}
 }
 
