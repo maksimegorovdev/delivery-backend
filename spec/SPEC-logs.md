@@ -93,11 +93,11 @@ func New(opts ...Option) *slog.Logger {
 
 ## Success Criteria
 
-- [ ] `task -d platform test` зелёный, покрытие `platform/logger` ≥ 80%.
-- [ ] В `otel.otel_logs` есть записи всех 5 сервисов (`SELECT DISTINCT ServiceName`).
-- [ ] Для HTTP-запроса через gateway записи gateway и order имеют одинаковый `TraceId` (после модуля `tracing`).
-- [ ] В stdout рядом с `request_id` выводятся `trace_id`/`span_id`.
-- [ ] С `OTEL_ENABLED=false` логи только в stdout, без ошибок.
+- [x] `task -d platform test` зелёный, покрытие `platform/logger` ≥ 80% (95.4%).
+- [x] В `otel.otel_logs` есть записи всех 5 сервисов (`SELECT DISTINCT ServiceName`): gateway, notification, order, product, user.
+- [x] Для HTTP-запроса через gateway записи gateway и order имеют одинаковый `TraceId` (проверено в ClickHouse: трейсы с логами `gateway`, `order`, `product`, `user` под одним `TraceId`).
+- [x] В stdout рядом с `request_id` выводятся `trace_id`/`span_id` (unit-тесты `platform/logger`, Task 1).
+- [x] С `OTEL_ENABLED=false` логи только в stdout, без ошибок (запуск всех 5 сервисов, Task 3).
 
 ## Open Questions
 

@@ -107,12 +107,12 @@ span.End()
 
 ## Success Criteria
 
-- [ ] `task -d platform test` зелёный.
-- [ ] Создание заказа даёт в `otel_traces` один `TraceId` со спанами от `gateway`, `order`, `user`, `product`; иерархия корректна (нет «осиротевших» корней, кроме ожидаемого корня в gateway).
-- [ ] В Grafana (Query type Traces) трейс заказа открывается водопадом, SQL-спаны видны под gRPC-спанами.
+- [x] `task -d platform test` зелёный.
+- [x] Создание заказа даёт в `otel_traces` один `TraceId` со спанами от `gateway`, `order`, `user`, `product`; иерархия корректна (корни: `POST /api/v1/orders` в gateway; `order.events.v1 receive` в notification — отдельный трейс до `async-propagation`; единичный корень `CreateOrder` в order — прямой вызов из grpcui в E2E Task 4).
+- [ ] В Grafana (Query type Traces) трейс заказа открывается водопадом, SQL-спаны видны под gRPC-спанами. **Ждёт ручной проверки в UI** (Checkpoint B).
 - [x] Обработка события в notification даёт спан `process` с `messaging.source.name = order.events.v1` (`kotel` v1.7.1 пишет semconv v1.18, атрибута `messaging.destination.name` в нём нет).
-- [ ] Ошибка (несуществующий user) → спаны с `StatusCode = Error` в order и gateway.
-- [ ] Вызовы grpcui (reflection) не создают спанов.
+- [x] Ошибка (несуществующий user/адрес, `not found`) → спаны с `StatusCode = Error`: client-спан `order.v1.OrderService/CreateOrder` в gateway и client-спан `address.v1.AddressService/GetAddress` в order. Server-спан с `NotFound` по semconv `otelgrpc` — не `Error`.
+- [x] Вызовы grpcui (reflection) не создают спанов (bufconn-тест Task 4; в `otel_traces` 0 спанов `reflection`/`health`).
 
 ## Open Questions
 
