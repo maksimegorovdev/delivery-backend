@@ -4,13 +4,21 @@ package telemetry
 import (
 	"context"
 	"os"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/log"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 func TestDeltaTemporality(t *testing.T) {
@@ -62,6 +70,110 @@ func (e *countingExporter) Export(context.Context, *metricdata.ResourceMetrics) 
 
 func (e *countingExporter) ForceFlush(context.Context) error { return nil }
 func (e *countingExporter) Shutdown(context.Context) error   { return nil }
+
+func TestSpanLimits_TruncatesLongAttribute(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string // "" — OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT не задан
+		want int
+	}{
+		{name: "по умолчанию 1024", env: "", want: defaultAttributeValueLengthLimit},
+		{name: "env переопределяет", env: "16", want: 16},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", "")
+			t.Setenv("OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT", tt.env)
+			if tt.env == "" {
+				if err := os.Unsetenv("OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.Unsetenv("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT"); err != nil {
+				t.Fatal(err)
+			}
+
+			exp := tracetest.NewInMemoryExporter()
+			tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp), sdktrace.WithRawSpanLimits(spanLimits()))
+			defer func() { _ = tp.Shutdown(context.Background()) }()
+
+			_, span := tp.Tracer("test").Start(context.Background(), "op")
+			span.SetAttributes(attribute.String("user_agent.original", strings.Repeat("a", 4096)))
+			span.End()
+
+			got := exp.GetSpans()
+			if len(got) != 1 {
+				t.Fatalf("спанов = %d, want 1", len(got))
+			}
+			if n := len(got[0].Attributes[0].Value.AsString()); n != tt.want {
+				t.Errorf("длина атрибута = %d, want %d", n, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoggerProviderOptions_AttributeLimit(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string // "" — OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT не задан
+		want int
+	}{
+		{name: "по умолчанию 1024", env: "", want: defaultAttributeValueLengthLimit},
+		{name: "env переопределяет", env: "16", want: 16},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(envLogAttributeValueLengthLimit, tt.env)
+			if tt.env == "" {
+				if err := os.Unsetenv(envLogAttributeValueLengthLimit); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			exp := &recordingLogExporter{}
+			lp := sdklog.NewLoggerProvider(loggerProviderOptions(exp, resource.Empty())...)
+
+			var rec log.Record
+			rec.AddAttributes(attribute.String("http.path", strings.Repeat("a", 4096)))
+			lp.Logger("test").Emit(context.Background(), rec)
+			if err := lp.Shutdown(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+
+			if len(exp.records) != 1 {
+				t.Fatalf("записей = %d, want 1", len(exp.records))
+			}
+			var n int
+			exp.records[0].WalkAttributes(func(kv attribute.KeyValue) bool {
+				n = len(kv.Value.AsString())
+				return false
+			})
+			if n != tt.want {
+				t.Errorf("длина атрибута = %d, want %d", n, tt.want)
+			}
+		})
+	}
+}
+
+// recordingLogExporter запоминает экспортированные записи логов.
+type recordingLogExporter struct {
+	mu      sync.Mutex
+	records []sdklog.Record
+}
+
+func (e *recordingLogExporter) Export(_ context.Context, records []sdklog.Record) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for _, r := range records {
+		e.records = append(e.records, r.Clone())
+	}
+	return nil
+}
+
+func (e *recordingLogExporter) Shutdown(context.Context) error   { return nil }
+func (e *recordingLogExporter) ForceFlush(context.Context) error { return nil }
 
 func TestNewPeriodicReader_Interval(t *testing.T) {
 	tests := []struct {

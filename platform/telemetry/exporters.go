@@ -16,8 +16,16 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
-// defaultMetricInterval — период экспорта метрик, если не задан OTEL_METRIC_EXPORT_INTERVAL.
-const defaultMetricInterval = 10 * time.Second
+const (
+	// defaultMetricInterval — период экспорта метрик, если не задан OTEL_METRIC_EXPORT_INTERVAL.
+	defaultMetricInterval = 10 * time.Second
+	// defaultAttributeValueLengthLimit обрезает строковые атрибуты спанов и логов:
+	// без него SDK хранит значения целиком, и клиент раздувает очередь экспорта
+	// длинным User-Agent или путём.
+	defaultAttributeValueLengthLimit = 1024
+	// envLogAttributeValueLengthLimit — переменная SDK логов с лимитом длины атрибута.
+	envLogAttributeValueLengthLimit = "OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT"
+)
 
 // newTracerProvider создаёт TracerProvider с OTLP gRPC экспортёром.
 //
@@ -34,7 +42,18 @@ func newTracerProvider(ctx context.Context, cfg Config, res *resource.Resource) 
 	return sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exp),
 		sdktrace.WithResource(res),
+		sdktrace.WithRawSpanLimits(spanLimits()),
 	), nil
+}
+
+// spanLimits берёт лимиты из OTEL_SPAN_* и OTEL_ATTRIBUTE_*, а длину атрибута,
+// которую env оставил неограниченной, сводит к defaultAttributeValueLengthLimit.
+func spanLimits() sdktrace.SpanLimits {
+	limits := sdktrace.NewSpanLimits()
+	if limits.AttributeValueLengthLimit < 0 {
+		limits.AttributeValueLengthLimit = defaultAttributeValueLengthLimit
+	}
+	return limits
 }
 
 // newMeterProvider создаёт MeterProvider с OTLP gRPC экспортёром
@@ -63,10 +82,20 @@ func newLoggerProvider(ctx context.Context, cfg Config, res *resource.Resource) 
 		return nil, fmt.Errorf("telemetry: log exporter: %w", err)
 	}
 
-	return sdklog.NewLoggerProvider(
+	return sdklog.NewLoggerProvider(loggerProviderOptions(exp, res)...), nil
+}
+
+// loggerProviderOptions задаёт лимит длины атрибута, только если не задан
+// OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT: явная опция перекрыла бы env.
+func loggerProviderOptions(exp sdklog.Exporter, res *resource.Resource) []sdklog.LoggerProviderOption {
+	opts := []sdklog.LoggerProviderOption{
 		sdklog.WithProcessor(sdklog.NewBatchProcessor(exp)),
 		sdklog.WithResource(res),
-	), nil
+	}
+	if os.Getenv(envLogAttributeValueLengthLimit) == "" {
+		opts = append(opts, sdklog.WithAttributeValueLengthLimit(defaultAttributeValueLengthLimit))
+	}
+	return opts
 }
 
 // newPeriodicReader создаёт reader с интервалом defaultMetricInterval. Если задан
