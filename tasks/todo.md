@@ -67,7 +67,7 @@ Explore → Logs) открывается трейс. Из трейса (Explore 
 ## Checkpoint A: готовые дашборды и переходы
 - [x] 3 дашборда в папке «Delivery», provisioning без ошибок
 - [x] Переходы лог ↔ трейс работают после рестарта Grafana
-- [ ] Ревью с пользователем
+- [x] Ревью с пользователем
 
 ## Task 3: Services Overview — RED-сводка, p95 по бакетам, data link
 
