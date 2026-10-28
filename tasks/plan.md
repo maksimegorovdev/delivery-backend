@@ -58,7 +58,7 @@ Task 1: миграция 000003 + коннектор (ручной INSERT → з
 ### Checkpoint A: заголовки доходят до notification
 
 ### Phase 2: Инжект в order
-- [ ] Task 2: `OutboxRepo.Save` пишет `traceparent`/`tracestate`
+- [x] Task 2: `OutboxRepo.Save` пишет `traceparent`/`tracestate`
 
 ### Checkpoint B: сквозной трейс gateway → notification
 
