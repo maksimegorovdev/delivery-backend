@@ -82,6 +82,7 @@ func New(ctx context.Context) (_ *App, err error) {
 	// HTTP Server
 	httpServer := httpserver.New(
 		cfg.HTTP.Addr,
+		httpserver.WithPublicEndpoint(),
 	)
 	httpServer.Router().Use(
 		middleware.RequestID,
