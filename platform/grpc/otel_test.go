@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcclient"
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcserver"
+	"github.com/maksimegorovdev/delivery-backend/platform/internal/otelenv"
 )
 
 const (
@@ -48,6 +50,7 @@ var (
 // Глобальные провайдеры ставятся один раз: otelgrpc берёт их при создании
 // хендлера через делегирующий глобальный провайдер.
 func TestMain(m *testing.M) {
+	otelenv.Unset()
 	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSyncer(spans)))
 	otel.SetMeterProvider(sdkmetric.NewMeterProvider(sdkmetric.WithReader(metrics)))
 	otel.SetTextMapPropagator(propagation.TraceContext{})
@@ -196,6 +199,67 @@ func TestServerSpanStatus(t *testing.T) {
 			require.Equal(t, tt.want, singleSpan(t, traceID, trace.SpanKindServer).Status.Code)
 		})
 	}
+}
+
+// Имя метода в rpc.method и имени спана берётся из запроса как есть, но grpc-go
+// для незарегистрированного метода отвечает Unimplemented без события End, а otelgrpc
+// пишет спан и метрику именно на End. Поэтому произвольные имена не плодят серии
+// rpc.server.*. Тест фиксирует это: если поведение grpc-go изменится, нужен фильтр
+// по зарегистрированным методам.
+func TestUnknownMethodCreatesNoTelemetry(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		method string
+	}{
+		{name: "unknown service", method: "/attacker.Svc/Random"},
+		{name: "unknown method of known service", method: "/test.Echo/Random"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			conn := newConn(t)
+			ctx, traceID := rootContext(t)
+
+			require.Equal(t, grpccodes.Unimplemented, status.Code(call(ctx, conn, tt.method)))
+
+			// Контрольный вызов: его спан и метрика пишутся после ответа, к этому
+			// моменту телеметрия неизвестного вызова, будь она, тоже уже записана.
+			require.NoError(t, call(ctx, conn, callOK))
+			require.Equal(t, "test.Echo/OK", singleSpan(t, traceID, trace.SpanKindServer).Name)
+
+			var methods map[string]bool
+			require.Eventually(t, func() bool {
+				methods = durationMethods()
+				return methods["test.Echo/OK"]
+			}, spanWait, spanPoll)
+			require.NotContains(t, methods, strings.TrimPrefix(tt.method, "/"))
+		})
+	}
+}
+
+// durationMethods собирает значения rpc.method у точек rpc.server.call.duration.
+// Вызывается из условия require.Eventually в чужой горутине, поэтому без require.
+func durationMethods() map[string]bool {
+	var rm metricdata.ResourceMetrics
+	if err := metrics.Collect(context.Background(), &rm); err != nil {
+		return nil
+	}
+
+	methods := map[string]bool{}
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			h, ok := m.Data.(metricdata.Histogram[float64])
+			if !ok || m.Name != serverDuration {
+				continue
+			}
+			for _, dp := range h.DataPoints {
+				method, _ := dp.Attributes.Value("rpc.method")
+				methods[method.AsString()] = true
+			}
+		}
+	}
+	return methods
 }
 
 func TestServerRecordsRPCDurationMetric(t *testing.T) {
