@@ -1,7 +1,7 @@
 # Implementation Plan: async-propagation
 
-> Спек: [SPEC-async-propagation.md](../spec/SPEC-async-propagation.md) · Карта: [SPEC-observability-map.md](../spec/SPEC-observability-map.md)
-> Задачи: [todo.md](todo.md) · Предыдущий модуль: [archive/logs-tracing-metrics-plan.md](archive/logs-tracing-metrics-plan.md)
+> Спек: [SPEC-async-propagation.md](../../spec/observability/SPEC-async-propagation.md) · Карта: [SPEC-observability-map.md](../../spec/observability/SPEC-observability-map.md)
+> Задачи: [todo.md](async-propagation-todo.md) · Предыдущий модуль: [logs-tracing-metrics-plan.md](logs-tracing-metrics-plan.md)
 
 ## Overview
 

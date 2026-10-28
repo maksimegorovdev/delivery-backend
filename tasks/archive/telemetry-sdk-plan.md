@@ -1,6 +1,6 @@
 # Implementation Plan: telemetry-sdk
 
-> Спек: [SPEC-telemetry-sdk.md](../../spec/SPEC-telemetry-sdk.md) · Карта: [SPEC-observability-map.md](../../spec/SPEC-observability-map.md)
+> Спек: [SPEC-telemetry-sdk.md](../../spec/observability/SPEC-telemetry-sdk.md) · Карта: [SPEC-observability-map.md](../../spec/observability/SPEC-observability-map.md)
 > Задачи: [todo.md](telemetry-sdk-todo.md) · Предыдущий модуль: [archive/obs-stack-plan.md](obs-stack-plan.md)
 
 ## Overview

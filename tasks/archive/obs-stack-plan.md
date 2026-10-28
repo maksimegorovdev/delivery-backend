@@ -1,6 +1,6 @@
 # Implementation Plan: obs-stack
 
-> Спек: [SPEC-obs-stack.md](../../spec/SPEC-obs-stack.md) · Карта: [SPEC-observability-map.md](../../spec/SPEC-observability-map.md)
+> Спек: [SPEC-obs-stack.md](../../spec/observability/SPEC-obs-stack.md) · Карта: [SPEC-observability-map.md](../../spec/observability/SPEC-observability-map.md)
 > Задачи: [obs-stack-todo.md](obs-stack-todo.md)
 
 > **После реализации:** задачи `obs-smoke` и `obs-ch` удалены из Taskfile (коммит `120ad3f`). Пункты ниже, где они

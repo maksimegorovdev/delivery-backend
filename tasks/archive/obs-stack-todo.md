@@ -1,6 +1,6 @@
 # Tasks: obs-stack
 
-> План: [obs-stack-plan.md](obs-stack-plan.md) · Спек: [SPEC-obs-stack.md](../../spec/SPEC-obs-stack.md)
+> План: [obs-stack-plan.md](obs-stack-plan.md) · Спек: [SPEC-obs-stack.md](../../spec/observability/SPEC-obs-stack.md)
 
 > **После реализации:** задачи `obs-smoke` и `obs-ch` удалены из Taskfile (коммит `120ad3f`). Пункты ниже, где они
 > упоминаются, — журнал проверок на момент выполнения. Сейчас данные проверяются в Grafana Explore (Query Builder,

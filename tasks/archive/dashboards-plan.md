@@ -1,6 +1,6 @@
 # Implementation Plan: dashboards
 
-> Спек: [SPEC-dashboards.md](../spec/SPEC-dashboards.md) · Задачи: [todo.md](todo.md)
+> Спек: [SPEC-dashboards.md](../../spec/observability/SPEC-dashboards.md) · Задачи: [todo.md](dashboards-todo.md)
 
 ## Overview
 

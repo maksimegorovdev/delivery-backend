@@ -1,7 +1,7 @@
 # Implementation Plan: logs + tracing + metrics
 
-> Спеки: [SPEC-logs.md](../../spec/SPEC-logs.md) · [SPEC-tracing.md](../../spec/SPEC-tracing.md) · [SPEC-metrics.md](../../spec/SPEC-metrics.md)
-> Карта: [SPEC-observability-map.md](../../spec/SPEC-observability-map.md) · Задачи: [todo.md](logs-tracing-metrics-todo.md)
+> Спеки: [SPEC-logs.md](../../spec/observability/SPEC-logs.md) · [SPEC-tracing.md](../../spec/observability/SPEC-tracing.md) · [SPEC-metrics.md](../../spec/observability/SPEC-metrics.md)
+> Карта: [SPEC-observability-map.md](../../spec/observability/SPEC-observability-map.md) · Задачи: [todo.md](logs-tracing-metrics-todo.md)
 > Предыдущий модуль: [archive/telemetry-sdk-plan.md](telemetry-sdk-plan.md)
 
 ## Overview

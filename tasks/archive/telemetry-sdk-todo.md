@@ -1,6 +1,6 @@
 # Tasks: telemetry-sdk
 
-> План: [plan.md](telemetry-sdk-plan.md) · Спек: [SPEC-telemetry-sdk.md](../../spec/SPEC-telemetry-sdk.md)
+> План: [plan.md](telemetry-sdk-plan.md) · Спек: [SPEC-telemetry-sdk.md](../../spec/observability/SPEC-telemetry-sdk.md)
 
 ## Task 1: Каркас пакета, noop-путь и `task -d platform test`
 

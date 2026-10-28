@@ -1,6 +1,6 @@
 # Tasks: logs + tracing + metrics
 
-> План: [plan.md](logs-tracing-metrics-plan.md) · Спеки: [logs](../../spec/SPEC-logs.md) · [tracing](../../spec/SPEC-tracing.md) · [metrics](../../spec/SPEC-metrics.md)
+> План: [plan.md](logs-tracing-metrics-plan.md) · Спеки: [logs](../../spec/observability/SPEC-logs.md) · [tracing](../../spec/observability/SPEC-tracing.md) · [metrics](../../spec/observability/SPEC-metrics.md)
 
 E2E-запросы к ClickHouse: `docker exec clickhouse clickhouse-client -q "<SQL>"` или Grafana Explore → SQL Editor.
 Запуск всех сервисов: `task watch-all` (или бинарники + `.env`, как при закрытии telemetry-sdk).
@@ -268,7 +268,7 @@ RPS и задержки не анализируются. По данным Click
 **Dependencies:** Task 9
 
 **Files likely touched:**
-- `spec/SPEC-observability-map.md`, `spec/SPEC-logs.md`, `spec/SPEC-tracing.md`, `spec/SPEC-metrics.md`, `TODO.md`
+- `spec/observability/SPEC-observability-map.md`, `spec/observability/SPEC-logs.md`, `spec/observability/SPEC-tracing.md`, `spec/observability/SPEC-metrics.md`, `TODO.md`
 
 **Estimated scope:** S
 

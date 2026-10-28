@@ -2,7 +2,7 @@
 
 > Модуль карты [SPEC-observability-map.md](SPEC-observability-map.md). Зависит от `logs`, `tracing`, `metrics`.
 >
-> Уточнён 2026-10-28 по [docs/observability/metrics.md](../docs/observability/metrics.md), данным в ClickHouse
+> Уточнён 2026-10-28 по [docs/observability/metrics.md](../../docs/observability/metrics.md), данным в ClickHouse
 > и содержимому плагина `grafana-clickhouse-datasource` 4.23.2 в контейнере Grafana.
 
 ## Objective
@@ -137,10 +137,10 @@ FROM b
 
 ## Success Criteria
 
-- [ ] После чистого `task compose-up` в папке «Delivery» 4 дашборда без ошибок provisioning.
+- [x] После чистого `task compose-up` в папке «Delivery» 4 дашборда без ошибок provisioning.
 - [x] Все панели Services Overview показывают данные при запущенных сервисах и нагрузке.
 - [x] Из лога открывается связанный трейс; из трейса — его логи (штатно, OTel-режим датасорса).
-- [ ] Из Services Overview есть переход в Service Dashboard выбранного сервиса.
+- [x] Из Services Overview есть переход в Service Dashboard выбранного сервиса.
 - [x] p95 на панели совпадает со сверочным SQL в пределах точности бакетов.
 
 ## Известные ограничения

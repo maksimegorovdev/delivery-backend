@@ -1,10 +1,10 @@
 # Tasks: dashboards
 
-> План: [plan.md](plan.md) · Спек: [SPEC-dashboards.md](../spec/SPEC-dashboards.md)
+> План: [plan.md](dashboards-plan.md) · Спек: [SPEC-dashboards.md](../../spec/observability/SPEC-dashboards.md)
 
 Grafana: http://localhost:3001/dashboards/f/delivery. SQL: `docker exec clickhouse clickhouse-client -q "<SQL>"`
 или Grafana Explore → SQL Editor. Нагрузка: `task watch-all`, затем `ab` на `POST /api/v1/orders`
-(успешный и с несуществующим продуктом → 404). Сценарий тот же, что в [metrics.md](../docs/observability/metrics.md).
+(успешный и с несуществующим продуктом → 404). Сценарий тот же, что в [metrics.md](../../docs/observability/metrics.md).
 
 ## Task 1: Provisioning в папку «Delivery» + 3 дашборда плагина
 
@@ -15,7 +15,7 @@ Grafana: http://localhost:3001/dashboards/f/delivery. SQL: `docker exec clickhou
 отформатировать `jq .`. Удалить `.gitkeep`. Написать `deploy/grafana/dashboards/README.md`: версия плагина,
 команда копирования и подстановки, порядок экспорта правок из UI.
 README позже удалён (0074106): версия плагина, подстановка датасорса и экспорт правок из UI описаны в
-[SPEC-dashboards.md](../spec/SPEC-dashboards.md) (AC1, AC4).
+[SPEC-dashboards.md](../../spec/observability/SPEC-dashboards.md) (AC1, AC4).
 
 **Acceptance criteria:**
 - [x] После `docker compose restart grafana` в папке `delivery` есть `otel-logs-explorer`, `otel-traces-explorer`, `otel-service-dashboard`, в логах Grafana нет ошибок provisioning
@@ -85,7 +85,7 @@ p95 считается через `sumForEach(BucketCounts)` + `arrayCumSum` с 
 **Acceptance criteria:**
 - [x] Дашборд в папке `delivery`. Под нагрузкой RPS > 0. При 404-нагрузке error rate = 0, client errors > 0 и совпадают у gateway (404) и order (`NOT_FOUND`)
 - [x] p95 сводки для order/user/product не выше верхней границы бакета, содержащего `quantile(0.95)(Duration)` спанов `SpanKind='Server'`, за то же окно
-- [ ] Клик по сервису в сводке открывает Service Dashboard с этим `service` и текущим диапазоном времени
+- [x] Клик по сервису в сводке открывает Service Dashboard с этим `service` и текущим диапазоном времени
 
 **Verification:**
 - [x] `curl -s 'localhost:3001/api/search?folderUIDs=delivery' | jq -r '.[].uid'` содержит `delivery-services-overview`
@@ -114,7 +114,7 @@ p95 считается через `sumForEach(BucketCounts)` + `arrayCumSum` с 
 
 **Verification:**
 - [x] SQL-сверка: `SELECT ServiceName, argMax(Value, TimeUnix) FROM otel.otel_metrics_sum WHERE MetricName='pgxpool.acquired_connections' AND TimeUnix > now() - INTERVAL 1 MINUTE GROUP BY 1`
-- [ ] Ручная: просмотр строки за 15 мин под нагрузкой и без неё
+- [x] Ручная: просмотр строки за 15 мин под нагрузкой и без неё
 
 **Dependencies:** Task 3
 
@@ -132,22 +132,22 @@ p95 считается через `sumForEach(BucketCounts)` + `arrayCumSum` с 
 **Acceptance criteria:**
 - [x] После создания заказов records/s по `order.events.v1` > 0. Read errors отображаются (0 — валидное значение, не «No data»)
 - [x] Runtime-панели показывают все 5 сервисов. Значения goroutines и heap совпадают с ручным `argMax` SQL
-- [ ] Success Criteria спека закрыты, в карте `dashboards` → `done`
+- [x] Success Criteria спека закрыты, в карте `dashboards` → `done`
 
 **Verification:**
 - [x] SQL-сверка: `SELECT ServiceName, argMax(Value, TimeUnix) FROM otel.otel_metrics_sum WHERE MetricName='go.goroutine.count' GROUP BY 1`
-- [ ] Ручная: чистый `task compose-up` (или удаление volume `grafana-data`) → 4 дашборда в «Delivery» без ошибок, все панели с данными под нагрузкой
+- [x] Ручная: чистый `task compose-up` (или удаление volume `grafana-data`) → 4 дашборда в «Delivery» без ошибок, все панели с данными под нагрузкой
 
 **Dependencies:** Task 3
 
 **Files likely touched:**
 - `deploy/grafana/dashboards/services-overview.json`
-- `spec/SPEC-dashboards.md` (Success Criteria)
-- `spec/SPEC-observability-map.md` (статус)
+- `spec/observability/SPEC-dashboards.md` (Success Criteria)
+- `spec/observability/SPEC-observability-map.md` (статус)
 
 **Estimated scope:** S
 
 ## Checkpoint B: модуль готов
-- [ ] Все Success Criteria `SPEC-dashboards.md` отмечены
-- [ ] Чистый старт Grafana: 4 дашборда в папке «Delivery», provisioning без ошибок
-- [ ] Ревью с пользователем
+- [x] Все Success Criteria `SPEC-dashboards.md` отмечены
+- [x] Чистый старт Grafana: 4 дашборда в папке «Delivery», provisioning без ошибок
+- [x] Ревью с пользователем

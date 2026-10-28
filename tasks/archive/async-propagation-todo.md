@@ -1,6 +1,6 @@
 # Tasks: async-propagation
 
-> План: [plan.md](plan.md) · Спек: [SPEC-async-propagation.md](../spec/SPEC-async-propagation.md)
+> План: [plan.md](async-propagation-plan.md) · Спек: [SPEC-async-propagation.md](../../spec/observability/SPEC-async-propagation.md)
 
 E2E-запросы к ClickHouse: `docker exec clickhouse clickhouse-client -q "<SQL>"` или Grafana Explore → SQL Editor.
 Заголовки Kafka: Redpanda Console http://localhost:3000 → topic `order.events.v1` → Headers.
@@ -82,7 +82,7 @@ table-driven, без глобального пропагатора.
 **Dependencies:** Task 2
 
 **Files likely touched:**
-- `spec/SPEC-async-propagation.md`, `spec/SPEC-observability-map.md`, `TODO.md`
+- `spec/observability/SPEC-async-propagation.md`, `spec/observability/SPEC-observability-map.md`, `TODO.md`
 
 **Estimated scope:** XS
 
