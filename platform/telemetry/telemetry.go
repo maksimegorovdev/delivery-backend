@@ -5,6 +5,7 @@ package telemetry
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -113,18 +114,32 @@ func (t *Telemetry) LoggerProvider() log.LoggerProvider {
 	return t.loggerProvider
 }
 
+// shutdowner — общий метод закрытия провайдеров трейсов, метрик и логов.
+type shutdowner interface {
+	Shutdown(ctx context.Context) error
+}
+
 // Shutdown закрывает провайдеры, дослав накопленные данные до отмены ctx.
-// Ошибки закрытия отдельных провайдеров объединяются через [errors.Join].
+// Провайдеры закрываются параллельно: зависший экспорт одного сигнала не съедает
+// бюджет ctx остальных. Ошибки объединяются через [errors.Join].
 func (t *Telemetry) Shutdown(ctx context.Context) error {
-	var errs []error
+	var providers []shutdowner
 	if t.tracerProvider != nil {
-		errs = append(errs, t.tracerProvider.Shutdown(ctx))
+		providers = append(providers, t.tracerProvider)
 	}
 	if t.meterProvider != nil {
-		errs = append(errs, t.meterProvider.Shutdown(ctx))
+		providers = append(providers, t.meterProvider)
 	}
 	if t.loggerProvider != nil {
-		errs = append(errs, t.loggerProvider.Shutdown(ctx))
+		providers = append(providers, t.loggerProvider)
 	}
+
+	errs := make([]error, len(providers))
+	var wg sync.WaitGroup
+	for i, p := range providers {
+		wg.Go(func() { errs[i] = p.Shutdown(ctx) })
+	}
+	wg.Wait()
+
 	return errors.Join(errs...)
 }
