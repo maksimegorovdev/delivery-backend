@@ -3,6 +3,7 @@ package httpserver_test
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/http/httpserver"
+	"github.com/maksimegorovdev/delivery-backend/platform/internal/otelenv"
 )
 
 const (
@@ -36,6 +38,7 @@ var (
 // Глобальные провайдеры ставятся один раз: otelhttp берёт их при создании
 // хендлера через делегирующий глобальный провайдер.
 func TestMain(m *testing.M) {
+	otelenv.Unset()
 	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSyncer(spans)))
 	otel.SetMeterProvider(sdkmetric.NewMeterProvider(sdkmetric.WithReader(metrics)))
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
@@ -136,6 +139,8 @@ func TestServer_PublicEndpointDoesNotTrustIncomingContext(t *testing.T) {
 	// sampled=00: клиент пытается выключить трассировку своего запроса.
 	req.Header.Set("Traceparent", "00-"+incoming+"-"+parentSpanID+"-00")
 	req.Header.Set("Baggage", "tenant=forged")
+	req.Header.Set("Tracestate", "vendor=forged")
+	req.Header.Set("X-Forwarded-For", "203.0.113.7")
 	srv.Handler().ServeHTTP(httptest.NewRecorder(), req)
 
 	require.Zero(t, members, "baggage клиента не должен попадать в контекст")
@@ -152,6 +157,12 @@ func TestServer_PublicEndpointDoesNotTrustIncomingContext(t *testing.T) {
 	require.Len(t, got, 1, "новый корневой спан со ссылкой на входящий контекст")
 	require.False(t, got[0].Parent.IsValid())
 	require.Equal(t, parentSpanID, got[0].Links[0].SpanContext.SpanID().String())
+	require.Zero(t, got[0].Links[0].SpanContext.TraceState().Len(), "tracestate клиента не хранится")
+
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	require.NoError(t, err)
+	require.Contains(t, got[0].Attributes, attribute.String("client.address", host),
+		"client.address — адрес соединения, а не X-Forwarded-For")
 }
 
 func TestServer_MetricIgnoresHostHeader(t *testing.T) {

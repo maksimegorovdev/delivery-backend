@@ -70,13 +70,33 @@ func (s *Server) tracedHandler() http.Handler {
 			return !strings.HasPrefix(r.URL.Path, swaggerPrefix)
 		}),
 	}
-	if s.publicEndpoint {
-		opts = append(opts,
-			otelhttp.WithPublicEndpointFn(func(*http.Request) bool { return true }),
-			otelhttp.WithPropagators(propagation.TraceContext{}),
-		)
+	if !s.publicEndpoint {
+		return otelhttp.NewHandler(s.router, otelOperation, opts...)
 	}
-	return otelhttp.NewHandler(s.router, otelOperation, opts...)
+
+	opts = append(opts,
+		otelhttp.WithPublicEndpointFn(func(*http.Request) bool { return true }),
+		otelhttp.WithPropagators(propagation.TraceContext{}),
+	)
+	return dropUntrustedHeaders(otelhttp.NewHandler(s.router, otelOperation, opts...))
+}
+
+// untrustedHeaders — заголовки внешнего клиента, которые otelhttp перенёс бы в телеметрию:
+// X-Forwarded-For — в client.address (клиент подставляет чужой IP), tracestate — в link
+// корневого спана. Доверенного прокси перед сервером нет, поэтому client.address берётся
+// из адреса соединения; если прокси появится, X-Forwarded-For надо разбирать от него.
+//
+//nolint:gochecknoglobals // неизменяемый список заголовков
+var untrustedHeaders = []string{"X-Forwarded-For", "Tracestate"}
+
+// dropUntrustedHeaders удаляет untrustedHeaders из запроса до otelhttp.
+func dropUntrustedHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for _, h := range untrustedHeaders {
+			r.Header.Del(h)
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) Router() *chi.Mux {
