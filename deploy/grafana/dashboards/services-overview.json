@@ -1,0 +1,628 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Обзор сервисов Delivery по метрикам OTel: RED, Postgres, Kafka, Runtime.",
+  "editable": true,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "panels": [],
+      "title": "Сводка",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Серверная сторона по сервисам за выбранный диапазон: gateway — HTTP (ошибка = 5xx), order/user/product — gRPC (ошибка = статус != OK). p95 — по delta-гистограммам с линейной интерполяцией внутри бакета, точность — до бакета. Клик по сервису открывает Service Dashboard.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "service"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Service"
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Service Dashboard: ${__value.raw}",
+                    "url": "/d/otel-service-dashboard?var-service=${__value.raw}&${__url_time_range}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rps"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "RPS"
+              },
+              {
+                "id": "unit",
+                "value": "reqps"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "error_rate"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Error rate"
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.01
+                    },
+                    {
+                      "color": "red",
+                      "value": 0.05
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p95"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "p95"
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "title": "Сводка по сервисам (RED, server)",
+      "type": "table",
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "rawSql": "WITH h AS (\n  SELECT ServiceName, MetricName, any(ExplicitBounds) AS b, sumForEach(BucketCounts) AS c, sum(Count) AS reqs,\n         sumIf(Count, if(MetricName = 'http.server.request.duration', toUInt16OrZero(Attributes['http.response.status_code']) >= 500, Attributes['rpc.response.status_code'] != 'OK')) AS errs\n  FROM otel.otel_metrics_histogram\n  WHERE $__timeFilter(TimeUnix) AND MetricName IN ('http.server.request.duration', 'rpc.server.call.duration') AND ServiceName IN (${service:singlequote})\n  GROUP BY ServiceName, MetricName\n), q AS (\n  SELECT *, arrayCumSum(c) AS cum, arrayFirstIndex(x -> x >= 0.95 * reqs, cum) AS i FROM h WHERE reqs > 0\n)\nSELECT ServiceName AS service,\n       reqs / greatest(dateDiff('second', $__fromTime, $__toTime), 1) AS rps,\n       errs / reqs AS error_rate,\n       b[i - 1] + (if(i > length(b), b[length(b)], b[i]) - b[i - 1]) * (0.95 * reqs - cum[i - 1]) / c[i] AS p95\nFROM q\nORDER BY service",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 101,
+      "panels": [],
+      "title": "Gateway: HTTP server",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "http.server.request.duration: число запросов в секунду по http.route.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.route}",
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 9
+      },
+      "id": 2,
+      "title": "Gateway RPS по маршрутам",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, Attributes['http.route'] AS route, sum(Count) / $__interval_s AS rps\nFROM otel.otel_metrics_histogram\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'http.server.request.duration' AND ServiceName IN (${service:singlequote})\nGROUP BY time, route\nORDER BY time",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Доля ответов 5xx по http.route. 4xx ошибкой не считается.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.route}",
+          "unit": "percentunit",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.01
+              },
+              {
+                "color": "red",
+                "value": 0.05
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 9
+      },
+      "id": 3,
+      "title": "Gateway error rate (5xx)",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, Attributes['http.route'] AS route, sumIf(Count, toUInt16OrZero(Attributes['http.response.status_code']) >= 500) / sum(Count) AS error_rate\nFROM otel.otel_metrics_histogram\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'http.server.request.duration' AND ServiceName IN (${service:singlequote})\nGROUP BY time, route\nORDER BY time",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "p95 http.server.request.duration по бакетам гистограммы, с интерполяцией.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.route}",
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 9
+      },
+      "id": 4,
+      "title": "Gateway p95 по маршрутам",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "WITH h AS (\n  SELECT $__timeInterval(TimeUnix) AS time, Attributes['http.route'] AS route, any(ExplicitBounds) AS b, sumForEach(BucketCounts) AS c\n  FROM otel.otel_metrics_histogram\n  WHERE $__timeFilter(TimeUnix) AND MetricName = 'http.server.request.duration' AND ServiceName IN (${service:singlequote})\n  GROUP BY time, route\n), q AS (\n  SELECT *, arraySum(c) AS n, arrayCumSum(c) AS cum, arrayFirstIndex(x -> x >= 0.95 * n, cum) AS i FROM h WHERE n > 0\n)\nSELECT time, route, b[i - 1] + (if(i > length(b), b[length(b)], b[i]) - b[i - 1]) * (0.95 * n - cum[i - 1]) / c[i] AS p95\nFROM q\nORDER BY time",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "id": 102,
+      "panels": [],
+      "title": "gRPC server: order / user / product",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "rpc.server.call.duration: число вызовов в секунду по сервису и rpc.method.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.service} ${__field.labels.method}",
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 18
+      },
+      "id": 5,
+      "title": "gRPC RPS по методам",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS service, Attributes['rpc.method'] AS method, sum(Count) / $__interval_s AS rps\nFROM otel.otel_metrics_histogram\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'rpc.server.call.duration' AND ServiceName IN (${service:singlequote})\nGROUP BY time, service, method\nORDER BY time",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Доля вызовов с rpc.response.status_code != OK (например, NOT_FOUND).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.service} ${__field.labels.method}",
+          "unit": "percentunit",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.01
+              },
+              {
+                "color": "red",
+                "value": 0.05
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 18
+      },
+      "id": 6,
+      "title": "gRPC error rate",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS service, Attributes['rpc.method'] AS method, sumIf(Count, Attributes['rpc.response.status_code'] != 'OK') / sum(Count) AS error_rate\nFROM otel.otel_metrics_histogram\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'rpc.server.call.duration' AND ServiceName IN (${service:singlequote})\nGROUP BY time, service, method\nORDER BY time",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "p95 rpc.server.call.duration по бакетам гистограммы, с интерполяцией.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.service} ${__field.labels.method}",
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 18
+      },
+      "id": 7,
+      "title": "gRPC p95 по методам",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "WITH h AS (\n  SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS service, Attributes['rpc.method'] AS method, any(ExplicitBounds) AS b, sumForEach(BucketCounts) AS c\n  FROM otel.otel_metrics_histogram\n  WHERE $__timeFilter(TimeUnix) AND MetricName = 'rpc.server.call.duration' AND ServiceName IN (${service:singlequote})\n  GROUP BY time, service, method\n), q AS (\n  SELECT *, arraySum(c) AS n, arrayCumSum(c) AS cum, arrayFirstIndex(x -> x >= 0.95 * n, cum) AS i FROM h WHERE n > 0\n)\nSELECT time, service, method, b[i - 1] + (if(i > length(b), b[length(b)], b[i]) - b[i - 1]) * (0.95 * n - cum[i - 1]) / c[i] AS p95\nFROM q\nORDER BY time",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "delivery",
+    "otel"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "definition": "SELECT DISTINCT ServiceName FROM otel.otel_metrics_sum WHERE MetricName = 'go.goroutine.count' ORDER BY ServiceName",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Service",
+        "multi": true,
+        "name": "service",
+        "options": [],
+        "query": {
+          "editorType": "sql",
+          "rawSql": "SELECT DISTINCT ServiceName FROM otel.otel_metrics_sum WHERE MetricName = 'go.goroutine.count' ORDER BY ServiceName"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Delivery / Services Overview",
+  "uid": "delivery-services-overview",
+  "version": 1
+}
