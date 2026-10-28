@@ -235,7 +235,7 @@ MeterProvider запускает `runtime.Start(runtime.WithMeterProvider(mp))`.
 
 **Description:** Прогнать ~500 запросов на `POST /api/v1/orders` (успешные и ошибочные) через
 `ab -n 500 -c 10 -p body.json`, чтобы сгенерировать метрики. Это не нагрузочное тестирование:
-RPS и задержки не анализируются. По данным ClickHouse собрать `docs/observability/metrics.md`: имя,
+RPS и задержки не анализируются. По данным ClickHouse собрать `spec/observability/metrics-catalog.md`: имя,
 тип, единица, атрибуты, таблица, сервисы. Проверить кардинальность и temporality.
 
 **Acceptance criteria:**
@@ -244,12 +244,12 @@ RPS и задержки не анализируются. По данным Click
 - [x] `AggregationTemporality = 1` (delta) у histogram и monotonic sum (non-monotonic sum — cumulative, `2`)
 
 **Verification:**
-- [x] SQL из SPEC-metrics Commands; запросы и результаты — в `docs/observability/metrics.md`, раздел «Проверки»
+- [x] SQL из SPEC-metrics Commands; запросы и результаты — в `spec/observability/metrics-catalog.md`, раздел «Проверки»
 
 **Dependencies:** Task 3, Task 6, Task 7, Task 8
 
 **Files likely touched:**
-- `docs/observability/metrics.md`
+- `spec/observability/metrics-catalog.md`
 
 **Estimated scope:** S
 

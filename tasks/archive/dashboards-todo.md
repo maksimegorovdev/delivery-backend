@@ -4,7 +4,7 @@
 
 Grafana: http://localhost:3001/dashboards/f/delivery. SQL: `docker exec clickhouse clickhouse-client -q "<SQL>"`
 или Grafana Explore → SQL Editor. Нагрузка: `task watch-all`, затем `ab` на `POST /api/v1/orders`
-(успешный и с несуществующим продуктом → 404). Сценарий тот же, что в [metrics.md](../../docs/observability/metrics.md).
+(успешный и с несуществующим продуктом → 404). Сценарий тот же, что в [metrics-catalog.md](../../spec/observability/metrics-catalog.md).
 
 ## Task 1: Provisioning в папку «Delivery» + 3 дашборда плагина
 

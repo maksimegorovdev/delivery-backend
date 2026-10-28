@@ -2,7 +2,7 @@
 
 > Модуль карты [SPEC-observability-map.md](SPEC-observability-map.md). Зависит от `logs`, `tracing`, `metrics`.
 >
-> Уточнён 2026-10-28 по [docs/observability/metrics.md](../../docs/observability/metrics.md), данным в ClickHouse
+> Уточнён 2026-10-28 по [metrics-catalog.md](metrics-catalog.md), данным в ClickHouse
 > и содержимому плагина `grafana-clickhouse-datasource` 4.23.2 в контейнере Grafana.
 
 ## Objective

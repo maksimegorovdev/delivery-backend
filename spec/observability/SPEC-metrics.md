@@ -20,7 +20,7 @@
 6. Кардинальность: ни один атрибут метрик не содержит идентификаторов (user/order id, request_id, сырой URL).
    Итоговое число уникальных time series на сервис < 1000 при локальной нагрузке.
 7. Counter/histogram приходят в ClickHouse как **delta** (`AggregationTemporality = 1` в `otel_metrics_sum`/`otel_metrics_histogram`).
-8. Каталог метрик (имя, тип, единица, атрибуты, таблица ClickHouse) зафиксирован в `docs/observability/metrics.md` — это вход для `dashboards`.
+8. Каталог метрик (имя, тип, единица, атрибуты, таблица ClickHouse) зафиксирован в `spec/observability/metrics-catalog.md` — это вход для `dashboards`.
 
 ## Tech Stack
 
@@ -47,7 +47,7 @@ platform/telemetry/runtime.go             → запуск runtime-метрик 
 platform/http/middleware/route.go         → http.route в метрики через otelhttp.Labeler (общий с tracing)
 platform/postgres/postgres.go             → otelpgx.RecordStats(pool)
 platform/kafka/kafkaconsumer/             → kotel meter
-docs/observability/metrics.md             → каталог метрик
+spec/observability/metrics-catalog.md     → каталог метрик
 ```
 
 ## Code Style
@@ -83,7 +83,7 @@ if pattern := chi.RouteContext(r.Context()).RoutePattern(); pattern != "" {
 
 ## Boundaries
 
-- **Always:** сверять каталог `docs/observability/metrics.md` с реальными данными в ClickHouse; проверять кардинальность новых атрибутов.
+- **Always:** сверять каталог `spec/observability/metrics-catalog.md` с реальными данными в ClickHouse; проверять кардинальность новых атрибутов.
 - **Ask first:** бизнес-метрики; exemplars; добавление Prometheus-эндпоинта; изменение интервала экспорта < 10s.
 - **Never:** идентификаторы и сырые пути в атрибутах метрик.
 
@@ -95,7 +95,7 @@ if pattern := chi.RouteContext(r.Context()).RoutePattern(); pattern != "" {
 - [x] gRPC-метрики длительности для order/user/product (server) и gateway/order (client): `rpc.server.call.duration`, `rpc.client.call.duration`.
 - [x] Метрики пула pgx для order/user/product/notification (`pgxpool.*`, `db.client.operation.duration`).
 - [x] `AggregationTemporality` = delta для histogram/sum-counter (`1`; non-monotonic sum — cumulative `2`).
-- [x] `docs/observability/metrics.md` заполнен и соответствует ClickHouse (gauge 1, sum 26, histogram 6).
+- [x] `spec/observability/metrics-catalog.md` заполнен и соответствует ClickHouse (gauge 1, sum 26, histogram 6).
 
 ## Open Questions
 

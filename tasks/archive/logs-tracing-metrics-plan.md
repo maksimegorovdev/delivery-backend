@@ -91,7 +91,7 @@ Task 0: spike — совместимость версий contrib с otel v1.47 
 - [ ] Все 5 сервисов стартуют и завершаются в обоих режимах; остановка Collector их не роняет
 
 ### Phase 4: Каталог и закрытие
-- [ ] Task 9: Каталог метрик `docs/observability/metrics.md` + проверка кардинальности и temporality
+- [ ] Task 9: Каталог метрик `spec/observability/metrics-catalog.md` + проверка кардинальности и temporality
 - [ ] Task 10: Карта, TODO, Success Criteria трёх спеков
 
 ### Checkpoint D: модули завершены
