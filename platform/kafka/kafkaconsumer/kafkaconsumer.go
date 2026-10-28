@@ -9,6 +9,7 @@ import (
 
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/plugin/kotel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -16,6 +17,10 @@ import (
 const (
 	defaultMaxPollRecords = 100
 	defaultRetryBackoff   = time.Second
+	// handlerFailed — описание статуса спана process при ошибке хендлера.
+	handlerFailed = "handler failed"
+	// errorTypeKey — атрибут семконвенции OTel с типом ошибки.
+	errorTypeKey = "error.type"
 )
 
 type Handler interface {
@@ -156,10 +161,12 @@ func (c *Consumer) processRecord(ctx context.Context, record *kgo.Record, handle
 	_, span := c.tracer.WithProcessSpan(record)
 	defer span.End()
 
+	// Текст ошибки хендлера может нести данные из payload, поэтому в спан идут
+	// только тип ошибки и короткий статус; подробности остаются в логах.
 	err := handler.Handle(trace.ContextWithSpan(ctx, span), toMessage(record))
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetAttributes(attribute.String(errorTypeKey, fmt.Sprintf("%T", err)))
+		span.SetStatus(codes.Error, handlerFailed)
 	}
 
 	return err
