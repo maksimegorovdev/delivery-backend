@@ -72,7 +72,6 @@ deploy/grafana/dashboards/
   otel-traces-explorer.json      → из плагина 4.23.2 (uid otel-traces-explorer)
   otel-service-dashboard.json    → из плагина 4.23.2 (uid otel-service-dashboard)
   services-overview.json         → свой дашборд (uid delivery-services-overview)
-  README.md                      → откуда взяты JSON плагина, как обновлять, как экспортировать правки из UI
 deploy/grafana/provisioning/dashboards/dashboards.yaml → folder «Delivery», folderUid delivery, путь к JSON
 ```
 
@@ -124,7 +123,7 @@ FROM b
 
 ## Boundaries
 
-- **Always:** коммитить JSON после правок в UI; фиксировать версию плагина, из которой взяты готовые дашборды (README).
+- **Always:** коммитить JSON после правок в UI; фиксировать версию плагина, из которой взяты готовые дашборды (в спеке и в `GF_PLUGINS_PREINSTALL_SYNC`).
 - **Ask first:** алерты (вне скоупа итерации); materialized views/агрегирующие таблицы в ClickHouse для ускорения панелей;
   дашборды бизнес-метрик; правки JSON плагина сверх подстановки датасорса; изменение бакетов гистограмм в Go-коде.
 - **Never:** держать дашборды только в volume Grafana без файлов в репозитории.
