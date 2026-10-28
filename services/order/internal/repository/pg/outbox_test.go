@@ -36,8 +36,10 @@ func TestTraceContext(t *testing.T) {
 		}))
 	}
 
-	const wantTraceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
-	wantTracestate := "vendor=value"
+	const (
+		wantTraceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+		wantTracestate  = "vendor=value"
+	)
 
 	tests := []struct {
 		name            string
@@ -48,13 +50,13 @@ func TestTraceContext(t *testing.T) {
 		{
 			name:            "span с tracestate",
 			ctx:             withSpan(tracestate),
-			wantTraceparent: &[]string{wantTraceparent}[0],
-			wantTracestate:  &wantTracestate,
+			wantTraceparent: new(wantTraceparent),
+			wantTracestate:  new(wantTracestate),
 		},
 		{
 			name:            "span без tracestate",
 			ctx:             withSpan(trace.TraceState{}),
-			wantTraceparent: &[]string{wantTraceparent}[0],
+			wantTraceparent: new(wantTraceparent),
 		},
 		{
 			name: "без span",
@@ -77,12 +79,8 @@ func TestTraceContext(t *testing.T) {
 func assertOptString(t *testing.T, name string, got, want *string) {
 	t.Helper()
 
-	switch {
-	case got == nil && want == nil:
-	case got == nil || want == nil:
-		t.Errorf("%s = %v, want %v", name, deref(got), deref(want))
-	case *got != *want:
-		t.Errorf("%s = %q, want %q", name, *got, *want)
+	if deref(got) != deref(want) {
+		t.Errorf("%s = %q, want %q", name, deref(got), deref(want))
 	}
 }
 
