@@ -80,15 +80,15 @@ p95 считается через `sumForEach(BucketCounts)` + `arrayCumSum` с 
 сводки → `/d/otel-service-dashboard?var-service=${__value.raw}&${__url_time_range}`.
 
 **Acceptance criteria:**
-- [ ] Дашборд в папке `delivery`. Под нагрузкой RPS > 0, error rate > 0 при 404-нагрузке (gateway 5xx = 0, gRPC `NOT_FOUND` > 0)
-- [ ] p95 сводки для order/user/product не выше верхней границы бакета, содержащего `quantile(0.95)(Duration)` спанов `SpanKind='Server'`, за то же окно
+- [x] Дашборд в папке `delivery`. Под нагрузкой RPS > 0, error rate > 0 при 404-нагрузке (gateway 5xx = 0, gRPC `NOT_FOUND` > 0)
+- [x] p95 сводки для order/user/product не выше верхней границы бакета, содержащего `quantile(0.95)(Duration)` спанов `SpanKind='Server'`, за то же окно
 - [ ] Клик по сервису в сводке открывает Service Dashboard с этим `service` и текущим диапазоном времени
 
 **Verification:**
-- [ ] `curl -s 'localhost:3001/api/search?folderUIDs=delivery' | jq -r '.[].uid'` содержит `delivery-services-overview`
-- [ ] SQL: `SELECT MetricName, uniqExact(ExplicitBounds) FROM otel.otel_metrics_histogram GROUP BY 1` → у всех 1
-- [ ] Сверка: `SELECT ServiceName, quantile(0.95)(Duration)/1e9 FROM otel.otel_traces WHERE SpanKind='Server' AND $__timeFilter(Timestamp) GROUP BY 1` против панели
-- [ ] Все SQL используют `$__timeFilter`/`$__interval_s`, без захардкоженных интервалов (`grep -E "INTERVAL [0-9]" services-overview.json` → пусто)
+- [x] `curl -s 'localhost:3001/api/search?folderUIDs=delivery' | jq -r '.[].uid'` содержит `delivery-services-overview`
+- [x] SQL: `SELECT MetricName, uniqExact(ExplicitBounds) FROM otel.otel_metrics_histogram GROUP BY 1` → у всех 1
+- [x] Сверка: `SELECT ServiceName, quantile(0.95)(Duration)/1e9 FROM otel.otel_traces WHERE SpanKind='Server' AND $__timeFilter(Timestamp) GROUP BY 1` против панели
+- [x] Все SQL используют `$__timeFilter`/`$__interval_s`, без захардкоженных интервалов (`grep -E "INTERVAL [0-9]" services-overview.json` → пусто)
 
 **Dependencies:** Task 1
 
