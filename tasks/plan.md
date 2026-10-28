@@ -67,7 +67,7 @@ Tasks 4 и 5 не зависят друг от друга, но правят о�
 | Крупные бакеты `rpc.*` → p95 грубый | Low | Интерполяция внутри бакета. Критерий сверки — «в пределах бакета». Изменение бакетов в Go — вне скоупа (Ask first) |
 | `sumForEach` ломается при разных `ExplicitBounds` у одной метрики | Low | Группировка по `MetricName` (+ сервис). Бакеты одинаковы в рамках метрики. Проверка `uniqExact(ExplicitBounds)` в Task 3 |
 | Тяжёлые SQL на сыром `otel_metrics_*` | Low | Объём dev-данных мал. MV/агрегаты — Ask first |
-| Правки из UI теряются в volume `grafana-data` | Low | README: экспорт JSON → `jq .` → коммит |
+| Правки из UI теряются в volume `grafana-data` | Low | Export as JSON → `jq .` → коммит |
 
 ## Open Questions
 
