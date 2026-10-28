@@ -19,6 +19,8 @@ const (
 	defaultShutdownTimeout = 10 * time.Second
 	// defaultReadHeaderTimeout защищает от Slowloris-атак.
 	defaultReadHeaderTimeout = 10 * time.Second
+	// defaultMaxHeaderBytes ограничивает заголовки запроса: их значения попадают в спаны и логи.
+	defaultMaxHeaderBytes = 16 << 10
 	// swaggerPrefix — документация API, её запросы не трассируются.
 	swaggerPrefix = "/swagger/"
 	// otelOperation — имя оператора otelhttp; имя спана затем заменяется на «METHOD route».
@@ -48,6 +50,7 @@ func New(addr string, opts ...Option) *Server {
 	srv.server = &http.Server{
 		Handler:           srv.tracedHandler(),
 		ReadHeaderTimeout: defaultReadHeaderTimeout,
+		MaxHeaderBytes:    defaultMaxHeaderBytes,
 	}
 
 	return srv
@@ -55,8 +58,12 @@ func New(addr string, opts ...Option) *Server {
 
 // tracedHandler оборачивает роутер в otelhttp: server-спан и метрики на каждый запрос.
 // Шаблон маршрута в спан и метрики переносит middleware.Route.
+//
+// server.address и server.port берутся из адреса прослушивания: без WithServerName
+// otelhttp читает их из заголовка Host, и клиент плодит серии метрик.
 func (s *Server) tracedHandler() http.Handler {
 	return otelhttp.NewHandler(s.router, otelOperation,
+		otelhttp.WithServerName(s.addr),
 		otelhttp.WithFilter(func(r *http.Request) bool {
 			return !strings.HasPrefix(r.URL.Path, swaggerPrefix)
 		}),
