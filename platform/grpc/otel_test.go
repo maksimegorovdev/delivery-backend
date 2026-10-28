@@ -2,9 +2,11 @@ package grpc_test
 
 import (
 	"context"
+	"io"
 	"net"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
@@ -33,6 +35,8 @@ const (
 	callNotFound   = "/test.Echo/NotFound"
 	bufferSize     = 1 << 20
 	serverDuration = "rpc.server.call.duration"
+	spanWait       = 5 * time.Second
+	spanPoll       = 5 * time.Millisecond
 )
 
 //nolint:gochecknoglobals // глобальные провайдеры OTel ставятся один раз в TestMain
@@ -120,9 +124,15 @@ func spansOfKind(traceID trace.TraceID, kind trace.SpanKind) []tracetest.SpanStu
 	return out
 }
 
+// singleSpan ждёт ровно один спан вида kind. Ожидание нужно для серверных спанов:
+// grpc-go закрывает их в defer уже после отправки ответа, и клиент возвращается раньше.
 func singleSpan(t *testing.T, traceID trace.TraceID, kind trace.SpanKind) tracetest.SpanStub {
 	t.Helper()
-	found := spansOfKind(traceID, kind)
+	var found []tracetest.SpanStub
+	require.Eventually(t, func() bool {
+		found = spansOfKind(traceID, kind)
+		return len(found) >= 1
+	}, spanWait, spanPoll, "spans of kind %s", kind)
 	require.Len(t, found, 1, "spans of kind %s", kind)
 	return found[0]
 }
@@ -153,9 +163,16 @@ func TestReflectionCallCreatesNoSpans(t *testing.T) {
 	_, err = stream.Recv()
 	require.NoError(t, err)
 	require.NoError(t, stream.CloseSend())
+	_, err = stream.Recv()
+	require.ErrorIs(t, err, io.EOF)
+
+	// Контрольный вызов в том же трейсе: когда его серверный спан выгружен, спан
+	// reflection-стрима, будь он, тоже уже закрыт — пустота проверяется не «рано».
+	require.NoError(t, call(ctx, conn, callOK))
+	server := singleSpan(t, traceID, trace.SpanKindServer)
 
 	// Серверный фильтр режет reflection, клиент трассируется как есть, поэтому проверяем сервер.
-	require.Empty(t, spansOfKind(traceID, trace.SpanKindServer))
+	require.Equal(t, "test.Echo/OK", server.Name)
 }
 
 func TestServerSpanStatus(t *testing.T) {
@@ -187,8 +204,25 @@ func TestServerRecordsRPCDurationMetric(t *testing.T) {
 
 	require.NoError(t, call(context.Background(), conn, callOK))
 
+	// Метрика пишется вместе с серверным спаном, после отправки ответа.
+	var attrs map[string]string
+	require.Eventually(t, func() bool {
+		attrs = okDurationAttrs()
+		return len(attrs) > 0
+	}, spanWait, spanPoll)
+
+	// otelgrpc v0.72 пишет семконвенцию rpc.*: сервис входит в rpc.method.
+	require.Equal(t, "test.Echo/OK", attrs["rpc.method"])
+	require.Equal(t, "OK", attrs["rpc.response.status_code"])
+}
+
+// okDurationAttrs собирает атрибуты точек rpc.server.call.duration вызова test.Echo/OK.
+// Вызывается из условия require.Eventually в чужой горутине, поэтому без require.
+func okDurationAttrs() map[string]string {
 	var rm metricdata.ResourceMetrics
-	require.NoError(t, metrics.Collect(context.Background(), &rm))
+	if err := metrics.Collect(context.Background(), &rm); err != nil {
+		return nil
+	}
 
 	attrs := map[string]string{}
 	for _, sm := range rm.ScopeMetrics {
@@ -208,7 +242,5 @@ func TestServerRecordsRPCDurationMetric(t *testing.T) {
 			}
 		}
 	}
-	// otelgrpc v0.72 пишет семконвенцию rpc.*: сервис входит в rpc.method.
-	require.Equal(t, "test.Echo/OK", attrs["rpc.method"])
-	require.Equal(t, "OK", attrs["rpc.response.status_code"])
+	return attrs
 }
