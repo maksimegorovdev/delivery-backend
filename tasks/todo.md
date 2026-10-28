@@ -17,14 +17,14 @@ Grafana: http://localhost:3001/dashboards/f/delivery. SQL: `docker exec clickhou
 
 **Acceptance criteria:**
 - [x] После `docker compose restart grafana` в папке `delivery` есть `otel-logs-explorer`, `otel-traces-explorer`, `otel-service-dashboard`, в логах Grafana нет ошибок provisioning
-- [ ] Каждый дашборд открывается с датасорсом ClickHouse без выбора вручную. Панели показывают данные (логи, service map, RED по спанам для `order`)
+- [x] Каждый дашборд открывается с датасорсом ClickHouse без выбора вручную. Панели показывают данные (логи, service map, RED по спанам для `order`)
 - [x] Diff JSON с оригиналом плагина — только подстановка датасорса и удаление `__inputs`
 
 **Verification:**
 - [x] `curl -s 'localhost:3001/api/search?folderUIDs=delivery' | jq -r '.[].uid'` → три uid
 - [x] `docker logs grafana 2>&1 | grep -iE 'provisioning.*(error|fail)'` → пусто
 - [x] `diff <(jq -S 'del(.__inputs)' orig.json | sed 's/${DS_GRAFANA_CLICKHOUSE_DATASOURCE}/clickhouse/g') <(jq -S . ours.json)` → пусто
-- [ ] Ручная: Service Dashboard → `service=order` → ссылка «View traces for …» ведёт в Traces Explorer
+- [x] Ручная: Service Dashboard → `service=order` → ссылка «View traces for …» ведёт в Traces Explorer
 
 **Dependencies:** None
 
@@ -45,14 +45,14 @@ Explore → Logs) открывается трейс. Из трейса (Explore 
 не трогать. Если штатно не получается — остановиться и предложить пользователю варианты.
 
 **Acceptance criteria:**
-- [ ] Клик по `TraceId` в записи лога `order` открывает трейс с теми же `TraceId`, спаны gateway → order → user/product видны
-- [ ] Из трейса открываются логи с этим `TraceId` (минимум записи `gateway` и `order`)
-- [ ] JSON плагина не изменён. Если менялся `clickhouse.yaml`, причина записана в README
+- [x] Клик по `TraceId` в записи лога `order` открывает трейс с теми же `TraceId`, спаны gateway → order → user/product видны
+- [x] Из трейса открываются логи с этим `TraceId` (минимум записи `gateway` и `order`)
+- [x] JSON плагина не изменён. Если менялся `clickhouse.yaml`, причина записана в README
 
 **Verification:**
-- [ ] Ручная: Logs Explorer → `service=order` → раскрыть запись → ссылка на трейс
-- [ ] Ручная: в трейсе — кнопка или ссылка на логи. Сверка `TraceId` SQL-запросом `SELECT ServiceName, Body FROM otel.otel_logs WHERE TraceId = '<id>'`
-- [ ] Повторить после `docker compose restart grafana` (конфиг из provisioning, а не из UI)
+- [x] Ручная: Logs Explorer → `service=order` → раскрыть запись → ссылка на трейс
+- [x] Ручная: в трейсе — кнопка или ссылка на логи. Сверка `TraceId` SQL-запросом `SELECT ServiceName, Body FROM otel.otel_logs WHERE TraceId = '<id>'`
+- [x] Повторить после `docker compose restart grafana` (конфиг из provisioning, а не из UI)
 
 **Dependencies:** Task 1
 
@@ -63,8 +63,8 @@ Explore → Logs) открывается трейс. Из трейса (Explore 
 **Estimated scope:** S
 
 ## Checkpoint A: готовые дашборды и переходы
-- [ ] 3 дашборда в папке «Delivery», provisioning без ошибок
-- [ ] Переходы лог ↔ трейс работают после рестарта Grafana
+- [x] 3 дашборда в папке «Delivery», provisioning без ошибок
+- [x] Переходы лог ↔ трейс работают после рестарта Grafana
 - [ ] Ревью с пользователем
 
 ## Task 3: Services Overview — RED-сводка, p95 по бакетам, data link
