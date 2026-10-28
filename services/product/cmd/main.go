@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -19,35 +17,41 @@ import (
 const shutdownTimeout = 10 * time.Second
 
 func main() {
-	if err := run(); err != nil {
-		//nolint:sloglint // логгер сервиса недоступен за пределами run, поэтому используется slog по умолчанию
-		slog.Error(
-			"service stopped with error",
-			logger.Err(err),
-		)
-		os.Exit(1)
-	}
+	os.Exit(run())
 }
 
-func run() (err error) {
+// run запускает сервис и возвращает код выхода. Ошибки логируются здесь, а не в main:
+// ошибка Run пишется до Close, пока LoggerProvider открыт, иначе она не дошла бы до OTel.
+// Логгер сервиса снаружи App недоступен, поэтому используется slog по умолчанию:
+// app.New делает логгер сервиса логгером по умолчанию.
+//
+//nolint:sloglint // см. комментарий выше
+func run() int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	a, err := app.New(ctx)
 	if err != nil {
-		return fmt.Errorf("app init: %w", err)
+		// Телеметрия при ошибке New уже откатилась: запись уходит только в stdout.
+		slog.ErrorContext(ctx, "service init failed", logger.Err(err))
+		return 1
 	}
-	defer func() {
-		// ctx к этому моменту уже отменён сигналом, поэтому Close получает его копию без отмены.
-		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
-		defer cancel()
 
-		err = errors.Join(err, a.Close(closeCtx))
-	}()
-
+	code := 0
 	if err = a.Run(ctx); err != nil {
-		return fmt.Errorf("app run: %w", err)
+		slog.ErrorContext(ctx, "service stopped with error", logger.Err(err))
+		code = 1
 	}
 
-	return nil
+	// ctx к этому моменту уже отменён сигналом, поэтому Close получает его копию без отмены.
+	closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
+	defer cancel()
+
+	if err = a.Close(closeCtx); err != nil {
+		// LoggerProvider уже закрыт: запись уходит только в stdout.
+		slog.ErrorContext(closeCtx, "service close failed", logger.Err(err))
+		code = 1
+	}
+
+	return code
 }
