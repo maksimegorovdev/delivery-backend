@@ -105,12 +105,12 @@ p95 считается через `sumForEach(BucketCounts)` + `arrayCumSum` с 
 - ожидание acquire: delta `pgxpool.acquire_duration` и `pgxpool.empty_acquire_wait_time` (ns → s), делённые на число acquire за окно, плюс `pgxpool.empty_acquire`/s.
 
 **Acceptance criteria:**
-- [ ] Под нагрузкой все панели строки показывают данные для 4 сервисов с БД. У gateway панели пустые, без ошибок
-- [ ] Утилизация пула в диапазоне 0..1 (или 0..100 %). Значение совпадает с ручным SQL `argMax` за последнюю минуту
-- [ ] Cumulative-метрики не суммируются по времени: график acquired не растёт монотонно при стабильной нагрузке
+- [x] Под нагрузкой все панели строки показывают данные для 4 сервисов с БД. У gateway панели пустые, без ошибок
+- [x] Утилизация пула в диапазоне 0..1 (или 0..100 %). Значение совпадает с ручным SQL `argMax` за последнюю минуту
+- [x] Cumulative-метрики не суммируются по времени: график acquired не растёт монотонно при стабильной нагрузке
 
 **Verification:**
-- [ ] SQL-сверка: `SELECT ServiceName, argMax(Value, TimeUnix) FROM otel.otel_metrics_sum WHERE MetricName='pgxpool.acquired_connections' AND TimeUnix > now() - INTERVAL 1 MINUTE GROUP BY 1`
+- [x] SQL-сверка: `SELECT ServiceName, argMax(Value, TimeUnix) FROM otel.otel_metrics_sum WHERE MetricName='pgxpool.acquired_connections' AND TimeUnix > now() - INTERVAL 1 MINUTE GROUP BY 1`
 - [ ] Ручная: просмотр строки за 15 мин под нагрузкой и без неё
 
 **Dependencies:** Task 3
