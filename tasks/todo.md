@@ -212,12 +212,12 @@ v0.72.0, `otelpgx` v0.13.0, `kotel` v1.7.1 в `platform`. Посмотреть, 
 MeterProvider запускает `runtime.Start(runtime.WithMeterProvider(mp))`. При `Enabled=false` ничего не делает.
 
 **Acceptance criteria:**
-- [ ] ManualReader: при `Enabled=true` есть goroutines/heap/GC-метрики, при `false` runtime не стартует
-- [ ] Покрытие `platform/telemetry` остаётся ≥ 80%
-- [ ] E2E: `SELECT DISTINCT ServiceName FROM otel.otel_metrics_gauge` (или `_sum`) с runtime-метриками — все 5 сервисов
+- [x] ManualReader: при `Enabled=true` есть goroutines/heap/GC-метрики (`go.goroutine.count`, `go.memory.used`, `go.memory.gc.goal`), при `false` MeterProvider и runtime не создаются
+- [x] Покрытие `platform/telemetry` остаётся ≥ 80% (90.1%)
+- [x] E2E: runtime-метрики `go.*` (в `otel_metrics_sum`, не в `gauge`: 7 метрик, goroutine.count/memory.used и др.) — все 5 сервисов
 
 **Verification:**
-- [ ] `task -d platform test`, `cd platform && go test -cover ./telemetry/...`, `task -d platform lint`
+- [x] `task -d platform test`, `cd platform && go test -cover ./telemetry/...`, `task -d platform lint`
 
 **Dependencies:** Task 0
 

@@ -85,6 +85,9 @@ func build(ctx context.Context, cfg Config, f factories) (*Telemetry, error) {
 	if t.meterProvider, err = f.meter(ctx, cfg, res); err != nil {
 		return nil, rollback(err)
 	}
+	if err = startRuntimeMetrics(t.meterProvider); err != nil {
+		return nil, rollback(err)
+	}
 	if t.loggerProvider, err = f.logger(ctx, cfg, res); err != nil {
 		return nil, rollback(err)
 	}
