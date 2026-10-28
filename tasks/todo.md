@@ -127,12 +127,12 @@ p95 считается через `sumForEach(BucketCounts)` + `arrayCumSum` с 
 - Строка Runtime (все сервисы из `service`): `go.goroutine.count` (argMax); `go.memory.used` по `go.memory.type` (stack/other) вместе с `go.memory.gc.goal` (argMax); скорость аллокаций `go.memory.allocated` (delta, By/s).
 
 **Acceptance criteria:**
-- [ ] После создания заказов records/s по `order.events.v1` > 0. Read errors отображаются (0 — валидное значение, не «No data»)
-- [ ] Runtime-панели показывают все 5 сервисов. Значения goroutines и heap совпадают с ручным `argMax` SQL
+- [x] После создания заказов records/s по `order.events.v1` > 0. Read errors отображаются (0 — валидное значение, не «No data»)
+- [x] Runtime-панели показывают все 5 сервисов. Значения goroutines и heap совпадают с ручным `argMax` SQL
 - [ ] Success Criteria спека закрыты, в карте `dashboards` → `done`
 
 **Verification:**
-- [ ] SQL-сверка: `SELECT ServiceName, argMax(Value, TimeUnix) FROM otel.otel_metrics_sum WHERE MetricName='go.goroutine.count' GROUP BY 1`
+- [x] SQL-сверка: `SELECT ServiceName, argMax(Value, TimeUnix) FROM otel.otel_metrics_sum WHERE MetricName='go.goroutine.count' GROUP BY 1`
 - [ ] Ручная: чистый `task compose-up` (или удаление volume `grafana-data`) → 4 дашборда в «Delivery» без ошибок, все панели с данными под нагрузкой
 
 **Dependencies:** Task 3
