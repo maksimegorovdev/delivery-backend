@@ -574,6 +574,262 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "id": 103,
+      "panels": [],
+      "title": "Postgres (pgxpool)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "db.client.operation.duration: p95 по pgx.operation.type, с интерполяцией внутри бакета. Только сервисы с БД.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 27
+      },
+      "id": 8,
+      "title": "Postgres p95 по операциям",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "WITH h AS (\n  SELECT $__timeInterval(TimeUnix) AS time, concat(ServiceName, ' · ', Attributes['pgx.operation.type']) AS series, any(ExplicitBounds) AS b, sumForEach(BucketCounts) AS c\n  FROM otel.otel_metrics_histogram\n  WHERE $__timeFilter(TimeUnix) AND MetricName = 'db.client.operation.duration' AND ServiceName IN (${service:singlequote})\n  GROUP BY time, series\n), q AS (\n  SELECT *, arraySum(c) AS n, arrayCumSum(c) AS cum, arrayFirstIndex(x -> x >= 0.95 * n, cum) AS i FROM h WHERE n > 0\n)\nSELECT time, series, b[i - 1] + (if(i > length(b), b[length(b)], b[i]) - b[i - 1]) * (0.95 * n - cum[i - 1]) / c[i] AS p95\nFROM q\nORDER BY time",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "pgxpool.acquired_connections / pgxpool.max_connections (argMax за интервал). Оба значения — текущее состояние, не накапливаются.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 27
+      },
+      "id": 9,
+      "title": "Утилизация пула",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, concat(ServiceName, ' · ', Attributes['db.client.connection.pool.name']) AS series,\n  argMaxIf(Value, TimeUnix, MetricName = 'pgxpool.acquired_connections') / nullIf(argMaxIf(Value, TimeUnix, MetricName = 'pgxpool.max_connections'), 0) AS utilization\nFROM (\n  SELECT ServiceName, MetricName, Attributes, TimeUnix, Value FROM otel.otel_metrics_sum WHERE MetricName = 'pgxpool.acquired_connections'\n  UNION ALL\n  SELECT ServiceName, MetricName, Attributes, TimeUnix, Value FROM otel.otel_metrics_gauge WHERE MetricName = 'pgxpool.max_connections'\n)\nWHERE $__timeFilter(TimeUnix) AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Delta pgxpool.acquire_duration (A) и pgxpool.empty_acquire_wait_time (B), делённые на число acquire за интервал, в секундах.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 27
+      },
+      "id": 10,
+      "title": "Ожидание acquire",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS series,\n  sumIf(Value, MetricName = 'pgxpool.acquire_duration') / 1e9 / nullIf(sumIf(Value, MetricName = 'pgxpool.acquires'), 0) AS wait\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName IN ('pgxpool.acquire_duration', 'pgxpool.acquires') AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nHAVING sumIf(Value, MetricName = 'pgxpool.acquires') > 0\nORDER BY time",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS series,\n  sumIf(Value, MetricName = 'pgxpool.empty_acquire_wait_time') / 1e9 / nullIf(sumIf(Value, MetricName = 'pgxpool.acquires'), 0) AS wait\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName IN ('pgxpool.empty_acquire_wait_time', 'pgxpool.acquires') AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nHAVING sumIf(Value, MetricName = 'pgxpool.acquires') > 0\nORDER BY time",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "pgxpool.empty_acquire в секунду: захваты, когда в пуле не было свободного соединения.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 35
+      },
+      "id": 11,
+      "title": "Empty acquire /s",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS series, sum(Value) / $__interval_s AS rate\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'pgxpool.empty_acquire' AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        }
+      ]
     }
   ],
   "refresh": "30s",
