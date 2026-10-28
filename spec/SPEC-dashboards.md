@@ -24,9 +24,14 @@
    их собственные data links).
 2. **Свой дашборд «Delivery / Services Overview»** (`delivery-services-overview`) на метриках (`otel_metrics_*`).
    Он даёт то, чего нет в Service Dashboard плагина: обзор всех сервисов сразу и метрики, которых нет в спанах.
-   - **RED-сводка (HTTP + gRPC server):** по сервису — RPS, error rate, p95.
-     - gateway: `http.server.request.duration`, ошибка — `http.response.status_code >= 500`; разбивка по `http.route`;
-     - order/user/product: `rpc.server.call.duration`, ошибка — `rpc.response.status_code != 'OK'`; разбивка по `rpc.method`.
+   - **RED-сводка (HTTP + gRPC server):** по сервису — RPS, error rate, client errors, p95.
+     - gateway: `http.server.request.duration`, ошибка — `http.response.status_code >= 500`, клиентская — `4xx`;
+       разбивка по `http.route`;
+     - order/user/product: `rpc.server.call.duration`, ошибка — серверные коды по semconv (`UNKNOWN`, `DEADLINE_EXCEEDED`,
+       `UNIMPLEMENTED`, `INTERNAL`, `UNAVAILABLE`, `DATA_LOSS`), клиентская — остальные коды кроме `OK`
+       (`NOT_FOUND`, `INVALID_ARGUMENT`, …); разбивка по `rpc.method`.
+     - Error rate = сбои сервиса; так же `otelgrpc` ставит статус `Error` серверному спану, поэтому значения совпадают
+       с Service Dashboard плагина. Клиентские ошибки — отдельный столбец сводки, в error rate не входят.
      - Data link с панелей сводки → `/d/otel-service-dashboard?var-service=<сервис>` с текущим диапазоном времени.
    - **Postgres** (order/user/product/notification): p95 `db.client.operation.duration` по `pgx.operation.type`;
      утилизация пула `pgxpool.acquired_connections / pgxpool.max_connections`; время ожидания acquire
@@ -79,6 +84,8 @@ deploy/grafana/provisioning/dashboards/dashboards.yaml → folder «Delivery», 
 
 - JSON дашбордов форматируется (2 пробела, `jq .`), uid дашбордов и датасорса фиксированы (`delivery-services-overview`, `clickhouse`).
 - SQL панелей — через макросы плагина (`$__timeFilter`, `$__timeInterval`, `$__interval_s`), без захардкоженных интервалов.
+- У timeseries-панелей `interval: "10s"` (min interval) = период экспорта метрик (`defaultMetricInterval`). Без него
+  `$__interval` меньше периода экспорта, и `sum(...) / $__interval_s` завышает скорость в разы (пустые бакеты чередуются с двойными).
 - Переменные Services Overview: `service` (multi, из `otel_metrics_sum`, `go.goroutine.count`), фильтр `ServiceName IN (${service:singlequote})`.
 
 Пример панели RPS:
@@ -140,7 +147,11 @@ FROM b
 
 - Бакеты гистограмм крупные (`rpc.*`: `[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, …]`), p95 точен до бакета. Точнее — только
   через View с `ExplicitBounds` в Go-коде (вне скоупа).
+- Если p95 попадает в overflow-бакет (выше последней границы), панель показывает последнюю границу, а не реальный хвост.
 - Метрики GC pause в рантайм-инструментации нет.
+- При смене `OTEL_METRIC_EXPORT_INTERVAL` нужно поменять `interval` у timeseries-панелей Services Overview.
+- `argMax` по cumulative-метрикам (пул, goroutines, память) берёт одну точку на группу: при нескольких репликах
+  сервиса видна одна из них. Для нескольких реплик нужна группировка по `service.instance.id`.
 
 ## Решённые вопросы
 

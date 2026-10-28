@@ -14,6 +14,8 @@ Grafana: http://localhost:3001/dashboards/f/delivery. SQL: `docker exec clickhou
 `${DS_GRAFANA_CLICKHOUSE_DATASOURCE}` на `clickhouse` (включая `current` переменной `datasource`), удалить `__inputs`,
 отформатировать `jq .`. Удалить `.gitkeep`. Написать `deploy/grafana/dashboards/README.md`: версия плагина,
 команда копирования и подстановки, порядок экспорта правок из UI.
+README позже удалён (0074106): версия плагина, подстановка датасорса и экспорт правок из UI описаны в
+[SPEC-dashboards.md](../spec/SPEC-dashboards.md) (AC1, AC4).
 
 **Acceptance criteria:**
 - [x] После `docker compose restart grafana` в папке `delivery` есть `otel-logs-explorer`, `otel-traces-explorer`, `otel-service-dashboard`, в логах Grafana нет ошибок provisioning
@@ -47,7 +49,7 @@ Explore → Logs) открывается трейс. Из трейса (Explore 
 **Acceptance criteria:**
 - [x] Клик по `TraceId` в записи лога `order` открывает трейс с теми же `TraceId`, спаны gateway → order → user/product видны
 - [x] Из трейса открываются логи с этим `TraceId` (минимум записи `gateway` и `order`)
-- [x] JSON плагина не изменён. Если менялся `clickhouse.yaml`, причина записана в README
+- [x] JSON плагина не изменён. `clickhouse.yaml` не менялся
 
 **Verification:**
 - [x] Ручная: Logs Explorer → `service=order` → раскрыть запись → ссылка на трейс
@@ -73,14 +75,15 @@ Explore → Logs) открывается трейс. Из трейса (Explore 
 датасорс `clickhouse`). Переменная `service`: multi, include All, источник — `go.goroutine.count` в `otel_metrics_sum`.
 Строка RED:
 - gateway — RPS, error rate (5xx), p95 по `http.route` из `http.server.request.duration`;
-- order/user/product — RPS, error rate (`rpc.response.status_code != 'OK'`), p95 по `rpc.method` из `rpc.server.call.duration`;
-- таблица-сводка по сервисам: RPS, error %, p95.
+- order/user/product — RPS, error rate (серверные коды по semconv: `UNKNOWN`, `DEADLINE_EXCEEDED`, `UNIMPLEMENTED`,
+  `INTERNAL`, `UNAVAILABLE`, `DATA_LOSS`), p95 по `rpc.method` из `rpc.server.call.duration`;
+- таблица-сводка по сервисам: RPS, error %, client errors % (HTTP 4xx, gRPC — остальные коды кроме `OK`), p95.
 
 p95 считается через `sumForEach(BucketCounts)` + `arrayCumSum` с линейной интерполяцией в бакете. Data link с сервиса
 сводки → `/d/otel-service-dashboard?var-service=${__value.raw}&${__url_time_range}`.
 
 **Acceptance criteria:**
-- [x] Дашборд в папке `delivery`. Под нагрузкой RPS > 0, error rate > 0 при 404-нагрузке (gateway 5xx = 0, gRPC `NOT_FOUND` > 0)
+- [x] Дашборд в папке `delivery`. Под нагрузкой RPS > 0. При 404-нагрузке error rate = 0, client errors > 0 и совпадают у gateway (404) и order (`NOT_FOUND`)
 - [x] p95 сводки для order/user/product не выше верхней границы бакета, содержащего `quantile(0.95)(Duration)` спанов `SpanKind='Server'`, за то же окно
 - [ ] Клик по сервису в сводке открывает Service Dashboard с этим `service` и текущим диапазоном времени
 

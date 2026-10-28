@@ -51,7 +51,7 @@
                 "value": [
                   {
                     "title": "Service Dashboard: ${__value.raw}",
-                    "url": "/d/otel-service-dashboard?var-service=${__value.raw}&${__url_time_range}"
+                    "url": "/d/otel-service-dashboard?var-service=${__value.raw:percentencode}&${__url_time_range}"
                   }
                 ]
               }
@@ -126,6 +126,26 @@
           {
             "matcher": {
               "id": "byName",
+              "options": "client_error_rate"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Client errors"
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
               "options": "p95"
             },
             "properties": [
@@ -166,7 +186,7 @@
           },
           "editorType": "sql",
           "format": 1,
-          "rawSql": "WITH h AS (\n  SELECT ServiceName, MetricName, any(ExplicitBounds) AS b, sumForEach(BucketCounts) AS c, sum(Count) AS reqs,\n         sumIf(Count, if(MetricName = 'http.server.request.duration', toUInt16OrZero(Attributes['http.response.status_code']) >= 500, Attributes['rpc.response.status_code'] != 'OK')) AS errs\n  FROM otel.otel_metrics_histogram\n  WHERE $__timeFilter(TimeUnix) AND MetricName IN ('http.server.request.duration', 'rpc.server.call.duration') AND ServiceName IN (${service:singlequote})\n  GROUP BY ServiceName, MetricName\n), q AS (\n  SELECT *, arrayCumSum(c) AS cum, arrayFirstIndex(x -> x >= 0.95 * reqs, cum) AS i FROM h WHERE reqs > 0\n)\nSELECT ServiceName AS service,\n       reqs / greatest(dateDiff('second', $__fromTime, $__toTime), 1) AS rps,\n       errs / reqs AS error_rate,\n       b[i - 1] + (if(i > length(b), b[length(b)], b[i]) - b[i - 1]) * (0.95 * reqs - cum[i - 1]) / c[i] AS p95\nFROM q\nORDER BY service",
+          "rawSql": "WITH h AS (\n  SELECT ServiceName, MetricName, any(ExplicitBounds) AS b, sumForEach(BucketCounts) AS c, sum(Count) AS reqs,\n         sumIf(Count, if(MetricName = 'http.server.request.duration', toUInt16OrZero(Attributes['http.response.status_code']) >= 500, Attributes['rpc.response.status_code'] IN ('UNKNOWN', 'DEADLINE_EXCEEDED', 'UNIMPLEMENTED', 'INTERNAL', 'UNAVAILABLE', 'DATA_LOSS'))) AS errs,\n         sumIf(Count, if(MetricName = 'http.server.request.duration', toUInt16OrZero(Attributes['http.response.status_code']) BETWEEN 400 AND 499, Attributes['rpc.response.status_code'] NOT IN ('', 'OK', 'UNKNOWN', 'DEADLINE_EXCEEDED', 'UNIMPLEMENTED', 'INTERNAL', 'UNAVAILABLE', 'DATA_LOSS'))) AS client_errs\n  FROM otel.otel_metrics_histogram\n  WHERE $__timeFilter(TimeUnix) AND MetricName IN ('http.server.request.duration', 'rpc.server.call.duration') AND ServiceName IN (${service:singlequote})\n  GROUP BY ServiceName, MetricName\n), q AS (\n  SELECT *, arrayCumSum(c) AS cum, arrayFirstIndex(x -> x >= 0.95 * reqs, cum) AS i FROM h WHERE reqs > 0\n)\nSELECT ServiceName AS service,\n       reqs / greatest(dateDiff('second', $__fromTime, $__toTime), 1) AS rps,\n       errs / reqs AS error_rate,\n       client_errs / reqs AS client_error_rate,\n       b[i - 1] + (if(i > length(b), b[length(b)], b[i]) - b[i - 1]) * (0.95 * reqs - cum[i - 1]) / c[i] AS p95\nFROM q\nORDER BY service",
           "refId": "A"
         }
       ]
@@ -239,7 +259,8 @@
           "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, Attributes['http.route'] AS route, sum(Count) / $__interval_s AS rps\nFROM otel.otel_metrics_histogram\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'http.server.request.duration' AND ServiceName IN (${service:singlequote})\nGROUP BY time, route\nORDER BY time",
           "refId": "A"
         }
-      ]
+      ],
+      "interval": "10s"
     },
     {
       "datasource": {
@@ -314,7 +335,8 @@
           "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, Attributes['http.route'] AS route, sumIf(Count, toUInt16OrZero(Attributes['http.response.status_code']) >= 500) / sum(Count) AS error_rate\nFROM otel.otel_metrics_histogram\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'http.server.request.duration' AND ServiceName IN (${service:singlequote})\nGROUP BY time, route\nORDER BY time",
           "refId": "A"
         }
-      ]
+      ],
+      "interval": "10s"
     },
     {
       "datasource": {
@@ -371,7 +393,8 @@
           "rawSql": "WITH h AS (\n  SELECT $__timeInterval(TimeUnix) AS time, Attributes['http.route'] AS route, any(ExplicitBounds) AS b, sumForEach(BucketCounts) AS c\n  FROM otel.otel_metrics_histogram\n  WHERE $__timeFilter(TimeUnix) AND MetricName = 'http.server.request.duration' AND ServiceName IN (${service:singlequote})\n  GROUP BY time, route\n), q AS (\n  SELECT *, arraySum(c) AS n, arrayCumSum(c) AS cum, arrayFirstIndex(x -> x >= 0.95 * n, cum) AS i FROM h WHERE n > 0\n)\nSELECT time, route, b[i - 1] + (if(i > length(b), b[length(b)], b[i]) - b[i - 1]) * (0.95 * n - cum[i - 1]) / c[i] AS p95\nFROM q\nORDER BY time",
           "refId": "A"
         }
-      ]
+      ],
+      "interval": "10s"
     },
     {
       "collapsed": false,
@@ -441,7 +464,8 @@
           "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS service, Attributes['rpc.method'] AS method, sum(Count) / $__interval_s AS rps\nFROM otel.otel_metrics_histogram\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'rpc.server.call.duration' AND ServiceName IN (${service:singlequote})\nGROUP BY time, service, method\nORDER BY time",
           "refId": "A"
         }
-      ]
+      ],
+      "interval": "10s"
     },
     {
       "datasource": {
@@ -513,10 +537,11 @@
           },
           "editorType": "sql",
           "format": 0,
-          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS service, Attributes['rpc.method'] AS method, sumIf(Count, Attributes['rpc.response.status_code'] != 'OK') / sum(Count) AS error_rate\nFROM otel.otel_metrics_histogram\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'rpc.server.call.duration' AND ServiceName IN (${service:singlequote})\nGROUP BY time, service, method\nORDER BY time",
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS service, Attributes['rpc.method'] AS method, sumIf(Count, Attributes['rpc.response.status_code'] IN ('UNKNOWN', 'DEADLINE_EXCEEDED', 'UNIMPLEMENTED', 'INTERNAL', 'UNAVAILABLE', 'DATA_LOSS')) / sum(Count) AS error_rate\nFROM otel.otel_metrics_histogram\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'rpc.server.call.duration' AND ServiceName IN (${service:singlequote})\nGROUP BY time, service, method\nORDER BY time",
           "refId": "A"
         }
-      ]
+      ],
+      "interval": "10s"
     },
     {
       "datasource": {
@@ -573,7 +598,8 @@
           "rawSql": "WITH h AS (\n  SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS service, Attributes['rpc.method'] AS method, any(ExplicitBounds) AS b, sumForEach(BucketCounts) AS c\n  FROM otel.otel_metrics_histogram\n  WHERE $__timeFilter(TimeUnix) AND MetricName = 'rpc.server.call.duration' AND ServiceName IN (${service:singlequote})\n  GROUP BY time, service, method\n), q AS (\n  SELECT *, arraySum(c) AS n, arrayCumSum(c) AS cum, arrayFirstIndex(x -> x >= 0.95 * n, cum) AS i FROM h WHERE n > 0\n)\nSELECT time, service, method, b[i - 1] + (if(i > length(b), b[length(b)], b[i]) - b[i - 1]) * (0.95 * n - cum[i - 1]) / c[i] AS p95\nFROM q\nORDER BY time",
           "refId": "A"
         }
-      ]
+      ],
+      "interval": "10s"
     },
     {
       "collapsed": false,
@@ -644,7 +670,8 @@
           "rawSql": "WITH h AS (\n  SELECT $__timeInterval(TimeUnix) AS time, concat(ServiceName, ' · ', Attributes['pgx.operation.type']) AS series, any(ExplicitBounds) AS b, sumForEach(BucketCounts) AS c\n  FROM otel.otel_metrics_histogram\n  WHERE $__timeFilter(TimeUnix) AND MetricName = 'db.client.operation.duration' AND ServiceName IN (${service:singlequote})\n  GROUP BY time, series\n), q AS (\n  SELECT *, arraySum(c) AS n, arrayCumSum(c) AS cum, arrayFirstIndex(x -> x >= 0.95 * n, cum) AS i FROM h WHERE n > 0\n)\nSELECT time, series, b[i - 1] + (if(i > length(b), b[length(b)], b[i]) - b[i - 1]) * (0.95 * n - cum[i - 1]) / c[i] AS p95\nFROM q\nORDER BY time",
           "refId": "A"
         }
-      ]
+      ],
+      "interval": "10s"
     },
     {
       "datasource": {
@@ -703,7 +730,8 @@
           "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, concat(ServiceName, ' · ', Attributes['db.client.connection.pool.name']) AS series,\n  argMaxIf(Value, TimeUnix, MetricName = 'pgxpool.acquired_connections') / nullIf(argMaxIf(Value, TimeUnix, MetricName = 'pgxpool.max_connections'), 0) AS utilization\nFROM (\n  SELECT ServiceName, MetricName, Attributes, TimeUnix, Value FROM otel.otel_metrics_sum WHERE MetricName = 'pgxpool.acquired_connections'\n  UNION ALL\n  SELECT ServiceName, MetricName, Attributes, TimeUnix, Value FROM otel.otel_metrics_gauge WHERE MetricName = 'pgxpool.max_connections'\n)\nWHERE $__timeFilter(TimeUnix) AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nORDER BY time",
           "refId": "A"
         }
-      ]
+      ],
+      "interval": "10s"
     },
     {
       "datasource": {
@@ -758,7 +786,7 @@
           },
           "editorType": "sql",
           "format": 0,
-          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS series,\n  sumIf(Value, MetricName = 'pgxpool.acquire_duration') / 1e9 / nullIf(sumIf(Value, MetricName = 'pgxpool.acquires'), 0) AS wait\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName IN ('pgxpool.acquire_duration', 'pgxpool.acquires') AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nHAVING sumIf(Value, MetricName = 'pgxpool.acquires') > 0\nORDER BY time",
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, concat(ServiceName, ' · acquire') AS series,\n  sumIf(Value, MetricName = 'pgxpool.acquire_duration') / 1e9 / sumIf(Value, MetricName = 'pgxpool.acquires') AS acquire_wait\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName IN ('pgxpool.acquire_duration', 'pgxpool.acquires') AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nHAVING sumIf(Value, MetricName = 'pgxpool.acquires') > 0\nORDER BY time",
           "refId": "A"
         },
         {
@@ -768,10 +796,11 @@
           },
           "editorType": "sql",
           "format": 0,
-          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS series,\n  sumIf(Value, MetricName = 'pgxpool.empty_acquire_wait_time') / 1e9 / nullIf(sumIf(Value, MetricName = 'pgxpool.acquires'), 0) AS wait\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName IN ('pgxpool.empty_acquire_wait_time', 'pgxpool.acquires') AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nHAVING sumIf(Value, MetricName = 'pgxpool.acquires') > 0\nORDER BY time",
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, concat(ServiceName, ' · empty pool') AS series,\n  sumIf(Value, MetricName = 'pgxpool.empty_acquire_wait_time') / 1e9 / sumIf(Value, MetricName = 'pgxpool.acquires') AS empty_wait\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName IN ('pgxpool.empty_acquire_wait_time', 'pgxpool.acquires') AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nHAVING sumIf(Value, MetricName = 'pgxpool.acquires') > 0\nORDER BY time",
           "refId": "B"
         }
-      ]
+      ],
+      "interval": "10s"
     },
     {
       "datasource": {
@@ -829,7 +858,8 @@
           "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS series, sum(Value) / $__interval_s AS rate\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'pgxpool.empty_acquire' AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nORDER BY time",
           "refId": "A"
         }
-      ]
+      ],
+      "interval": "10s"
     },
     {
       "collapsed": false,
@@ -900,7 +930,8 @@
           "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, Attributes['topic'] AS series,\n  sum(Value) / $__interval_s AS records_per_s\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'messaging.kafka.fetch_records.count' AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nORDER BY time",
           "refId": "A"
         }
-      ]
+      ],
+      "interval": "10s"
     },
     {
       "datasource": {
@@ -1034,7 +1065,8 @@
           "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS series, argMax(Value, TimeUnix) AS goroutines\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'go.goroutine.count' AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nORDER BY time",
           "refId": "A"
         }
-      ]
+      ],
+      "interval": "10s"
     },
     {
       "datasource": {
@@ -1102,7 +1134,8 @@
           "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, concat(ServiceName, ' · gc goal') AS series,\n  argMax(Value, TimeUnix) AS gc_goal\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'go.memory.gc.goal' AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nORDER BY time",
           "refId": "B"
         }
-      ]
+      ],
+      "interval": "10s"
     },
     {
       "datasource": {
@@ -1160,7 +1193,8 @@
           "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS series, sum(Value) / $__interval_s AS alloc_bytes_per_s\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'go.memory.allocated' AND ServiceName IN (${service:singlequote})\nGROUP BY time, series\nORDER BY time",
           "refId": "A"
         }
-      ]
+      ],
+      "interval": "10s"
     }
   ],
   "refresh": "30s",
