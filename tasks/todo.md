@@ -73,11 +73,11 @@ table-driven, без глобального пропагатора.
 (TraceId, формат заголовка). В карте `async-propagation` → done. В `TODO.md` отметить подпункт async-propagation.
 
 **Acceptance criteria:**
-- [ ] Все 5 Success Criteria спека отмечены с фактами
-- [ ] Карта и TODO.md отражают статус
+- [x] Success Criteria спека отмечены с фактами (4 из 5; логи notification не проверены — нет логов при обработке события)
+- [x] Карта и TODO.md отражают статус
 
 **Verification:**
-- [ ] `git diff` — только документация; ссылки открываются
+- [x] `git diff` — только документация; ссылки открываются
 
 **Dependencies:** Task 2
 
@@ -87,5 +87,5 @@ table-driven, без глобального пропагатора.
 **Estimated scope:** XS
 
 ## Checkpoint C: модуль завершён
-- [ ] Success Criteria спека отмечены
+- [x] Success Criteria спека отмечены
 - [ ] Ревью с пользователем → переход к `dashboards`

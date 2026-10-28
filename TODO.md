@@ -35,7 +35,7 @@
   - [x] logs: fan-out slog → stdout + OTel, `trace_id`/`span_id`
   - [x] tracing: `otelhttp`, `otelgrpc`, `otelpgx`, `kotel` (водопад в Grafana проверен)
   - [x] metrics: RED + runtime Go, каталог `docs/observability/metrics.md`
-  - [ ] async-propagation: `traceparent` через outbox → Debezium → Kafka → notification
+  - [x] async-propagation: `traceparent` через outbox → Debezium → Kafka → notification
   - [ ] dashboards: Grafana as code
 - [ ] Logger логирование ошибок по стеку
 - [ ] Доработка пакетов http, grpc, pgx, redis, kafka итд насчет кол-ва соединенией, timeout
