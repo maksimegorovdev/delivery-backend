@@ -112,6 +112,45 @@ func TestServer_MetricHasRouteTemplate(t *testing.T) {
 	require.NotContains(t, routes, "/api/v1/metric-orders/42")
 }
 
+func TestServer_MetricIgnoresHostHeader(t *testing.T) {
+	t.Parallel()
+
+	const (
+		route = "/api/v1/host-orders/{id}"
+		host  = "attacker-controlled.example:31337"
+	)
+	srv := httpserver.New(":8080")
+	srv.Router().Get(route, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/host-orders/42", nil)
+	req.Host = host
+	srv.Handler().ServeHTTP(httptest.NewRecorder(), req)
+
+	var rm metricdata.ResourceMetrics
+	require.NoError(t, metrics.Collect(t.Context(), &rm))
+
+	var found bool
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			hist, ok := m.Data.(metricdata.Histogram[float64])
+			if !ok || m.Name != requestDuration {
+				continue
+			}
+			for _, dp := range hist.DataPoints {
+				if v, _ := dp.Attributes.Value("http.route"); v.AsString() != route {
+					continue
+				}
+				found = true
+				addr, _ := dp.Attributes.Value("server.address")
+				port, _ := dp.Attributes.Value("server.port")
+				require.Empty(t, addr.AsString())
+				require.Equal(t, int64(8080), port.AsInt64())
+			}
+		}
+	}
+	require.True(t, found, "нет точки метрики для %s", route)
+}
+
 func TestServer_SwaggerNotTraced(t *testing.T) {
 	t.Parallel()
 
