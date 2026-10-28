@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/propagation"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/http/middleware"
 )
@@ -32,6 +33,7 @@ type Server struct {
 	router          *chi.Mux
 	addr            string
 	shutdownTimeout time.Duration
+	publicEndpoint  bool
 }
 
 func New(addr string, opts ...Option) *Server {
@@ -62,12 +64,19 @@ func New(addr string, opts ...Option) *Server {
 // server.address и server.port берутся из адреса прослушивания: без WithServerName
 // otelhttp читает их из заголовка Host, и клиент плодит серии метрик.
 func (s *Server) tracedHandler() http.Handler {
-	return otelhttp.NewHandler(s.router, otelOperation,
+	opts := []otelhttp.Option{
 		otelhttp.WithServerName(s.addr),
 		otelhttp.WithFilter(func(r *http.Request) bool {
 			return !strings.HasPrefix(r.URL.Path, swaggerPrefix)
 		}),
-	)
+	}
+	if s.publicEndpoint {
+		opts = append(opts,
+			otelhttp.WithPublicEndpointFn(func(*http.Request) bool { return true }),
+			otelhttp.WithPropagators(propagation.TraceContext{}),
+		)
+	}
+	return otelhttp.NewHandler(s.router, otelOperation, opts...)
 }
 
 func (s *Server) Router() *chi.Mux {

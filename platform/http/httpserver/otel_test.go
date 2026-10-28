@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
@@ -37,7 +38,10 @@ var (
 func TestMain(m *testing.M) {
 	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSyncer(spans)))
 	otel.SetMeterProvider(sdkmetric.NewMeterProvider(sdkmetric.WithReader(metrics)))
-	otel.SetTextMapPropagator(propagation.TraceContext{})
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	))
 	os.Exit(m.Run())
 }
 
@@ -110,6 +114,44 @@ func TestServer_MetricHasRouteTemplate(t *testing.T) {
 
 	require.Contains(t, routes, route)
 	require.NotContains(t, routes, "/api/v1/metric-orders/42")
+}
+
+func TestServer_PublicEndpointDoesNotTrustIncomingContext(t *testing.T) {
+	t.Parallel()
+
+	const route = "/api/v1/public-orders/{id}"
+	raw := make([]byte, 16)
+	_, err := rand.Read(raw)
+	require.NoError(t, err)
+	incoming := hex.EncodeToString(raw)
+
+	srv := httpserver.New(":0", httpserver.WithPublicEndpoint())
+	var members int
+	srv.Router().Get(route, func(w http.ResponseWriter, r *http.Request) {
+		members = baggage.FromContext(r.Context()).Len()
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/public-orders/42", nil)
+	// sampled=00: клиент пытается выключить трассировку своего запроса.
+	req.Header.Set("Traceparent", "00-"+incoming+"-"+parentSpanID+"-00")
+	req.Header.Set("Baggage", "tenant=forged")
+	srv.Handler().ServeHTTP(httptest.NewRecorder(), req)
+
+	require.Zero(t, members, "baggage клиента не должен попадать в контекст")
+	require.Empty(t, spansOf(incoming), "входящий trace-id не должен продолжаться")
+
+	var got tracetest.SpanStubs
+	for _, s := range spans.GetSpans() {
+		for _, l := range s.Links {
+			if l.SpanContext.TraceID().String() == incoming {
+				got = append(got, s)
+			}
+		}
+	}
+	require.Len(t, got, 1, "новый корневой спан со ссылкой на входящий контекст")
+	require.False(t, got[0].Parent.IsValid())
+	require.Equal(t, parentSpanID, got[0].Links[0].SpanContext.SpanID().String())
 }
 
 func TestServer_MetricIgnoresHostHeader(t *testing.T) {
