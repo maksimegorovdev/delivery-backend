@@ -21,8 +21,8 @@ Debezium не инструментируется (нужен OTel Java agent в 
    Домен (`domain.OutboxEvent`, `OrderEventBuilder`) **не меняется** — tracing остаётся инфраструктурной деталью репозитория.
 3. Коннектор `deploy/debezium/order-outbox.json`: `transforms.outbox.table.fields.additional.placement`
    дополнен `traceparent:header:traceparent,tracestate:header:tracestate` (сохраняя `type:header:event-type`).
-4. В notification спан `process` (из модуля `tracing`) — дочерний к спану order, сделавшему INSERT:
-   совпадает `TraceId`, `ParentSpanId` = span order'а.
+4. В notification спаны kotel продолжают трейс order: совпадает `TraceId`, `ParentSpanId` спана
+   `receive` = span order'а, сделавшего INSERT, а `process` (из модуля `tracing`) — дочерний к `receive`.
 5. Событие без trace context (старые записи, `OTEL_ENABLED=false` в order) обрабатывается штатно — новый корневой трейс, без ошибок.
 6. Логи notification при обработке события имеют тот же `TraceId` (следствие модуля `logs`).
 
