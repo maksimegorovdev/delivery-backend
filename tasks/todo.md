@@ -239,12 +239,12 @@ RPS и задержки не анализируются. По данным Click
 тип, единица, атрибуты, таблица, сервисы. Проверить кардинальность и temporality.
 
 **Acceptance criteria:**
-- [ ] Каталог покрывает все метрики из ClickHouse (`SELECT DISTINCT MetricName` по 4 таблицам) и только их
-- [ ] `uniqExact(Attributes)` на сервис < 1000; нет атрибутов с id, `request_id`, сырым путём
-- [ ] `AggregationTemporality = 1` (delta) у histogram и monotonic sum
+- [x] Каталог покрывает все метрики из ClickHouse (`SELECT DISTINCT MetricName` по 4 таблицам) и только их (gauge 1, sum 26, histogram 6; тестовая метрика `gen` от `telemetrygen` удалена из ClickHouse)
+- [x] `uniqExact(Attributes)` на сервис < 1000 (максимум 37, notification); нет атрибутов с id, `request_id`, сырым путём
+- [x] `AggregationTemporality = 1` (delta) у histogram и monotonic sum (non-monotonic sum — cumulative, `2`)
 
 **Verification:**
-- [ ] SQL из SPEC-metrics Commands; результаты запросов приложены в описание коммита/PR
+- [x] SQL из SPEC-metrics Commands; запросы и результаты — в `docs/observability/metrics.md`, раздел «Проверки»
 
 **Dependencies:** Task 3, Task 6, Task 7, Task 8
 
