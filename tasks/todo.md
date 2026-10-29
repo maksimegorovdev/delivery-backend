@@ -258,23 +258,24 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 
 **Estimated scope:** S
 
-## Task 6: Порог 80% на каждый пакет `platform`, I/O-исключения по замеру
+## Task 6: Порог 80% на каждый пакет `platform`
 
-> Номер сохранён, выполняется после Task 11: пороги исключений измеряются, когда у всех пакетов `platform` есть unit-тесты.
+> Номер сохранён, выполняется после Task 11: решение по каждому пакету принимается, когда у всех пакетов `platform` есть тесты.
 
 **Description:** В `platform/.testcoverage.yml` удалить неработающие правила `/domain$` и `/service$`, задать
 `threshold.package: 80`. Прогнать `task -d platform cover` и для каждого пакета ниже 80% решить: дописать тесты
-(если логика без I/O) или добавить в override с измеренным порогом (округление вниз до целого) и комментарием,
-почему пакет упирается в I/O. Ожидаемые исключения — `postgres`, `kafka/kafkaconsumer`; итоговый список — по замеру.
+(unit-тест или интеграционный на `pgtest`/`kafkatest`, `task cover` и так идёт с Docker). `testkit/` тоже под порогом:
+у него есть собственные тесты. Пороговых override нет: они фиксируют низкое покрытие вместо того, чтобы его устранить.
+Недостижимая ветка вне I/O помечается `// coverage-ignore` с причиной в doc-комментарии.
 
 **Acceptance criteria:**
-- [ ] `task -d platform cover` зелёный: каждый пакет ≥ 80%, кроме перечисленных в override
-- [ ] Каждое исключение — I/O-пакет с комментарием и измеренным порогом; пакетов без I/O в исключениях нет
-- [ ] Список исключений и пороги перечислены в резюме задачи
+- [x] `task -d platform cover` зелёный: каждый пакет ≥ 80%, override отсутствуют
+- [x] `postgres` и `testkit/pgtest` покрыты интеграционными тестами (≥ 80%), `coverage-ignore` только на недостижимой ветке `otelenv.Unset`
+- [x] Исключение (`mocks/`) и `coverage-ignore` перечислены в резюме задачи
 
 **Verification:**
-- [ ] `task -d platform cover` (Docker запущен)
-- [ ] Временный пустой пакет с одной непокрытой функцией делает `cover` красным (новый пакет под порогом), пакет удалён
+- [x] `task -d platform cover` (Docker запущен)
+- [x] Временный пустой пакет с одной непокрытой функцией делает `cover` красным (новый пакет под порогом), пакет удалён
 
 **Dependencies:** Tasks 2–5, 7–11
 
@@ -284,8 +285,8 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 **Estimated scope:** XS
 
 ## Checkpoint 2: platform готов
-- [ ] `task -d platform test`, `task -d platform lint` зелёные
-- [ ] `task -d platform cover` зелёный с новыми порогами
+- [x] `task -d platform test`, `task -d platform lint` зелёные
+- [x] `task -d platform cover` зелёный с новыми порогами
 
 ---
 
