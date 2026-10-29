@@ -148,12 +148,12 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 `logger`: запись лога с методом и кодом (логгер в буфер). Тестовый сервис — health или echo на `Unimplemented*Server`.
 
 **Acceptance criteria:**
-- [ ] Каждый код `apperr` превращается в ожидаемый код gRPC через реальную цепочку интерцепторов
-- [ ] Валидация отсекает невалидный запрос до handler-а (handler не вызван)
-- [ ] Тесты используют `grpctest.NewConn`, своей bufconn-обвязки нет
+- [x] Каждый код `apperr` превращается в ожидаемый код gRPC через реальную цепочку интерцепторов
+- [x] Валидация отсекает невалидный запрос до handler-а (handler не вызван)
+- [x] Тесты используют `grpctest.NewConn`, своей bufconn-обвязки нет
 
 **Verification:**
-- [ ] `cd platform && go test -race -shuffle=on -count=1 -cover ./grpc/interceptors/`
+- [x] `cd platform && go test -race -shuffle=on -count=1 -cover ./grpc/interceptors/`
 
 **Dependencies:** Tasks 1, 3
 
