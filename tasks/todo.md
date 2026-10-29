@@ -220,26 +220,11 @@ mockery: хелпер `newDeps(t)` собирает моки и сервис. `T
 
 **Estimated scope:** S
 
-## Task 9: Раздел «Тесты» в `AGENTS.md`
+## Task 9: Раздел «Тесты» в `AGENTS.md` — отменена
 
-**Description:** Кратко записать конвенции из спека: команды, build-тег `integration`, `testkit`, mockery и коммит моков,
-`require`/`assert`, `t.Parallel`, английские `name`, именование файлов. Ссылка на спек — для деталей.
-
-**Acceptance criteria:**
-- [x] Раздел до ~25 строк, без дублирования спека целиком
-- [x] Команды в разделе реально работают
-
-**Verification:**
-- [x] Ручная: прогнать каждую команду из раздела
-
-**Dependencies:** Task 7, Task 8
-
-**Files likely touched:**
-- `AGENTS.md`
-
-**Estimated scope:** XS
+Раздел не добавляется по решению пользователя: команды видны в `Taskfile.yml`, конвенции остаются в [спеке](../spec/testing/SPEC-test-foundation.md).
 
 ## Checkpoint: Complete
-- [ ] Все Success Criteria [спека](../spec/testing/SPEC-test-foundation.md) выполнены
-- [ ] `task lint`, `task test`, `task test-integration` зелёные; `task cover` печатает отчёт
-- [ ] Резюме изменений пользователю, коммит — по команде
+- [x] Все Success Criteria [спека](../spec/testing/SPEC-test-foundation.md) выполнены
+- [x] `task lint`, `task test`, `task test-integration` зелёные; `task cover` печатает отчёт
+- [x] Резюме изменений пользователю, коммит — по команде

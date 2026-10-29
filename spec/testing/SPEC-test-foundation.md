@@ -197,13 +197,13 @@ packages:
 
 ## Success Criteria
 
-- [ ] `task test` зелёный во всех модулях, работает без Docker.
-- [ ] `task test-integration` поднимает Postgres из `testkit`, пилотный тест репозитория `order` зелёный; Redpanda-хелпер запускается smoke-тестом в самом `testkit`.
-- [ ] `task mocks` генерирует моки для интерфейсов `order/internal/service`, повторный запуск не даёт diff.
-- [ ] Пилотный unit-тест `CreateOrder` покрывает ошибку зависимости, отсутствующий продукт и успешный путь.
-- [ ] `task cover` печатает покрытие по пакетам и проверяет пороги из `.testcoverage.yml`. Пока модули `unit`/`integration` не готовы, пороги могут не выполняться: красный результат ожидаем и фиксируется.
-- [ ] `task lint` зелёный с новыми правилами (`thelper`, `testifylint`, `depguard`).
-- [ ] Конвенции из раздела Code Style продублированы кратко в `AGENTS.md` (раздел «Тесты»).
+- [x] `task test` зелёный во всех модулях, работает без Docker.
+- [x] `task test-integration` поднимает Postgres из `testkit`, пилотный тест репозитория `order` зелёный; Redpanda-хелпер запускается smoke-тестом в самом `testkit`.
+- [x] `task mocks` генерирует моки для интерфейсов `order/internal/service`, повторный запуск не даёт diff.
+- [x] Пилотный unit-тест `CreateOrder` покрывает ошибку зависимости, отсутствующий продукт и успешный путь.
+- [x] `task cover` печатает покрытие по пакетам и проверяет пороги из `.testcoverage.yml`. Пока модули `unit`/`integration` не готовы, пороги могут не выполняться: красный результат ожидаем и фиксируется.
+- [x] `task lint` зелёный с новыми правилами (`thelper`, `testifylint`, `depguard`).
+- [x] ~~Конвенции продублированы в `AGENTS.md`~~ — отменено: источник конвенций — этот спек.
 
 ## Open Questions
 

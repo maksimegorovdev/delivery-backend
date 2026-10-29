@@ -54,11 +54,11 @@ Task 9 AGENTS.md (в конце, фиксирует итоговые конве�
 ### Phase 3: Контроль качества
 - [x] Task 7: Линтеры `thelper`, `testifylint` (enable-all), `depguard` для `testkit`/`mocks`
 - [x] Task 8: `task cover` + `.testcoverage.yml`
-- [ ] Task 9: Раздел «Тесты» в `AGENTS.md`
+- [x] Task 9: Раздел «Тесты» в `AGENTS.md` — отменена: команды видны в Taskfile, конвенции остаются в спеке
 
 ### Checkpoint: Complete
-- [ ] Все Success Criteria спека выполнены
-- [ ] `task lint`, `task test`, `task test-integration` зелёные; `task cover` печатает отчёт
+- [x] Все Success Criteria спека выполнены (кроме раздела в `AGENTS.md`: отменён)
+- [x] `task lint`, `task test`, `task test-integration` зелёные; `task cover` печатает отчёт
 
 ## Risks and Mitigations
 
