@@ -35,7 +35,7 @@ testify и английские имена кейсов, fuzz для парсе�
 ### Phase 2: platform — транспорт и горутины
 - [x] Task 7: Тесты `grpc/interceptors` на `grpctest`
 - [x] Task 8: Тесты `grpcserver` и `grpcclient`, `goleak`
-- [ ] Task 9: Тесты `http/middleware`
+- [x] Task 9: Тесты `http/middleware`
 - [ ] Task 10: Тесты `httpserver` (graceful shutdown), `goleak`
 - [ ] Task 11: Unit-тесты `kafkaconsumer`
 - [ ] Task 6: Порог 80% на каждый пакет `platform`, I/O-исключения по замеру

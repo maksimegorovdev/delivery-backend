@@ -196,12 +196,12 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 `route` (шаблон маршрута в контексте/метриках). Существующий `request_id_test.go` проверить на конвенции.
 
 **Acceptance criteria:**
-- [ ] Каждый middleware проверен через `httptest` на реальном `http.Handler`
-- [ ] Panic в handler-е не роняет тест и даёт 500
-- [ ] Все имена кейсов на английском
+- [x] Каждый middleware проверен через `httptest` на реальном `http.Handler`
+- [x] Panic в handler-е не роняет тест и даёт 500
+- [x] Все имена кейсов на английском
 
 **Verification:**
-- [ ] `cd platform && go test -race -shuffle=on -count=1 -cover ./http/middleware/`
+- [x] `cd platform && go test -race -shuffle=on -count=1 -cover ./http/middleware/`
 
 **Dependencies:** Task 4 (`appctx`, `response`)
 
