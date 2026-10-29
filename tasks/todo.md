@@ -39,12 +39,12 @@
 Клиент для smoke-теста — `franz-go`, как в `platform/kafka`.
 
 **Acceptance criteria:**
-- [ ] Smoke-тест создаёт топик, публикует и читает сообщение
-- [ ] Два параллельных теста получают разные топики
+- [x] Smoke-тест создаёт топик, публикует и читает сообщение
+- [x] Два параллельных теста получают разные топики
 
 **Verification:**
-- [ ] `cd platform && go test -race -count=1 -tags=integration ./testkit/kafkatest/...`
-- [ ] `task -d platform lint` зелёный (и с `--build-tags=integration`)
+- [x] `cd platform && go test -race -count=1 -tags=integration ./testkit/kafkatest/...`
+- [x] `task -d platform lint` зелёный (и с `--build-tags=integration`)
 
 **Dependencies:** Task 1
 
@@ -56,7 +56,7 @@
 **Estimated scope:** S
 
 ## Checkpoint: testkit
-- [ ] `go test -tags=integration ./...` в `platform/testkit` зелёный, контейнеры удаляются
+- [x] `go test -tags=integration ./...` в `platform/testkit` зелёный, контейнеры удаляются
 - [ ] Показать пользователю API `pgtest`/`kafkatest` перед использованием в сервисах
 
 ## Task 3: Задачи Taskfile `test` и `test-integration` во всех модулях

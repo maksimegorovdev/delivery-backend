@@ -36,10 +36,10 @@ Task 9 AGENTS.md (в конце, фиксирует итоговые конве�
 
 ### Phase 1: testkit
 - [x] Task 1: Пакет `platform/testkit/pgtest` со smoke-тестом
-- [ ] Task 2: `kafkatest` со smoke-тестом
+- [x] Task 2: `kafkatest` со smoke-тестом
 
 ### Checkpoint: testkit
-- [ ] `go test -tags=integration ./...` в `platform/testkit` зелёный, контейнеры удаляются после прогона
+- [x] `go test -tags=integration ./...` в `platform/testkit` зелёный, контейнеры удаляются после прогона
 
 ### Phase 2: Команды и пилот
 - [ ] Task 3: Задачи Taskfile `test` и `test-integration` во всех модулях
