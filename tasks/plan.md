@@ -53,7 +53,7 @@ Task 9 AGENTS.md (в конце, фиксирует итоговые конве�
 
 ### Phase 3: Контроль качества
 - [x] Task 7: Линтеры `thelper`, `testifylint` (enable-all), `depguard` для `testkit`/`mocks`
-- [ ] Task 8: `task cover` + `.testcoverage.yml`
+- [x] Task 8: `task cover` + `.testcoverage.yml`
 - [ ] Task 9: Раздел «Тесты» в `AGENTS.md`
 
 ### Checkpoint: Complete

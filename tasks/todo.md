@@ -193,19 +193,29 @@ mockery: хелпер `newDeps(t)` собирает моки и сервис. `T
 исключения `proto/gen`, `/mocks/`, `/cmd/`, `/docs/`. `coverage/` в `.gitignore`. Синтаксис сверить с документацией.
 
 **Acceptance criteria:**
-- [ ] `task cover` печатает покрытие по пакетам всех модулей
-- [ ] Исключённые пути в отчёт не входят
-- [ ] Нарушение порога даёт ненулевой код. Текущий результат (ожидаемо красный) записан в todo
+- [x] `task cover` печатает покрытие по пакетам всех модулей
+- [x] Исключённые пути в отчёт не входят
+- [x] Нарушение порога даёт ненулевой код. Текущий результат (ожидаемо красный) записан в todo
 
 **Verification:**
-- [ ] `task cover; echo $?`
-- [ ] Отчёт не содержит `mocks`, `proto/gen`, `cmd`
+- [x] `task cover; echo $?`
+- [x] Отчёт не содержит `mocks`, `proto/gen`, `cmd`
+
+**Результат:** `task cover` ожидаемо красный (код 201): пороги пока не выполняются.
+Сейчас total: platform 38.2%, proto 0/0 (зелёный), gateway 11.9%, order 31.6%, user 13.8%, product 16.0%, notification 12.6%.
+Пакеты ниже 80% по override: `internal/domain` в order (0%), `internal/service` в gateway/user/product/notification (0%); `order/internal/service` проходит (81.8%).
+
+**Отклонение от плана:** вместо одного корневого `.testcoverage.yml` у каждого модуля свои `go-test-coverage` (ставится в `bin/` модуля через `tools`),
+`.testcoverage.yml` и задача `cover` в Taskfile, как у `lint`/`test`. Корневой `task cover` обходит модули и проверяет все до выхода.
+Причина: из корня инструмент не находит `go.mod`, и одноимённые пакеты разных сервисов слились бы в один. Модульная схема не меняется,
+когда сервисы станут отдельными репозиториями. `proto` исключён (только сгенерированный код, нет тестов). Пороги и `total: 70` действуют на каждый модуль отдельно.
+Общего total по монорепо нет.
 
 **Dependencies:** Task 3, Task 5, Task 6
 
 **Files likely touched:**
-- `Taskfile.yml`
-- `.testcoverage.yml`
+- `Taskfile.yml`, `platform/Taskfile.yml`, `services/*/Taskfile.yml`
+- `platform/.testcoverage.yml`, `services/*/.testcoverage.yml`
 - `.gitignore`
 
 **Estimated scope:** S
@@ -216,11 +226,11 @@ mockery: хелпер `newDeps(t)` собирает моки и сервис. `T
 `require`/`assert`, `t.Parallel`, английские `name`, именование файлов. Ссылка на спек — для деталей.
 
 **Acceptance criteria:**
-- [ ] Раздел до ~25 строк, без дублирования спека целиком
-- [ ] Команды в разделе реально работают
+- [x] Раздел до ~25 строк, без дублирования спека целиком
+- [x] Команды в разделе реально работают
 
 **Verification:**
-- [ ] Ручная: прогнать каждую команду из раздела
+- [x] Ручная: прогнать каждую команду из раздела
 
 **Dependencies:** Task 7, Task 8
 

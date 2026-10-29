@@ -35,3 +35,5 @@ profile.cov
 .DS_Store
 bin/
 tmp/
+# Coverage profiles from task cover
+coverage/

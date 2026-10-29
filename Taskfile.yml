@@ -5,6 +5,7 @@ version: '3'
 vars:
   MODULES: platform,proto,services/gateway,services/order,services/user,services/product,services/notification
   DB_SERVICES: order,user,product,notification
+  COVER_MODULES: platform,services/gateway,services/order,services/user,services/product,services/notification
 
 tasks:
   compose-up:
@@ -54,6 +55,18 @@ tasks:
     cmds:
       - for: { var: MODULES, split: ',' }
         cmd: task -d {{.ITEM}} test-integration
+
+  cover:
+    desc: Run tests with coverage and check thresholds in every module (requires Docker)
+    cmds:
+      # Все модули проверяются до выхода: красный порог одного не скрывает остальные.
+      - |
+        status=0
+        for m in $(echo '{{.COVER_MODULES}}' | tr ',' ' '); do
+          echo "== $m"
+          task -d "$m" cover || status=1
+        done
+        exit $status
 
   mocks:
     desc: Generate mocks in every module that has .mockery.yml

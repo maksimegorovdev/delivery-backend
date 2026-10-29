@@ -1,0 +1,13 @@
+threshold:
+  total: 70
+
+# Первое совпавшее правило применяется к пакету, поэтому от частного к общему.
+override:
+  - path: /domain$
+    threshold: 80
+  - path: /service$
+    threshold: 80
+
+exclude:
+  paths:
+    - (^|/)mocks/
