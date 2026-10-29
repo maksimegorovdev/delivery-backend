@@ -33,6 +33,16 @@ tasks:
     cmds:
       - PATH="{{.LOCAL_BIN}}:$PATH" {{.LOCAL_BIN}}/buf generate
 
+  test:
+    desc: Run unit tests (no Docker required)
+    cmds:
+      - go test -race -shuffle=on -count=1 ./...
+
+  test-integration:
+    desc: Run integration tests (requires Docker)
+    cmds:
+      - go test -race -shuffle=on -count=1 -tags=integration ./...
+
   lint:
     desc: Run buf lint
     cmds:

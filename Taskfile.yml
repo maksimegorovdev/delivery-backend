@@ -43,6 +43,18 @@ tasks:
       - for: { var: MODULES, split: ',' }
         cmd: task -d {{.ITEM}} lint
 
+  test:
+    desc: Run unit tests across every module (no Docker required)
+    cmds:
+      - for: { var: MODULES, split: ',' }
+        cmd: task -d {{.ITEM}} test
+
+  test-integration:
+    desc: Run integration tests across every module (requires Docker)
+    cmds:
+      - for: { var: MODULES, split: ',' }
+        cmd: task -d {{.ITEM}} test-integration
+
   tidy:
     desc: Tidy go.mod/go.sum for every module
     cmds:

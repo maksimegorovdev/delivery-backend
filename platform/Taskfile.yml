@@ -15,9 +15,14 @@ tasks:
       - curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b {{.LOCAL_BIN}} {{.GOLANGCI_LINT_VERSION}}
 
   test:
-    desc: Run tests with race detector
+    desc: Run unit tests (no Docker required)
     cmds:
-      - go test -race ./...
+      - go test -race -shuffle=on -count=1 ./...
+
+  test-integration:
+    desc: Run integration tests (requires Docker)
+    cmds:
+      - go test -race -shuffle=on -count=1 -tags=integration ./...
 
   lint:
     desc: Run golangci-lint

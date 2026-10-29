@@ -21,6 +21,16 @@ tasks:
       - go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@{{.MIGRATE_VERSION}}
       - go install github.com/air-verse/air@{{.AIR_VERSION}}
 
+  test:
+    desc: Run unit tests (no Docker required)
+    cmds:
+      - go test -race -shuffle=on -count=1 ./...
+
+  test-integration:
+    desc: Run integration tests (requires Docker)
+    cmds:
+      - go test -race -shuffle=on -count=1 -tags=integration ./...
+
   lint:
     desc: Run golangci-lint
     cmds:

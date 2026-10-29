@@ -67,13 +67,13 @@
 Правки механические, поэтому больше 5 файлов допустимо.
 
 **Acceptance criteria:**
-- [ ] `task test` из корня проходит по всем модулям и зелёный при остановленном Docker
-- [ ] `task test-integration` из корня запускает smoke-тесты `testkit`
+- [x] `task test` из корня проходит по всем модулям и зелёный при остановленном Docker
+- [x] `task test-integration` из корня запускает smoke-тесты `testkit`
 
 **Verification:**
-- [ ] `task test` (Docker остановлен) → exit 0
-- [ ] `task test-integration` → exit 0
-- [ ] `task --list` показывает новые задачи с `desc`
+- [x] `task test` (Docker остановлен) → exit 0
+- [x] `task test-integration` → exit 0
+- [x] `task --list` показывает новые задачи с `desc`
 
 **Dependencies:** Task 1
 
