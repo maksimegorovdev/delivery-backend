@@ -16,6 +16,7 @@
 coverage.*
 *.coverprofile
 profile.cov
+coverage/
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
@@ -35,5 +36,3 @@ profile.cov
 .DS_Store
 bin/
 tmp/
-# Coverage profiles from task cover
-coverage/
