@@ -1,230 +1,667 @@
-# Tasks: test-foundation
+# Tasks: unit
 
-> План: [plan.md](plan.md) · Спек: [SPEC-test-foundation.md](../spec/testing/SPEC-test-foundation.md)
+> План: [plan.md](plan.md) · Спек: [SPEC-unit.md](../spec/testing/SPEC-unit.md)
 
-Для интеграционных задач нужен запущенный Docker. Образы: `postgres:18`, `redpandadata/redpanda:v26.2.3`.
+Общее для каждой задачи (Definition of Done, в задачах не повторяется):
+- тесты в `package x_test`, testify, английские `name`, `t.Parallel`, без `time.Sleep`;
+- моки только через `task mocks`, повторный запуск без diff;
+- найденный баг: сначала красный тест, затем исправление; изменение контракта — только после согласия; исправленные баги перечислены в резюме задачи;
+- `task -d <module> test` и `task -d <module> lint` зелёные; `git commit` — только по команде.
 
-## Task 1: Пакет `platform/testkit/pgtest` со smoke-тестом
+---
 
-**Description:** Создать пакет `github.com/maksimegorovdev/delivery-backend/platform/testkit` внутри модуля `platform`.
-Реализовать `pgtest`: общий контейнер `postgres:18` на тестовый бинарь (`sync.Once`), применение миграций
-`golang-migrate` из переданного каталога в БД `template_app`, `NewDB(t, migrationsDir) *pgxpool.Pool`
-(клон `CREATE DATABASE t_<random> TEMPLATE template_app`, в `t.Cleanup` закрыть пул и `DROP DATABASE`).
-Без Docker — понятная ошибка через `t.Fatal`. В модуль добавить `Taskfile.yml` и `.golangci.yml` по образцу `platform`.
+## Phase 1: platform — фундамент и чистые функции
+
+## Task 1: `platform/testkit/grpctest` с собственным тестом
+
+**Description:** Хелпер `NewConn(t testing.TB, register func(*grpc.Server), opts ...grpc.ServerOption) *grpc.ClientConn`:
+in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewClient` с bufconn-диалером, закрытие сервера
+и соединения в `t.Cleanup`. Пакет не импортирует другие пакеты `platform`. Собственный тест на
+встроенном health-сервисе (`grpc/health`) — вызов доходит до сервера; `goleak` после `Cleanup`.
 
 **Acceptance criteria:**
-- [x] Smoke-тест (`//go:build integration`) на тестовых миграциях из `testdata/` получает БД с таблицей из миграции
-- [x] 10 параллельных `NewDB` получают разные БД: запись в одной не видна в другой
-- [x] После прогона `docker ps -a` не показывает контейнеров testcontainers, `pgtest` не импортирует другие пакеты `platform`
+- [ ] Вызов через возвращённый `conn` доходит до сервера, зарегистрированного в `register`
+- [ ] `opts` применяются к серверу (тест с интерцептором-счётчиком)
+- [ ] После завершения теста горутины не утекают (`goleak.VerifyTestMain`), тега `integration` нет
 
 **Verification:**
-- [x] `cd platform && go test -race -count=1 -tags=integration ./testkit/...`
-- [x] `docker ps -a --filter label=org.testcontainers=true` → пусто через ~10 с после прогона
-- [x] `go list -deps ./testkit/... | grep delivery-backend/platform | grep -v /testkit` → пусто
-- [x] `task -d platform lint` зелёный (и `golangci-lint run --build-tags=integration ./testkit/...`)
+- [ ] `cd platform && go test -race -shuffle=on -count=10 ./testkit/grpctest/...`
+- [ ] `task -d platform lint` (`depguard`: `testkit` не импортируется из не-тестовых файлов)
 
 **Dependencies:** None
 
 **Files likely touched:**
-- `platform/go.mod`, `platform/go.sum`
-- `platform/testkit/pgtest/pgtest.go`
-- `platform/testkit/pgtest/pgtest_integration_test.go`, `platform/testkit/pgtest/testdata/*.sql`
+- `platform/testkit/grpctest/grpctest.go`
+- `platform/testkit/grpctest/grpctest_test.go`
+- `platform/testkit/grpctest/main_test.go`
+
+**Estimated scope:** S
+
+## Task 2: Тесты `platform/apperr`
+
+**Description:** Таблицы для конструкторов (`constructors.go`), `Error` (`Wrap`, `Error()`, `Unwrap`,
+`errors.Is`/`errors.As`), кодов (`code.go`: строковое представление, HTTP- и gRPC-соответствия) и `reason.go`.
+
+**Acceptance criteria:**
+- [ ] Каждый конструктор проверен на код и сообщение
+- [ ] `Wrap` сохраняет причину: `errors.Is`/`errors.As` находят и `*apperr.Error`, и исходную ошибку
+- [ ] Покрытие пакета ≥ 80%
+
+**Verification:**
+- [ ] `cd platform && go test -race -shuffle=on -count=1 -cover ./apperr/`
+
+**Dependencies:** None
+
+**Files likely touched:**
+- `platform/apperr/error_test.go`
+- `platform/apperr/code_test.go`
+- `platform/apperr/constructors_test.go`
+
+**Estimated scope:** S
+
+## Task 3: Тесты `apperr/grpcerr`, `apperr/ozzoerr`, `apperr/pgerr`
+
+**Description:** `grpcerr`: маппинг `apperr` → `status` и обратно (`Map`), для каждого кода, плюс
+не-gRPC ошибка. `ozzoerr`: `validation.Errors` и одиночная ошибка ozzo → `apperr` с деталями полей, `nil` → `nil`.
+`pgerr`: `pgconn.PgError` с кодами (unique, FK, not null и т. д.) и `pgx.ErrNoRows` → коды `apperr`.
+
+**Acceptance criteria:**
+- [ ] Маппинг кодов gRPC проверен в обе стороны для всех кодов `apperr`
+- [ ] Ошибки валидации ozzo дают `InvalidArgument` с перечнем полей
+- [ ] Покрытие каждого пакета ≥ 80%
+
+**Verification:**
+- [ ] `cd platform && go test -race -shuffle=on -count=1 -cover ./apperr/...`
+
+**Dependencies:** Task 2
+
+**Files likely touched:**
+- `platform/apperr/grpcerr/grpcerr_test.go`
+- `platform/apperr/ozzoerr/ozzoerr_test.go`
+- `platform/apperr/pgerr/pgerr_test.go`
 
 **Estimated scope:** M
 
-## Task 2: `kafkatest` со smoke-тестом
+## Task 4: Тесты `appctx`, `closer`, `http/response`, `internal/otelenv`
 
-**Description:** `kafkatest`: общий контейнер `redpandadata/redpanda:v26.2.3` (модуль testcontainers `redpanda`)
-на тестовый бинарь, `Brokers(t) []string`, `CreateTopic(t, name)` с уникальным суффиксом для изоляции тестов.
-Клиент для smoke-теста — `franz-go`, как в `platform/kafka`.
-
-**Acceptance criteria:**
-- [x] Smoke-тест создаёт топик, публикует и читает сообщение
-- [x] Два параллельных теста получают разные топики
-
-**Verification:**
-- [x] `cd platform && go test -race -count=1 -tags=integration ./testkit/kafkatest/...`
-- [x] `task -d platform lint` зелёный (и с `--build-tags=integration`)
-
-**Dependencies:** Task 1
-
-**Files likely touched:**
-- `platform/testkit/kafkatest/kafkatest.go`
-- `platform/testkit/kafkatest/kafkatest_integration_test.go`
-- `platform/go.mod`
-
-**Estimated scope:** S
-
-## Checkpoint: testkit
-- [x] `go test -tags=integration ./...` в `platform/testkit` зелёный, контейнеры удаляются
-- [ ] Показать пользователю API `pgtest`/`kafkatest` перед использованием в сервисах
-
-## Task 3: Задачи Taskfile `test` и `test-integration` во всех модулях
-
-**Description:** В Taskfile каждого модуля (`platform`, `proto`, 5 сервисов) задачи
-`test` (`go test -race -shuffle=on -count=1 ./...`) и `test-integration` (то же с `-tags=integration`).
-В корневом Taskfile — циклы по `MODULES`. Задачу `test` в `platform` привести к общему виду.
-Правки механические, поэтому больше 5 файлов допустимо.
+**Description:** `appctx`: запись и чтение `request_id`, `user_id`, `error_box` из контекста, пустой контекст.
+`closer`: порядок закрытия (LIFO или как реализовано), сбор ошибок, повторный вызов. `response`: статус,
+`Content-Type`, тело JSON для успеха и для `apperr` (через `httptest.ResponseRecorder`). `otelenv`: таблица по env.
 
 **Acceptance criteria:**
-- [x] `task test` из корня проходит по всем модулям и зелёный при остановленном Docker
-- [x] `task test-integration` из корня запускает smoke-тесты `testkit`
+- [ ] Порядок закрытия и агрегирование ошибок `closer` зафиксированы тестом
+- [ ] `response` отдаёт HTTP-код, соответствующий коду `apperr`, и тело ошибки
+- [ ] Покрытие `appctx` и `http/response` ≥ 80%
 
 **Verification:**
-- [x] `task test` (Docker остановлен) → exit 0
-- [x] `task test-integration` → exit 0
-- [x] `task --list` показывает новые задачи с `desc`
+- [ ] `cd platform && go test -race -shuffle=on -count=1 -cover ./appctx/ ./closer/ ./http/response/ ./internal/otelenv/`
 
-**Dependencies:** Task 1
+**Dependencies:** Task 2
 
 **Files likely touched:**
+- `platform/appctx/appctx_test.go`
+- `platform/closer/closer_test.go`
+- `platform/http/response/response_test.go`
+- `platform/internal/otelenv/otelenv_test.go`
+
+**Estimated scope:** M
+
+## Task 5: Тесты и fuzz `http/bind`, задача `task fuzz`
+
+**Description:** Таблица для `bind.JSON`: валидное тело, битый JSON, ошибка `Validate()`. Fuzz-цель `FuzzJSON`:
+любой вход не паникует, ошибка — `apperr` с кодом `InvalidArgument`; seed-корпус (валидный пример, пустой
+ввод, `null`, обрезанный JSON, лишние поля). Задача `fuzz` в `platform/Taskfile.yml` обходит `FUZZ_TARGETS`
+(`./http/bind:FuzzJSON`) с `FUZZTIME` (по умолчанию `30s`); корневая `fuzz` — цикл по `FUZZ_MODULES`.
+
+**Acceptance criteria:**
+- [ ] `task test` прогоняет seed-корпус `FuzzJSON`
+- [ ] `task fuzz` и `task -d platform fuzz FUZZTIME=5s` запускают цель и завершаются с кодом 0
+- [ ] Покрытие `http/bind` ≥ 80%
+
+**Verification:**
+- [ ] `cd platform && go test -race -count=1 -cover ./http/bind/`
+- [ ] `task fuzz FUZZTIME=5s`
+
+**Dependencies:** Task 3 (`ozzoerr`)
+
+**Files likely touched:**
+- `platform/http/bind/bind_test.go`
+- `platform/http/bind/testdata/fuzz/FuzzJSON/` (при находках)
+- `platform/Taskfile.yml`
 - `Taskfile.yml`
-- `platform/Taskfile.yml`, `proto/Taskfile.yml`, `services/*/Taskfile.yml`
 
-**Estimated scope:** S (механика, 8 файлов)
+**Estimated scope:** M
 
-## Task 4: mockery v3: установка, `.mockery.yml`, `task mocks`, моки `order/internal/service`
+## Task 6: Порог 80% для пакетов `platform` без I/O
 
-**Description:** Добавить `MOCKERY_VERSION` и установку mockery в `tools` Taskfile `order`. Задача `mocks`
-в модуле и корневой цикл по модулям, где есть `.mockery.yml`. Конфиг `services/order/.mockery.yml` из спека
-(`all: true` для `internal/service`). Сгенерировать моки и закоммитить в рабочее дерево (коммит — по команде пользователя).
-Перед этим сверить ключи конфига с документацией mockery v3.
+**Description:** В `platform/.testcoverage.yml` удалить неработающие правила `/domain$` и `/service$`,
+добавить override 80% для `appctx|apperr|apperr/grpcerr|apperr/ozzoerr|apperr/pgerr|http/bind|http/response`.
 
 **Acceptance criteria:**
-- [x] `services/order/internal/service/mocks/mocks.go` содержит `MockTxManager`, `MockOrderRepo`, `MockOutboxRepo`, `MockOrderEvents`, `MockUserProvider`, `MockProductProvider` с `EXPECT()` и `NewMock…(t)`
-- [x] Повторный `task mocks` не меняет файлы
-- [x] Файл помечен `// Code generated`, `golangci-lint` его не проверяет
+- [ ] `task -d platform cover` зелёный с новым правилом
+- [ ] Временное удаление одного тест-файла `apperr` делает `cover` красным (проверка, что правило матчится), файл возвращён
 
 **Verification:**
-- [x] `task mocks && git diff --exit-code services/order/internal/service/mocks`
-- [x] `go build ./...` и `task -d services/order lint` зелёные
+- [ ] `task -d platform cover` (Docker запущен)
 
-**Dependencies:** Task 3
+**Dependencies:** Tasks 2–5
 
 **Files likely touched:**
-- `services/order/Taskfile.yml`, `Taskfile.yml`
-- `services/order/.mockery.yml`
-- `services/order/internal/service/mocks/mocks.go`
-- `services/order/go.mod`
+- `platform/.testcoverage.yml`
+
+**Estimated scope:** XS
+
+## Checkpoint 1: platform-фундамент
+- [ ] `task -d platform test` и `task -d platform lint` зелёные
+- [ ] `task fuzz FUZZTIME=5s` работает
+- [ ] Обзор API `grpctest` и образца табличного теста с пользователем
+
+---
+
+## Phase 2: platform — транспорт и горутины
+
+## Task 7: Тесты `grpc/interceptors` на `grpctest`
+
+**Description:** `error`: ошибка handler-а (`apperr` каждого кода, обычная ошибка, panic, если обрабатывается) →
+код и сообщение `status`. `validation`: запрос с невалидным `Validate()` → `InvalidArgument`, валидный проходит.
+`logger`: запись лога с методом и кодом (логгер в буфер). Тестовый сервис — health или echo на `Unimplemented*Server`.
+
+**Acceptance criteria:**
+- [ ] Каждый код `apperr` превращается в ожидаемый код gRPC через реальную цепочку интерцепторов
+- [ ] Валидация отсекает невалидный запрос до handler-а (handler не вызван)
+- [ ] Тесты используют `grpctest.NewConn`, своей bufconn-обвязки нет
+
+**Verification:**
+- [ ] `cd platform && go test -race -shuffle=on -count=1 -cover ./grpc/interceptors/`
+
+**Dependencies:** Tasks 1, 3
+
+**Files likely touched:**
+- `platform/grpc/interceptors/error_test.go`
+- `platform/grpc/interceptors/validation_test.go`
+- `platform/grpc/interceptors/logger_test.go`
+- `platform/grpc/interceptors/helpers_test.go`
+
+**Estimated scope:** M
+
+## Task 8: Тесты `grpcserver` и `grpcclient`, `goleak`
+
+**Description:** `grpcserver`: опции применяются, reflection регистрируется по опции, `Run` завершается по
+отмене контекста (graceful) и возвращает ошибку при занятом адресе. `grpcclient`: `New` применяет опции,
+ошибка на некорректном адресе. `goleak.VerifyTestMain` в `grpcserver`. `Run` запускается на `127.0.0.1:0`;
+занятый адрес — второй сервер на адресе первого.
+
+**Acceptance criteria:**
+- [ ] Остановка по `ctx` возвращает `nil`, горутины не утекают
+- [ ] Ошибка `Listen` оборачивается с префиксом `grpcserver:`
+- [ ] Стабильно под `-count=10`
+
+**Verification:**
+- [ ] `cd platform && go test -race -shuffle=on -count=10 ./grpc/grpcserver/ ./grpc/grpcclient/`
+
+**Dependencies:** Task 1
+
+**Files likely touched:**
+- `platform/grpc/grpcserver/server_test.go`
+- `platform/grpc/grpcserver/main_test.go`
+- `platform/grpc/grpcclient/client_test.go`
+
+**Estimated scope:** M
+
+## Task 9: Тесты `http/middleware`
+
+**Description:** Дополнить пакет (сейчас 28%): `fake_auth` (кладёт `user_id` в контекст / отказ без заголовка —
+как реализовано), `logger` (поля лога), `recover` (panic → 500 и лог, следующий запрос обслуживается),
+`route` (шаблон маршрута в контексте/метриках). Существующий `request_id_test.go` проверить на конвенции.
+
+**Acceptance criteria:**
+- [ ] Каждый middleware проверен через `httptest` на реальном `http.Handler`
+- [ ] Panic в handler-е не роняет тест и даёт 500
+- [ ] Все имена кейсов на английском
+
+**Verification:**
+- [ ] `cd platform && go test -race -shuffle=on -count=1 -cover ./http/middleware/`
+
+**Dependencies:** Task 4 (`appctx`, `response`)
+
+**Files likely touched:**
+- `platform/http/middleware/fake_auth_test.go`
+- `platform/http/middleware/logger_test.go`
+- `platform/http/middleware/recover_test.go`
+- `platform/http/middleware/route_test.go`
+
+**Estimated scope:** M
+
+## Task 10: Тесты `httpserver` (graceful shutdown), `goleak`
+
+**Description:** Сервер на `127.0.0.1:0`: опции, остановка по контексту, таймаут graceful shutdown, ошибка старта.
+`goleak.VerifyTestMain`.
+Перевести имена кейсов `otel_test.go` на английский.
+
+**Acceptance criteria:**
+- [ ] Graceful shutdown дожидается активного запроса (синхронизация каналами)
+- [ ] Горутины не утекают; стабильно под `-count=10`
+- [ ] В `otel_test.go` нет кириллицы в `name`/`t.Run`
+
+**Verification:**
+- [ ] `cd platform && go test -race -shuffle=on -count=10 ./http/httpserver/`
+
+**Dependencies:** None
+
+**Files likely touched:**
+- `platform/http/httpserver/server_test.go`
+- `platform/http/httpserver/main_test.go`
+- `platform/http/httpserver/otel_test.go`
+
+**Estimated scope:** M
+
+## Task 11: Unit-тесты `kafkaconsumer`
+
+**Description:** Без брокера: обработка одного сообщения, ошибка обработчика (коммит/повтор — как реализовано),
+построение `Message` из записи, опции. Перевести `process_test.go` на testify. Цикл чтения — модуль `integration`.
+
+**Acceptance criteria:**
+- [ ] Поведение при ошибке обработчика зафиксировано тестом
+- [ ] `process_test.go` на testify, кейсы не ослаблены
+- [ ] Покрытие пакета выросло относительно 14% (значение — в резюме)
+
+**Verification:**
+- [ ] `cd platform && go test -race -shuffle=on -count=10 -cover ./kafka/kafkaconsumer/`
+
+**Dependencies:** None
+
+**Files likely touched:**
+- `platform/kafka/kafkaconsumer/process_test.go`
+- `platform/kafka/kafkaconsumer/message_test.go`
+- `platform/kafka/kafkaconsumer/options_test.go`
 
 **Estimated scope:** S
 
-## Task 5: Пилотный unit-тест `OrderService.CreateOrder`
+## Checkpoint 2: platform готов
+- [ ] `task -d platform test`, `task -d platform lint` зелёные
+- [ ] `task -d platform cover` — пороги 80% выполнены
 
-**Description:** `services/order/internal/service/order_test.go`, `package service_test`. Табличный тест с моками
-mockery: хелпер `newDeps(t)` собирает моки и сервис. `TxManager` — ручной фейк, который вызывает `fn(ctx)`.
-Имена кейсов на английском, стиль — как в разделе Code Style спека.
+---
+
+## Phase 3: order — эталонный сервис
+
+## Task 12: Тесты `order/internal/domain`
+
+**Description:** Таблица для `NewOrder`: пустые позиции → `ErrOrderNoItems`, расчёт `TotalAmount`, ID позиций
+и `OrderID` (формат UUID), статус `created`, время в UTC; `OrderItem.Subtotal`.
 
 **Acceptance criteria:**
-- [x] Кейсы: ошибка `GetUser` пробрасывается (`ErrorIs`) и `Create` не вызывается; отсутствующий продукт → `ErrorIs(domain.ErrProductNotFound)`; успех — заказ с позициями и ценами из каталога, `Create` и `Save` вызваны внутри tx
-- [x] Тест и подтесты с `t.Parallel()`, без Docker, стабилен под `-shuffle=on -count=20`
+- [ ] Все ветки `NewOrder` покрыты
+- [ ] UUID и время проверяются по формату (`uuid.Parse`, `Location() == time.UTC`), не по значению
+- [ ] Покрытие `domain` ≥ 80%
 
 **Verification:**
-- [x] `task -d services/order test`
-- [x] `cd services/order && go test -race -shuffle=on -count=20 ./internal/service/...`
-- [x] `task -d services/order lint` зелёный
+- [ ] `cd services/order && go test -race -shuffle=on -count=1 -cover ./internal/domain/`
 
-**Dependencies:** Task 4
+**Dependencies:** None
+
+**Files likely touched:**
+- `services/order/internal/domain/order_test.go`
+
+**Estimated scope:** XS
+
+## Task 13: Тесты и fuzz `order/internal/event`
+
+**Description:** `OrderCreated`: payload разбирается `protojson` обратно в `orderv1.OrderCreated` с теми же
+полями, имена полей `snake_case`, поля `OutboxEvent` (тип, aggregate, ключ). Fuzz-цель `FuzzOrderCreated`
+(round-trip: заказ собирается из примитивов `testing.F` — id, суммы, строки, число позиций). `FUZZ_TARGETS` и задача `fuzz` в Taskfile
+`order`, модуль добавлен в `FUZZ_MODULES`.
+
+**Acceptance criteria:**
+- [ ] Round-trip тест проходит для заказа с несколькими позициями
+- [ ] `task -d services/order fuzz FUZZTIME=5s` запускает цель
+- [ ] `task fuzz` из корня запускает цели `platform` и `order`
+
+**Verification:**
+- [ ] `cd services/order && go test -race -shuffle=on -count=1 -cover ./internal/event/`
+- [ ] `task fuzz FUZZTIME=5s`
+
+**Dependencies:** Task 5
+
+**Files likely touched:**
+- `services/order/internal/event/order_test.go`
+- `services/order/Taskfile.yml`
+- `Taskfile.yml`
+
+**Estimated scope:** S
+
+## Task 14: Дополнить тесты `order/internal/service`
+
+**Description:** Сейчас 87.9%. Найти непокрытые ветки (`go tool cover -func`) и use case-ы без тестов
+(например, `GetOrder`), добавить кейсы: ошибка каждой зависимости, порядок вызовов в транзакции.
+
+**Acceptance criteria:**
+- [ ] Каждый публичный метод `OrderService` имеет тест успеха и ошибки каждой зависимости
+- [ ] Покрытие `service` не ниже текущего и ≥ 80%
+
+**Verification:**
+- [ ] `cd services/order && go test -race -shuffle=on -count=1 -coverprofile=/tmp/order.out ./internal/service/ && go tool cover -func=/tmp/order.out`
+
+**Dependencies:** None
 
 **Files likely touched:**
 - `services/order/internal/service/order_test.go`
-- `services/order/go.mod`
 
 **Estimated scope:** S
 
-## Task 6: Пилотный integration-тест `OrderRepo.Create`
+## Task 15: Тесты `order/internal/client` на `grpctest`
 
-**Description:** `services/order/internal/repository/pg/order_integration_test.go` (`//go:build integration`,
-`package pg_test`). `pgtest.NewDB(t, "../../../migrations/pg")`, `pg.NewOrderRepo(pool).Create`, проверка
-строк `orders` и позиций прямым SQL. Второй тест параллельно проверяет изоляцию: в его БД записей нет.
+**Description:** `UserClient` (`GetUser`, `GetAddress`) и `ProductClient`: фейковые серверы на
+`Unimplemented*Server`, клиент на `conn` из `grpctest.NewConn`. Проверить передачу аргументов, маппинг
+proto → domain (все поля, время), маппинг кодов gRPC → `apperr` через `grpcerr.Map`.
 
 **Acceptance criteria:**
-- [x] Заказ и позиции сохранены с корректными полями
-- [x] Параллельный тест не видит данных первого
-- [x] Под `task test` (без тега) тест не компилируется и не запускается
+- [ ] Для каждого метода: успех с проверкой всех полей domain и ошибка `NotFound` → `apperr` NotFound
+- [ ] Фейковый сервер проверяет полученный `Id`
+- [ ] Своей bufconn-обвязки нет
 
 **Verification:**
-- [x] `task -d services/order test-integration`
-- [x] `task -d services/order test` с остановленным Docker → зелёный
-- [x] `task -d services/order lint` зелёный (с тегом: `golangci-lint run --build-tags=integration`)
+- [ ] `cd services/order && go test -race -shuffle=on -count=1 -cover ./internal/client/`
 
-**Dependencies:** Task 1, Task 3
+**Dependencies:** Tasks 1, 3
 
 **Files likely touched:**
-- `services/order/internal/repository/pg/order_integration_test.go`
-- `services/order/go.mod`
+- `services/order/internal/client/user_test.go`
+- `services/order/internal/client/product_test.go`
+- `services/order/internal/client/helpers_test.go`
+
+**Estimated scope:** M
+
+## Task 16: Тесты `order/internal/transport/grpc` на `grpctest`
+
+**Description:** В `.mockery.yml` добавить пакет `transport/grpc`, сгенерировать `MockOrderService`.
+Тесты handler-а: маппинг request → вход use case, результат → response, ошибки `apperr` → коды gRPC через
+те же интерцепторы, что в `app` сервиса. Образец — блок кода в спеке.
+
+**Acceptance criteria:**
+- [ ] Каждый RPC: успех с проверкой ответа и аргументов мока, ошибка сервиса → ожидаемый код
+- [ ] Цепочка интерцепторов совпадает с `app` (валидация отсекает невалидный запрос до сервиса)
+- [ ] `task mocks` повторно без diff
+
+**Verification:**
+- [ ] `task -d services/order mocks && git diff --exit-code services/order`
+- [ ] `cd services/order && go test -race -shuffle=on -count=1 -cover ./internal/transport/grpc/`
+
+**Dependencies:** Tasks 1, 7
+
+**Files likely touched:**
+- `services/order/.mockery.yml`
+- `services/order/internal/transport/grpc/mocks/mocks.go`
+- `services/order/internal/transport/grpc/order_test.go`
+
+**Estimated scope:** M
+
+## Checkpoint 3: образцы закреплены
+- [ ] `task -d services/order test`, `lint`, `cover` зелёные
+- [ ] Обзор образцов тестов клиента (Task 15) и транспорта (Task 16) с пользователем перед копированием
+
+---
+
+## Phase 4: остальные сервисы (задачи 17–23 независимы)
+
+## Task 17: user — моки и тесты `service`
+
+**Description:** Создать `services/user/.mockery.yml` (пакеты `service` и `transport/grpc`), сгенерировать моки.
+Тесты `UserService` и `AddressService`: успех и ошибка репозитория для каждого метода.
+
+**Acceptance criteria:**
+- [ ] Каждый use case: успех, ошибка репозитория пробрасывается
+- [ ] Покрытие `service` ≥ 80%
+- [ ] `task mocks` повторно без diff
+
+**Verification:**
+- [ ] `cd services/user && go test -race -shuffle=on -count=1 -cover ./internal/service/`
+
+**Dependencies:** Checkpoint 3
+
+**Files likely touched:**
+- `services/user/.mockery.yml`
+- `services/user/internal/service/mocks/mocks.go`
+- `services/user/internal/service/user_test.go`
+- `services/user/internal/service/address_test.go`
+
+**Estimated scope:** M
+
+## Task 18: user — тесты `transport/grpc`
+
+**Description:** Handler-ы `User` и `Address` на `grpctest` с моками сервисов и интерцепторами как в `app`.
+
+**Acceptance criteria:**
+- [ ] Каждый RPC: успех с проверкой ответа, ошибка сервиса → код gRPC
+- [ ] Используется `grpctest.NewConn`
+
+**Verification:**
+- [ ] `cd services/user && go test -race -shuffle=on -count=1 -cover ./internal/transport/grpc/`
+
+**Dependencies:** Task 17
+
+**Files likely touched:**
+- `services/user/internal/transport/grpc/mocks/mocks.go`
+- `services/user/internal/transport/grpc/user_test.go`
+- `services/user/internal/transport/grpc/address_test.go`
+
+**Estimated scope:** M
+
+## Task 19: product — моки, тесты `service` и `transport/grpc`
+
+**Description:** Сервис маленький (23 + 54 строки). `.mockery.yml` (`service`, `transport/grpc`), тесты
+`ProductService` и handler-а на `grpctest`.
+
+**Acceptance criteria:**
+- [ ] Use case и RPC: успех и ошибка
+- [ ] Покрытие `service` ≥ 80%
+- [ ] `task mocks` повторно без diff
+
+**Verification:**
+- [ ] `cd services/product && go test -race -shuffle=on -count=1 -cover ./internal/...`
+
+**Dependencies:** Checkpoint 3
+
+**Files likely touched:**
+- `services/product/.mockery.yml`
+- `services/product/internal/service/product_test.go`
+- `services/product/internal/transport/grpc/product_test.go`
+- моки в `service/mocks/`, `transport/grpc/mocks/`
+
+**Estimated scope:** M
+
+## Task 20: notification — моки и тесты `service`
+
+**Description:** `.mockery.yml` (`service`, `transport/kafka/order`). Тесты `CreateNotification` с ручным
+фейком `TxManager`: `Claim` и `CreateForChannels` вызываются внутри транзакции и по порядку; ошибка `Claim`
+(в т. ч. «уже обработано» — идемпотентность inbox) → уведомление не создаётся; ошибка репозитория пробрасывается.
+
+**Acceptance criteria:**
+- [ ] Повторное событие (ошибка/результат `Claim` для дубля) не создаёт уведомление
+- [ ] Оба вызова сделаны внутри `WithinTx`
+- [ ] Покрытие `service` ≥ 80%
+
+**Verification:**
+- [ ] `cd services/notification && go test -race -shuffle=on -count=1 -cover ./internal/service/`
+
+**Dependencies:** Checkpoint 3
+
+**Files likely touched:**
+- `services/notification/.mockery.yml`
+- `services/notification/internal/service/mocks/mocks.go`
+- `services/notification/internal/service/notification_test.go`
 
 **Estimated scope:** S
 
-## Checkpoint: Пилот
-- [x] `task test` (без Docker) и `task test-integration` зелёные из корня
-- [x] Ревью пилотных тестов с пользователем
+## Task 21: notification — тесты и fuzz `transport/kafka`
 
-## Task 7: Линтеры `thelper`, `testifylint`, `depguard`
-
-**Description:** Во всех `.golangci.yml`: включить `thelper`, `testifylint: enable-all: true`, правило `depguard`
-с `files: ["!$test"]`, запрещающее `.../testkit` и `.../mocks`. Задача `lint` должна линтить и
-интеграционные файлы (`--build-tags=integration` или `run.build-tags`). Посчитать нарушения в существующих тестах.
-Если их больше ~20, остановиться и согласовать перенос в модуль `unit`.
+**Description:** `Router`: маршрут по топику, неизвестный топик → `nil`. `order.Handler`: роутинг по заголовку
+типа события, неизвестный тип → `nil` и сервис не вызван (tolerant reader), битый payload → `InvalidArgument`
+и сервис не вызван, заполнение `InboxEvent` из сообщения. Fuzz `FuzzHandleOrderCreated`; `FUZZ_TARGETS` в
+Taskfile `notification`, модуль в `FUZZ_MODULES`.
 
 **Acceptance criteria:**
-- [x] `task lint` зелёный во всех модулях
-- [x] Импорт `testkit` в не-тестовом файле даёт ошибку `depguard` (проверено временной правкой)
-- [x] Интеграционные тесты попадают в линт
+- [ ] Поля `InboxEvent` и `Payload` во входе сервиса совпадают с сообщением
+- [ ] Любой `msg.Value` не паникует; ошибка — `InvalidArgument`, сервис не вызывается
+- [ ] `task fuzz` запускает все три цели
 
 **Verification:**
-- [x] `task lint`
-- [x] Временный импорт `pgtest` в `services/order/internal/app/app.go` → `depguard` ругается, правка откатывается
+- [ ] `cd services/notification && go test -race -shuffle=on -count=1 -cover ./internal/transport/...`
+- [ ] `task fuzz FUZZTIME=5s`
 
-**Результат:** нарушений 5 (`thelper`), чинились сразу. `proto` без golangci-lint (там `buf lint`), конфиг не добавлялся. `testifylint` уже был в списке, добавлен `enable-all`. Интеграционные файлы линтятся через `run.build-tags: [integration]`.
-
-**Dependencies:** Task 5, Task 6
+**Dependencies:** Tasks 5, 20
 
 **Files likely touched:**
-- `platform/.golangci.yml`, `proto/.golangci.yml`, `services/*/.golangci.yml`
+- `services/notification/internal/transport/kafka/router_test.go`
+- `services/notification/internal/transport/kafka/order/handler_test.go`
+- `services/notification/internal/transport/kafka/order/mocks/mocks.go`
+- `services/notification/Taskfile.yml`
+- `Taskfile.yml`
 
-**Estimated scope:** S (механика, 7 файлов)
+**Estimated scope:** M
 
-## Task 8: `task cover` + `.testcoverage.yml`
+## Task 22: gateway — моки, тесты `service` и `client`
 
-**Description:** Установка `go-test-coverage` (`GO_TEST_COVERAGE_VERSION`) в корневой `tools`. Задача `cover`:
-по каждому модулю `go test -race -count=1 -tags=integration -coverprofile=../coverage/<module>.out ./...`,
-затем `go-test-coverage --config=.testcoverage.yml`. Конфиг: total 70, override 80 для `/domain$` и `/service$`,
-исключения `proto/gen`, `/mocks/`, `/cmd/`, `/docs/`. `coverage/` в `.gitignore`. Синтаксис сверить с документацией.
+**Description:** `.mockery.yml` (`service`, `transport/http/v1/order`). Тесты `service` с моком
+`OrderProvider`. Тесты `client/order.go` на `grpctest` по образцу Task 15.
 
 **Acceptance criteria:**
-- [x] `task cover` печатает покрытие по пакетам всех модулей
-- [x] Исключённые пути в отчёт не входят
-- [x] Нарушение порога даёт ненулевой код. Текущий результат (ожидаемо красный) записан в todo
+- [ ] Use case-ы gateway: успех и ошибка провайдера
+- [ ] Клиент: маппинг proto ↔ domain и кодов gRPC → `apperr`
+- [ ] Покрытие `service` ≥ 80%
 
 **Verification:**
-- [x] `task cover; echo $?`
-- [x] Отчёт не содержит `mocks`, `proto/gen`, `cmd`
+- [ ] `cd services/gateway && go test -race -shuffle=on -count=1 -cover ./internal/service/ ./internal/client/`
 
-**Результат:** `task cover` ожидаемо красный (код 201): пороги пока не выполняются.
-Сейчас total: platform 38.2%, proto 0/0 (зелёный), gateway 11.9%, order 31.6%, user 13.8%, product 16.0%, notification 12.6%.
-Пакеты ниже 80% по override: `internal/domain` в order (0%), `internal/service` в gateway/user/product/notification (0%); `order/internal/service` проходит (81.8%).
-
-**Отклонение от плана:** вместо одного корневого `.testcoverage.yml` у каждого модуля свои `go-test-coverage` (ставится в `bin/` модуля через `tools`),
-`.testcoverage.yml` и задача `cover` в Taskfile, как у `lint`/`test`. Корневой `task cover` обходит модули и проверяет все до выхода.
-Причина: из корня инструмент не находит `go.mod`, и одноимённые пакеты разных сервисов слились бы в один. Модульная схема не меняется,
-когда сервисы станут отдельными репозиториями. `proto` исключён (только сгенерированный код, нет тестов). Пороги и `total: 70` действуют на каждый модуль отдельно.
-Общего total по монорепо нет.
-
-**Dependencies:** Task 3, Task 5, Task 6
+**Dependencies:** Checkpoint 3
 
 **Files likely touched:**
-- `Taskfile.yml`, `platform/Taskfile.yml`, `services/*/Taskfile.yml`
-- `platform/.testcoverage.yml`, `services/*/.testcoverage.yml`
-- `.gitignore`
+- `services/gateway/.mockery.yml`
+- `services/gateway/internal/service/mocks/mocks.go`
+- `services/gateway/internal/service/order_test.go`
+- `services/gateway/internal/client/order_test.go`
+
+**Estimated scope:** M
+
+## Task 23: gateway — тесты HTTP-транспорта `v1/order`
+
+**Description:** `httptest` + реальный роутер + мок `Service`: статусы и тела ответов, невалидный JSON → 400,
+ошибки сервиса → HTTP-коды, `mapper` и `dto` (`Validate`).
+
+**Acceptance criteria:**
+- [ ] Каждый endpoint: успех (статус + тело), невалидное тело, ошибка сервиса
+- [ ] Валидация `dto` покрыта таблицей
+- [ ] Запрос идёт через роутер, как в `app`
+
+**Verification:**
+- [ ] `cd services/gateway && go test -race -shuffle=on -count=1 -cover ./internal/transport/...`
+
+**Dependencies:** Task 22
+
+**Files likely touched:**
+- `services/gateway/internal/transport/http/v1/order/mocks/mocks.go`
+- `services/gateway/internal/transport/http/v1/order/handler_test.go`
+- `services/gateway/internal/transport/http/v1/order/dto_test.go`
+- `services/gateway/internal/transport/http/v1/order/mapper_test.go`
+
+**Estimated scope:** M
+
+## Checkpoint 4: все сервисы покрыты
+- [ ] `task test`, `task lint` из корня зелёные
+- [ ] `task cover` зелёный по `domain` и `service` во всех сервисах
+- [ ] `task mocks` без diff
+
+---
+
+## Phase 5: перевод оставшихся тестов
+
+## Task 24: Перевод тестов `platform/telemetry`
+
+**Description:** 9 файлов: stdlib-ассерты → `require`/`assert`, русские имена кейсов → английские. Поведение
+кейсов не меняется. Механика, поэтому больше 5 файлов допустимо.
+
+**Acceptance criteria:**
+- [ ] Количество кейсов до и после совпадает
+- [ ] Нет кириллицы в `name`/`t.Run`; покрытие `telemetry` не упало (91%)
+
+**Verification:**
+- [ ] `cd platform && go test -race -shuffle=on -count=1 -cover ./telemetry/`
+
+**Dependencies:** None
+
+**Files likely touched:** `platform/telemetry/*_test.go`
+
+**Estimated scope:** M (механика)
+
+## Task 25: Перевод тестов `logger`, `postgres`, `grpc` (otel)
+
+**Description:** `logger/logger_test.go`, `logger/otel_test.go`, `postgres` (unit-часть), `grpc/otel_test.go` —
+на testify и английские имена.
+
+**Acceptance criteria:**
+- [ ] Количество кейсов до и после совпадает, покрытие не упало
+- [ ] Нет кириллицы в `name`/`t.Run`
+
+**Verification:**
+- [ ] `cd platform && go test -race -shuffle=on -count=1 -cover ./logger/ ./postgres/ ./grpc/`
+
+**Dependencies:** None
+
+**Files likely touched:**
+- `platform/logger/logger_test.go`
+- `platform/logger/otel_test.go`
+- `platform/postgres/postgres_test.go`
+- `platform/grpc/otel_test.go`
 
 **Estimated scope:** S
 
-## Task 9: Раздел «Тесты» в `AGENTS.md` — отменена
+## Task 26: Перевод тестов конфигов сервисов и `outbox_test.go`
 
-Раздел не добавляется по решению пользователя: команды видны в `Taskfile.yml`, конвенции остаются в [спеке](../spec/testing/SPEC-test-foundation.md).
+**Description:** `config_test.go` в 5 сервисах и `order/internal/repository/pg/outbox_test.go` — на testify
+и английские имена.
+
+**Acceptance criteria:**
+- [ ] Количество кейсов до и после совпадает
+- [ ] Нет кириллицы в `name`/`t.Run` во всём репозитории
+
+**Verification:**
+- [ ] `task test`
+- [ ] `grep -rnE '(name:|t\.Run\()\s*"[^"]*[А-Яа-я]' platform services --include='*_test.go'` — пусто
+
+**Dependencies:** None
+
+**Files likely touched:** `services/*/internal/config/config_test.go`, `services/order/internal/repository/pg/outbox_test.go`
+
+**Estimated scope:** M (механика)
+
+---
+
+## Phase 6: закрытие
+
+## Task 27: Финальная проверка, покрытие в карте эпика, резюме багов
+
+**Description:** Прогнать все Success Criteria спека. Записать итоговое покрытие по пакетам в
+`SPEC-testing-map.md`, перевести статус `unit` в `done`, перечислить найденные и исправленные баги.
+
+**Acceptance criteria:**
+- [ ] Все пункты Success Criteria в `SPEC-unit.md` отмечены
+- [ ] Покрытие по пакетам записано в карту эпика
+- [ ] Резюме багов составлено (или явно «багов не найдено»)
+
+**Verification:**
+- [ ] `task test` при остановленном Docker → exit 0
+- [ ] `task cover`, `task lint`, `task fuzz FUZZTIME=5s` зелёные
+- [ ] `task mocks && git diff --exit-code`
+- [ ] `grep` по кириллице в именах кейсов пуст; `grep -rn bufconn services` пуст (только `grpctest`)
+
+**Dependencies:** Все задачи
+
+**Files likely touched:**
+- `spec/testing/SPEC-testing-map.md`
+- `spec/testing/SPEC-unit.md`
+
+**Estimated scope:** XS
 
 ## Checkpoint: Complete
-- [x] Все Success Criteria [спека](../spec/testing/SPEC-test-foundation.md) выполнены
-- [x] `task lint`, `task test`, `task test-integration` зелёные; `task cover` печатает отчёт
-- [x] Резюме изменений пользователю, коммит — по команде
+- [ ] Все Success Criteria спека выполнены
+- [ ] Готово к ревью

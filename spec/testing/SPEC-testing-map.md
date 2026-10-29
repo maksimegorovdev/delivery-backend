@@ -19,7 +19,7 @@ Build order: `test-foundation` → `unit`, `integration` (параллельно
 | Module id | Спек | Статус |
 |---|---|---|
 | `test-foundation` | [SPEC-test-foundation.md](SPEC-test-foundation.md) | approved |
-| `unit` | — | todo |
+| `unit` | [SPEC-unit.md](SPEC-unit.md) | draft |
 | `integration` | — | todo |
 | `e2e` | — | todo |
 | `load` | — | todo |
