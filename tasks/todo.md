@@ -116,13 +116,13 @@ mockery: хелпер `newDeps(t)` собирает моки и сервис. `T
 Имена кейсов на английском, стиль — как в разделе Code Style спека.
 
 **Acceptance criteria:**
-- [ ] Кейсы: ошибка `GetUser` пробрасывается (`ErrorIs`) и `Create` не вызывается; отсутствующий продукт → `ErrorIs(domain.ErrProductNotFound)`; успех — заказ с позициями и ценами из каталога, `Create` и `Save` вызваны внутри tx
-- [ ] Тест и подтесты с `t.Parallel()`, без Docker, стабилен под `-shuffle=on -count=20`
+- [x] Кейсы: ошибка `GetUser` пробрасывается (`ErrorIs`) и `Create` не вызывается; отсутствующий продукт → `ErrorIs(domain.ErrProductNotFound)`; успех — заказ с позициями и ценами из каталога, `Create` и `Save` вызваны внутри tx
+- [x] Тест и подтесты с `t.Parallel()`, без Docker, стабилен под `-shuffle=on -count=20`
 
 **Verification:**
-- [ ] `task -d services/order test`
-- [ ] `cd services/order && go test -race -shuffle=on -count=20 ./internal/service/...`
-- [ ] `task -d services/order lint` зелёный
+- [x] `task -d services/order test`
+- [x] `cd services/order && go test -race -shuffle=on -count=20 ./internal/service/...`
+- [x] `task -d services/order lint` зелёный
 
 **Dependencies:** Task 4
 
