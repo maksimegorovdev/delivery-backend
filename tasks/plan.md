@@ -48,11 +48,11 @@ Task 9 AGENTS.md (в конце, фиксирует итоговые конве�
 - [x] Task 6: Пилотный integration-тест `OrderRepo.Create`
 
 ### Checkpoint: Пилот
-- [ ] `task test` (без Docker) и `task test-integration` зелёные из корня
-- [ ] Ревью пилотных тестов с пользователем: стиль закрепляется до массового написания
+- [x] `task test` (без Docker) и `task test-integration` зелёные из корня
+- [x] Ревью пилотных тестов с пользователем: стиль закрепляется до массового написания
 
 ### Phase 3: Контроль качества
-- [ ] Task 7: Линтеры `thelper`, `testifylint` (enable-all), `depguard` для `testkit`/`mocks`
+- [x] Task 7: Линтеры `thelper`, `testifylint` (enable-all), `depguard` для `testkit`/`mocks`
 - [ ] Task 8: `task cover` + `.testcoverage.yml`
 - [ ] Task 9: Раздел «Тесты» в `AGENTS.md`
 

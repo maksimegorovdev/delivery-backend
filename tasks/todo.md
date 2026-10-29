@@ -157,8 +157,8 @@ mockery: хелпер `newDeps(t)` собирает моки и сервис. `T
 **Estimated scope:** S
 
 ## Checkpoint: Пилот
-- [ ] `task test` (без Docker) и `task test-integration` зелёные из корня
-- [ ] Ревью пилотных тестов с пользователем
+- [x] `task test` (без Docker) и `task test-integration` зелёные из корня
+- [x] Ревью пилотных тестов с пользователем
 
 ## Task 7: Линтеры `thelper`, `testifylint`, `depguard`
 
@@ -168,13 +168,15 @@ mockery: хелпер `newDeps(t)` собирает моки и сервис. `T
 Если их больше ~20, остановиться и согласовать перенос в модуль `unit`.
 
 **Acceptance criteria:**
-- [ ] `task lint` зелёный во всех модулях
-- [ ] Импорт `testkit` в не-тестовом файле даёт ошибку `depguard` (проверено временной правкой)
-- [ ] Интеграционные тесты попадают в линт
+- [x] `task lint` зелёный во всех модулях
+- [x] Импорт `testkit` в не-тестовом файле даёт ошибку `depguard` (проверено временной правкой)
+- [x] Интеграционные тесты попадают в линт
 
 **Verification:**
-- [ ] `task lint`
-- [ ] Временный импорт `pgtest` в `services/order/internal/app/app.go` → `depguard` ругается, правка откатывается
+- [x] `task lint`
+- [x] Временный импорт `pgtest` в `services/order/internal/app/app.go` → `depguard` ругается, правка откатывается
+
+**Результат:** нарушений 5 (`thelper`), чинились сразу. `proto` без golangci-lint (там `buf lint`), конфиг не добавлялся. `testifylint` уже был в списке, добавлен `enable-all`. Интеграционные файлы линтятся через `run.build-tags: [integration]`.
 
 **Dependencies:** Task 5, Task 6
 

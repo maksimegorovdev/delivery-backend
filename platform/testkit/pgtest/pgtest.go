@@ -60,41 +60,41 @@ var (
 //
 // Путь относительный: тест запускается из каталога своего пакета. В пределах одного тестового
 // бинаря каталог должен быть один и тот же, потому что шаблон собирается по первому вызову.
-// БД удаляется в t.Cleanup. Если Docker недоступен, тест падает, а не пропускается.
-func NewDB(t testing.TB, migrationsDir string) *pgxpool.Pool {
-	t.Helper()
+// БД удаляется в tb.Cleanup. Если Docker недоступен, тест падает, а не пропускается.
+func NewDB(tb testing.TB, migrationsDir string) *pgxpool.Pool {
+	tb.Helper()
 
 	srv, err := sharedServer(migrationsDir)
 	if err != nil {
-		t.Fatalf("pgtest: %v", err)
+		tb.Fatalf("pgtest: %v", err)
 	}
 
 	name := "t_" + strings.ToLower(rand.Text())
 
-	if err = createDatabase(t.Context(), srv, name); err != nil {
-		t.Fatalf("pgtest: %v", err)
+	if err = createDatabase(tb.Context(), srv, name); err != nil {
+		tb.Fatalf("pgtest: %v", err)
 	}
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(t.Context()), dbOpTimeout)
+	tb.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(tb.Context()), dbOpTimeout)
 		defer cancel()
 
 		if dropErr := dropDatabase(ctx, srv, name); dropErr != nil {
-			t.Errorf("pgtest: %v", dropErr)
+			tb.Errorf("pgtest: %v", dropErr)
 		}
 	})
 
 	poolCfg, err := pgxpool.ParseConfig(srv.dsn)
 	if err != nil {
-		t.Fatalf("pgtest: parse dsn: %v", err)
+		tb.Fatalf("pgtest: parse dsn: %v", err)
 	}
 	poolCfg.ConnConfig.Database = name
 	poolCfg.MaxConns = maxPoolConns
 
-	pool, err := pgxpool.NewWithConfig(t.Context(), poolCfg)
+	pool, err := pgxpool.NewWithConfig(tb.Context(), poolCfg)
 	if err != nil {
-		t.Fatalf("pgtest: connect to %s: %v", name, err)
+		tb.Fatalf("pgtest: connect to %s: %v", name, err)
 	}
-	t.Cleanup(pool.Close) // выполняется до удаления БД: cleanup идут в обратном порядке
+	tb.Cleanup(pool.Close) // выполняется до удаления БД: cleanup идут в обратном порядке
 
 	return pool
 }

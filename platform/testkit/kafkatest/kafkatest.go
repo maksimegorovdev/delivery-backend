@@ -42,12 +42,12 @@ var (
 // Brokers возвращает адреса брокеров для kgo.SeedBrokers. Контейнер запускается при первом вызове.
 //
 // Если Docker недоступен, тест падает, а не пропускается.
-func Brokers(t testing.TB) []string {
-	t.Helper()
+func Brokers(tb testing.TB) []string {
+	tb.Helper()
 
 	addr, err := sharedBroker()
 	if err != nil {
-		t.Fatalf("kafkatest: %v", err)
+		tb.Fatalf("kafkatest: %v", err)
 	}
 
 	return []string{addr}
@@ -56,23 +56,23 @@ func Brokers(t testing.TB) []string {
 // CreateTopic создаёт топик с одной партицией и возвращает его имя: name плюс уникальный суффикс.
 //
 // Топик остаётся до остановки контейнера, который удаляет Ryuk после завершения тестового бинаря.
-func CreateTopic(t testing.TB, name string) string {
-	t.Helper()
+func CreateTopic(tb testing.TB, name string) string {
+	tb.Helper()
 
-	brokers := Brokers(t)
+	brokers := Brokers(tb)
 	topic := name + "-" + strings.ToLower(rand.Text())[:suffixLen]
 
 	client, err := kgo.NewClient(kgo.SeedBrokers(brokers...))
 	if err != nil {
-		t.Fatalf("kafkatest: create client: %v", err)
+		tb.Fatalf("kafkatest: create client: %v", err)
 	}
 	defer client.Close()
 
-	ctx, cancel := context.WithTimeout(t.Context(), opTimeout)
+	ctx, cancel := context.WithTimeout(tb.Context(), opTimeout)
 	defer cancel()
 
 	if err = createTopic(ctx, client, topic); err != nil {
-		t.Fatalf("kafkatest: %v", err)
+		tb.Fatalf("kafkatest: %v", err)
 	}
 
 	return topic
