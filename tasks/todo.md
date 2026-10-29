@@ -89,12 +89,12 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 `Content-Type`, тело JSON для успеха и для `apperr` (через `httptest.ResponseRecorder`). `otelenv`: таблица по env.
 
 **Acceptance criteria:**
-- [ ] Порядок закрытия и агрегирование ошибок `closer` зафиксированы тестом
-- [ ] `response` отдаёт HTTP-код, соответствующий коду `apperr`, и тело ошибки
-- [ ] Покрытие `appctx` и `http/response` ≥ 80%
+- [x] Порядок закрытия и агрегирование ошибок `closer` зафиксированы тестом
+- [x] `response` отдаёт HTTP-код, соответствующий коду `apperr`, и тело ошибки
+- [x] Покрытие `appctx` и `http/response` ≥ 80%
 
 **Verification:**
-- [ ] `cd platform && go test -race -shuffle=on -count=1 -cover ./appctx/ ./closer/ ./http/response/ ./internal/otelenv/`
+- [x] `cd platform && go test -race -shuffle=on -count=1 -cover ./appctx/ ./closer/ ./http/response/ ./internal/otelenv/`
 
 **Dependencies:** Task 2
 
