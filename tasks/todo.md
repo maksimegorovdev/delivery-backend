@@ -20,13 +20,13 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 встроенном health-сервисе (`grpc/health`) — вызов доходит до сервера; `goleak` после `Cleanup`.
 
 **Acceptance criteria:**
-- [ ] Вызов через возвращённый `conn` доходит до сервера, зарегистрированного в `register`
-- [ ] `opts` применяются к серверу (тест с интерцептором-счётчиком)
-- [ ] После завершения теста горутины не утекают (`goleak.VerifyTestMain`), тега `integration` нет
+- [x] Вызов через возвращённый `conn` доходит до сервера, зарегистрированного в `register`
+- [x] `opts` применяются к серверу (тест с интерцептором-счётчиком)
+- [x] После завершения теста горутины не утекают (`goleak.VerifyTestMain`), тега `integration` нет
 
 **Verification:**
-- [ ] `cd platform && go test -race -shuffle=on -count=10 ./testkit/grpctest/...`
-- [ ] `task -d platform lint` (`depguard`: `testkit` не импортируется из не-тестовых файлов)
+- [x] `cd platform && go test -race -shuffle=on -count=10 ./testkit/grpctest/...`
+- [x] `task -d platform lint` (`depguard`: `testkit` не импортируется из не-тестовых файлов)
 
 **Dependencies:** None
 
