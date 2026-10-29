@@ -77,10 +77,30 @@ func fixtureProducts() []domain.Product {
 	}
 }
 
+// expectUserResolved настраивает успешное получение пользователя и адреса доставки.
+func expectUserResolved(d deps) {
+	d.users.EXPECT().GetUser(mock.Anything, "user-1").Return(domain.User{ID: "user-1"}, nil)
+	d.users.EXPECT().GetAddress(mock.Anything, "address-1").
+		Return(domain.Address{ID: "address-1", Address: "Main st, 1"}, nil)
+}
+
+// expectOrderPrepared настраивает успешные вызовы до транзакции: пользователь, адрес, каталог, событие.
+func expectOrderPrepared(d deps) domain.OutboxEvent {
+	event := domain.OutboxEvent{ID: "event-1", Type: domain.EventTypeOrderCreated}
+
+	expectUserResolved(d)
+	d.products.EXPECT().GetProducts(mock.Anything, []string{"product-1", "product-2"}).
+		Return(fixtureProducts(), nil)
+	d.events.EXPECT().OrderCreated(mock.Anything).Return(event, nil)
+
+	return event
+}
+
 func TestOrderService_CreateOrder(t *testing.T) {
 	t.Parallel()
 
 	errUnavailable := errors.New("user service unavailable")
+	errDB := errors.New("db is down")
 
 	tests := []struct {
 		name    string
@@ -97,13 +117,29 @@ func TestOrderService_CreateOrder(t *testing.T) {
 		{
 			name: "returns product not found when catalog misses an item",
 			setup: func(d deps) {
-				d.users.EXPECT().GetUser(mock.Anything, "user-1").Return(domain.User{ID: "user-1"}, nil)
-				d.users.EXPECT().GetAddress(mock.Anything, "address-1").
-					Return(domain.Address{ID: "address-1", Address: "Main st, 1"}, nil)
+				expectUserResolved(d)
 				d.products.EXPECT().GetProducts(mock.Anything, []string{"product-1", "product-2"}).
 					Return(fixtureProducts()[:1], nil)
 			},
 			wantErr: domain.ErrProductNotFound,
+		},
+		{
+			// Save без EXPECT: строгий мок упадёт, если outbox вызовется после ошибки Create.
+			name: "propagates order repo error without saving outbox event",
+			setup: func(d deps) {
+				expectOrderPrepared(d)
+				d.orders.EXPECT().Create(mock.Anything, mock.Anything).Return(errDB)
+			},
+			wantErr: errDB,
+		},
+		{
+			name: "propagates outbox error",
+			setup: func(d deps) {
+				event := expectOrderPrepared(d)
+				d.orders.EXPECT().Create(mock.Anything, mock.Anything).Return(nil)
+				d.outbox.EXPECT().Save(mock.Anything, event).Return(errDB)
+			},
+			wantErr: errDB,
 		},
 	}
 
@@ -130,16 +166,10 @@ func TestOrderService_CreateOrder_Success(t *testing.T) {
 	must := require.New(t)
 
 	d := newDeps(t)
-	event := domain.OutboxEvent{ID: "event-1", Type: domain.EventTypeOrderCreated}
+	event := expectOrderPrepared(d)
 
 	var created domain.Order
 
-	d.users.EXPECT().GetUser(mock.Anything, "user-1").Return(domain.User{ID: "user-1"}, nil)
-	d.users.EXPECT().GetAddress(mock.Anything, "address-1").
-		Return(domain.Address{ID: "address-1", Address: "Main st, 1"}, nil)
-	d.products.EXPECT().GetProducts(mock.Anything, []string{"product-1", "product-2"}).
-		Return(fixtureProducts(), nil)
-	d.events.EXPECT().OrderCreated(mock.Anything).Return(event, nil)
 	d.orders.EXPECT().Create(mock.Anything, mock.Anything).
 		RunAndReturn(func(_ context.Context, order domain.Order) error {
 			is.True(d.tx.isInTx, "Create must be called inside transaction")
