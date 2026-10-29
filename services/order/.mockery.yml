@@ -1,0 +1,9 @@
+template: testify
+packages:
+  github.com/maksimegorovdev/delivery-backend/services/order/internal/service:
+    config:
+      all: true
+      dir: "{{.InterfaceDir}}/mocks"
+      filename: mocks.go
+      pkgname: mocks
+      structname: "Mock{{.InterfaceName}}"

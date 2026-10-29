@@ -64,6 +64,8 @@ func TestTraceHandler_Text(t *testing.T) {
 		{
 			name: "request_id stays and goes before trace ids",
 			ctx: func(t *testing.T) context.Context {
+				t.Helper()
+
 				return appctx.WithRequestID(spanContext(t), "req-1")
 			},
 			want: "level=INFO msg=hello request_id=req-1 trace_id=" + testTraceID + " span_id=" + testSpanID + "\n",
@@ -118,6 +120,8 @@ func TestTraceHandler_JSON(t *testing.T) {
 		{
 			name: "request_id stays next to trace ids",
 			ctx: func(t *testing.T) context.Context {
+				t.Helper()
+
 				return appctx.WithRequestID(spanContext(t), "req-1")
 			},
 			want: map[string]any{

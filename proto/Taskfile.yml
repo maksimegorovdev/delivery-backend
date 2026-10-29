@@ -33,6 +33,16 @@ tasks:
     cmds:
       - PATH="{{.LOCAL_BIN}}:$PATH" {{.LOCAL_BIN}}/buf generate
 
+  test:
+    desc: Run unit tests (no Docker required)
+    cmds:
+      - go test -race -shuffle=on -count=1 ./...
+
+  test-integration:
+    desc: Run integration tests (requires Docker)
+    cmds:
+      - go test -race -shuffle=on -count=1 -tags=integration ./...
+
   lint:
     desc: Run buf lint
     cmds:
@@ -46,7 +56,7 @@ tasks:
   breaking:
     desc: Check for breaking changes against main
     cmds:
-      - "{{.LOCAL_BIN}}/buf breaking --against '.git#branch=main'"
+      - "{{.LOCAL_BIN}}/buf breaking --against '../.git#branch=main,subdir=proto'"
 
   tidy:
     desc: Tidy go.mod/go.sum

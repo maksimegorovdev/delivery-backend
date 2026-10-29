@@ -7,6 +7,7 @@ dotenv: ['.env']
 vars:
   LOCAL_BIN: '{{.TASKFILE_DIR}}/bin'
   GOLANGCI_LINT_VERSION: v2.15.0
+  GO_TEST_COVERAGE_VERSION: v2.21.0
   MIGRATE_VERSION: v4.19.1
   GRPCUI_VERSION: v1.5.3
   AIR_VERSION: v1.63.0
@@ -22,6 +23,24 @@ tasks:
       - go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@{{.MIGRATE_VERSION}}
       - go install github.com/fullstorydev/grpcui/cmd/grpcui@{{.GRPCUI_VERSION}}
       - go install github.com/air-verse/air@{{.AIR_VERSION}}
+      - go install github.com/vladopajic/go-test-coverage/v2@{{.GO_TEST_COVERAGE_VERSION}}
+
+  test:
+    desc: Run unit tests (no Docker required)
+    cmds:
+      - go test -race -shuffle=on -count=1 ./...
+
+  test-integration:
+    desc: Run integration tests (requires Docker)
+    cmds:
+      - go test -race -shuffle=on -count=1 -tags=integration ./...
+
+  cover:
+    desc: Run tests with coverage and check thresholds (requires Docker)
+    cmds:
+      - mkdir -p coverage
+      - go test -race -count=1 -tags=integration -coverprofile=coverage/cover.out ./...
+      - '{{.LOCAL_BIN}}/go-test-coverage --config=.testcoverage.yml --profile=coverage/cover.out'
 
   lint:
     desc: Run golangci-lint
