@@ -4,14 +4,14 @@
 
 ## Overview
 
-Общая тестовая инфраструктура монорепо: модуль `testkit/` (Postgres и Redpanda на testcontainers),
+Общая тестовая инфраструктура монорепо: пакет `platform/testkit/` (Postgres и Redpanda на testcontainers),
 задачи Taskfile `test`/`test-integration`/`mocks`/`cover`, генерация моков mockery v3, линтеры для тестов,
 порог покрытия. Работоспособность доказывается пилотом в `order`: unit-тест `CreateOrder` на моках
 и integration-тест `OrderRepo.Create`. Боевой код не меняется.
 
 ## Architecture Decisions
 
-- **`testkit` — отдельный модуль без зависимости от `platform`.** Иначе возникает цикл модулей: интеграционные тесты `platform` тоже будут импортировать `testkit`. Наружу отдаются только `*pgxpool.Pool`, DSN и адреса брокеров.
+- **`testkit` — пакет `platform/testkit`, а не отдельный модуль.** Он нужен всем сервисам, как и остальной `platform`. Тестовые зависимости (`testcontainers`, `golang-migrate`) попадают в `platform/go.mod`; версии `otel`/`pgx` не конфликтуют (проверено в Task 1). Пакеты не импортируют другие пакеты `platform`, наружу отдаются только `*pgxpool.Pool`, DSN и адреса брокеров. Запрет на импорт из не-тестовых файлов обеспечивает `depguard`.
 - **Изоляция БД — клон шаблона.** На тестовый бинарь один контейнер (`sync.Once`), миграции применяются один раз в `template_app`, каждый `NewDB(t)` делает `CREATE DATABASE ... TEMPLATE`. Это совместимо с `t.Parallel`, snapshot/restore — нет.
 - **Миграции применяются библиотекой `golang-migrate`** из того же каталога `migrations/pg`, что и `task migrate-up`. Схема в тестах совпадает с боевой.
 - **Моки коммитятся.** `dir: {{.InterfaceDir}}/mocks`, `pkgname: mocks`, `structname: Mock{{.InterfaceName}}`. Свежесть проверяет `task mocks` + `git diff --exit-code`.
@@ -35,11 +35,11 @@ Task 9 AGENTS.md (в конце, фиксирует итоговые конве�
 ## Task List
 
 ### Phase 1: testkit
-- [ ] Task 1: Модуль `testkit` + `pgtest` со smoke-тестом
+- [x] Task 1: Пакет `platform/testkit/pgtest` со smoke-тестом
 - [ ] Task 2: `kafkatest` со smoke-тестом
 
 ### Checkpoint: testkit
-- [ ] `go test -tags=integration ./...` в `testkit` зелёный, контейнеры удаляются после прогона
+- [ ] `go test -tags=integration ./...` в `platform/testkit` зелёный, контейнеры удаляются после прогона
 
 ### Phase 2: Команды и пилот
 - [ ] Task 3: Задачи Taskfile `test` и `test-integration` во всех модулях

@@ -28,8 +28,8 @@ e2e, нагрузка, CI.
 | Ассерты, моки | `github.com/stretchr/testify` (`require`, `assert`, `mock`) | все модули |
 | Генерация моков | `github.com/vektra/mockery/v3`, шаблон `testify` | `bin/` модуля, через Taskfile |
 | Утечки горутин | `go.uber.org/goleak` | пакеты с горутинами |
-| Контейнеры | `github.com/testcontainers/testcontainers-go` + модули `postgres`, `redpanda` | только `testkit/` |
-| Миграции в тестах | `github.com/golang-migrate/migrate/v4` (библиотека, `source/file`, драйвер `pgx/v5`) | только `testkit/` |
+| Контейнеры | `github.com/testcontainers/testcontainers-go` + модули `postgres`, `redpanda` | только `platform/testkit/` |
+| Миграции в тестах | `github.com/golang-migrate/migrate/v4` (библиотека, `source/file`, драйвер `pgx/v5`) | только `platform/testkit/` |
 | Порог покрытия | `github.com/vladopajic/go-test-coverage/v2` | `bin/` корня, через Taskfile |
 
 Версии фиксируются в Taskfile (`*_VERSION`) и `go.mod`, как для `golangci-lint`. Образы контейнеров
@@ -38,7 +38,7 @@ e2e, нагрузка, CI.
 
 ## Commands
 
-Корневой `Taskfile.yml` обходит `MODULES` (+ `testkit`), как сейчас `lint`:
+Корневой `Taskfile.yml` обходит `MODULES` , как сейчас `lint`:
 
 ```
 task test               # unit: go test -race -shuffle=on -count=1 ./...
@@ -53,8 +53,7 @@ task tools              # дополнительно ставит mockery и go-
 ## Project Structure
 
 ```
-testkit/                          → новый модуль в go.work, импортируется только из *_test.go
-  go.mod
+platform/testkit/                 → пакеты внутри модуля platform, импортируются только из *_test.go
   pgtest/pgtest.go                → общий контейнер Postgres на тестовый бинарь, шаблонная БД с миграциями, NewDB(t)
   kafkatest/kafkatest.go          → общий контейнер Redpanda, Brokers(t), CreateTopic(t, name)
 services/<svc>/
@@ -65,7 +64,7 @@ services/<svc>/
 .testcoverage.yml                 → пороги и исключения покрытия
 ```
 
-### testkit/pgtest
+### platform/testkit/pgtest
 
 Изоляция — через клон шаблонной БД, а не snapshot/restore. Snapshot общий на контейнер
 и не совместим с `t.Parallel`. `CREATE DATABASE ... TEMPLATE` даёт каждому тесту свою БД за десятки миллисекунд.
@@ -76,7 +75,8 @@ services/<svc>/
    и возвращает пул. В `t.Cleanup` закрывает пул и делает `DROP DATABASE`.
 3. Контейнер удаляет Ryuk после завершения бинаря. Без Docker тест падает с понятной ошибкой, а не пропускается.
 
-`testkit` не импортирует `platform` (иначе цикл модулей) и отдаёт только `*pgxpool.Pool`/DSN.
+`testkit` лежит в модуле `platform`, потому что нужен всем сервисам. Тестовые зависимости (`testcontainers`, `golang-migrate`) попадают в `platform/go.mod`.
+Пакеты `testkit` не импортируют другие пакеты `platform` и отдают только `*pgxpool.Pool`/DSN.
 
 ## Code Style
 
@@ -158,7 +158,6 @@ func TestOrderRepo_Create(t *testing.T) {
 
 ## Изменения конфигурации
 
-- `go.work`: `use ./testkit`.
 - `.golangci.yml` во всех модулях:
   - включить `thelper`;
   - `testifylint` с `enable-all`;

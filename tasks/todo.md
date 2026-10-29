@@ -4,32 +4,31 @@
 
 Для интеграционных задач нужен запущенный Docker. Образы: `postgres:18`, `redpandadata/redpanda:v26.2.3`.
 
-## Task 1: Модуль `testkit` + `pgtest` со smoke-тестом
+## Task 1: Пакет `platform/testkit/pgtest` со smoke-тестом
 
-**Description:** Создать модуль `github.com/maksimegorovdev/delivery-backend/testkit`, подключить его в `go.work`.
+**Description:** Создать пакет `github.com/maksimegorovdev/delivery-backend/platform/testkit` внутри модуля `platform`.
 Реализовать `pgtest`: общий контейнер `postgres:18` на тестовый бинарь (`sync.Once`), применение миграций
 `golang-migrate` из переданного каталога в БД `template_app`, `NewDB(t, migrationsDir) *pgxpool.Pool`
 (клон `CREATE DATABASE t_<random> TEMPLATE template_app`, в `t.Cleanup` закрыть пул и `DROP DATABASE`).
 Без Docker — понятная ошибка через `t.Fatal`. В модуль добавить `Taskfile.yml` и `.golangci.yml` по образцу `platform`.
 
 **Acceptance criteria:**
-- [ ] Smoke-тест (`//go:build integration`) на тестовых миграциях из `testdata/` получает БД с таблицей из миграции
-- [ ] 10 параллельных `NewDB` получают разные БД: запись в одной не видна в другой
-- [ ] После прогона `docker ps -a` не показывает контейнеров testcontainers, `testkit` не импортирует `platform`
+- [x] Smoke-тест (`//go:build integration`) на тестовых миграциях из `testdata/` получает БД с таблицей из миграции
+- [x] 10 параллельных `NewDB` получают разные БД: запись в одной не видна в другой
+- [x] После прогона `docker ps -a` не показывает контейнеров testcontainers, `pgtest` не импортирует другие пакеты `platform`
 
 **Verification:**
-- [ ] `cd testkit && go test -race -count=1 -tags=integration ./...`
-- [ ] `docker ps -a --filter label=org.testcontainers=true` → пусто через ~10 с после прогона
-- [ ] `go list -deps ./... | grep delivery-backend/platform` → пусто
-- [ ] `task -d testkit lint` зелёный
+- [x] `cd platform && go test -race -count=1 -tags=integration ./testkit/...`
+- [x] `docker ps -a --filter label=org.testcontainers=true` → пусто через ~10 с после прогона
+- [x] `go list -deps ./testkit/... | grep delivery-backend/platform | grep -v /testkit` → пусто
+- [x] `task -d platform lint` зелёный (и `golangci-lint run --build-tags=integration ./testkit/...`)
 
 **Dependencies:** None
 
 **Files likely touched:**
-- `go.work`
-- `testkit/go.mod`, `testkit/Taskfile.yml`, `testkit/.golangci.yml`
-- `testkit/pgtest/pgtest.go`
-- `testkit/pgtest/pgtest_integration_test.go`, `testkit/pgtest/testdata/*.sql`
+- `platform/go.mod`, `platform/go.sum`
+- `platform/testkit/pgtest/pgtest.go`
+- `platform/testkit/pgtest/pgtest_integration_test.go`, `platform/testkit/pgtest/testdata/*.sql`
 
 **Estimated scope:** M
 
@@ -44,27 +43,27 @@
 - [ ] Два параллельных теста получают разные топики
 
 **Verification:**
-- [ ] `cd testkit && go test -race -count=1 -tags=integration ./kafkatest/...`
-- [ ] `task -d testkit lint` зелёный
+- [ ] `cd platform && go test -race -count=1 -tags=integration ./testkit/kafkatest/...`
+- [ ] `task -d platform lint` зелёный (и с `--build-tags=integration`)
 
 **Dependencies:** Task 1
 
 **Files likely touched:**
-- `testkit/kafkatest/kafkatest.go`
-- `testkit/kafkatest/kafkatest_integration_test.go`
-- `testkit/go.mod`
+- `platform/testkit/kafkatest/kafkatest.go`
+- `platform/testkit/kafkatest/kafkatest_integration_test.go`
+- `platform/go.mod`
 
 **Estimated scope:** S
 
 ## Checkpoint: testkit
-- [ ] `go test -tags=integration ./...` в `testkit` зелёный, контейнеры удаляются
+- [ ] `go test -tags=integration ./...` в `platform/testkit` зелёный, контейнеры удаляются
 - [ ] Показать пользователю API `pgtest`/`kafkatest` перед использованием в сервисах
 
 ## Task 3: Задачи Taskfile `test` и `test-integration` во всех модулях
 
-**Description:** В Taskfile каждого модуля (`platform`, `proto`, 5 сервисов, `testkit`) задачи
+**Description:** В Taskfile каждого модуля (`platform`, `proto`, 5 сервисов) задачи
 `test` (`go test -race -shuffle=on -count=1 ./...`) и `test-integration` (то же с `-tags=integration`).
-В корневом Taskfile — циклы по `MODULES`, `testkit` добавить в `MODULES`. Задачу `test` в `platform` привести к общему виду.
+В корневом Taskfile — циклы по `MODULES`. Задачу `test` в `platform` привести к общему виду.
 Правки механические, поэтому больше 5 файлов допустимо.
 
 **Acceptance criteria:**
@@ -80,9 +79,9 @@
 
 **Files likely touched:**
 - `Taskfile.yml`
-- `platform/Taskfile.yml`, `proto/Taskfile.yml`, `services/*/Taskfile.yml`, `testkit/Taskfile.yml`
+- `platform/Taskfile.yml`, `proto/Taskfile.yml`, `services/*/Taskfile.yml`
 
-**Estimated scope:** S (механика, 9 файлов)
+**Estimated scope:** S (механика, 8 файлов)
 
 ## Task 4: mockery v3: установка, `.mockery.yml`, `task mocks`, моки `order/internal/service`
 
@@ -180,9 +179,9 @@ mockery: хелпер `newDeps(t)` собирает моки и сервис. `T
 **Dependencies:** Task 5, Task 6
 
 **Files likely touched:**
-- `platform/.golangci.yml`, `proto/.golangci.yml`, `services/*/.golangci.yml`, `testkit/.golangci.yml`
+- `platform/.golangci.yml`, `proto/.golangci.yml`, `services/*/.golangci.yml`
 
-**Estimated scope:** S (механика, 8 файлов)
+**Estimated scope:** S (механика, 7 файлов)
 
 ## Task 8: `task cover` + `.testcoverage.yml`
 
