@@ -114,13 +114,13 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 (`./http/bind:FuzzJSON`) с `FUZZTIME` (по умолчанию `30s`); корневая `fuzz` — цикл по `FUZZ_MODULES`.
 
 **Acceptance criteria:**
-- [ ] `task test` прогоняет seed-корпус `FuzzJSON`
-- [ ] `task fuzz` и `task -d platform fuzz FUZZTIME=5s` запускают цель и завершаются с кодом 0
-- [ ] Покрытие `http/bind` ≥ 80%
+- [x] `task test` прогоняет seed-корпус `FuzzJSON`
+- [x] `task fuzz` и `task -d platform fuzz FUZZTIME=5s` запускают цель и завершаются с кодом 0
+- [x] Покрытие `http/bind` ≥ 80%
 
 **Verification:**
-- [ ] `cd platform && go test -race -count=1 -cover ./http/bind/`
-- [ ] `task fuzz FUZZTIME=5s`
+- [x] `cd platform && go test -race -count=1 -cover ./http/bind/`
+- [x] `task fuzz FUZZTIME=5s`
 
 **Dependencies:** Task 3 (`ozzoerr`)
 
