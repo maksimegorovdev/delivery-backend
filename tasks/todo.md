@@ -242,12 +242,12 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 построение `Message` из записи, опции. Перевести `process_test.go` на testify. Цикл чтения — модуль `integration`.
 
 **Acceptance criteria:**
-- [ ] Поведение при ошибке обработчика зафиксировано тестом
-- [ ] `process_test.go` на testify, кейсы не ослаблены
-- [ ] Покрытие пакета выросло относительно 14% (значение — в резюме)
+- [x] Поведение при ошибке обработчика зафиксировано тестом
+- [x] `process_test.go` на testify, кейсы не ослаблены
+- [x] Покрытие пакета выросло относительно 14% (значение — в резюме)
 
 **Verification:**
-- [ ] `cd platform && go test -race -shuffle=on -count=10 -cover ./kafka/kafkaconsumer/`
+- [x] `cd platform && go test -race -shuffle=on -count=10 -cover ./kafka/kafkaconsumer/`
 
 **Dependencies:** None
 
