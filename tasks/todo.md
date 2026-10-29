@@ -220,12 +220,12 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 Перевести имена кейсов `otel_test.go` на английский.
 
 **Acceptance criteria:**
-- [ ] Graceful shutdown дожидается активного запроса (синхронизация каналами)
-- [ ] Горутины не утекают; стабильно под `-count=10`
-- [ ] В `otel_test.go` нет кириллицы в `name`/`t.Run`
+- [x] Graceful shutdown дожидается активного запроса (синхронизация каналами)
+- [x] Горутины не утекают; стабильно под `-count=10`
+- [x] В `otel_test.go` нет кириллицы в `name`/`t.Run`
 
 **Verification:**
-- [ ] `cd platform && go test -race -shuffle=on -count=10 ./http/httpserver/`
+- [x] `cd platform && go test -race -shuffle=on -count=10 ./http/httpserver/`
 
 **Dependencies:** None
 
