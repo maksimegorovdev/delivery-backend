@@ -173,12 +173,12 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 занятый адрес — второй сервер на адресе первого.
 
 **Acceptance criteria:**
-- [ ] Остановка по `ctx` возвращает `nil`, горутины не утекают
-- [ ] Ошибка `Listen` оборачивается с префиксом `grpcserver:`
-- [ ] Стабильно под `-count=10`
+- [x] Остановка по `ctx` возвращает `nil`, горутины не утекают
+- [x] Ошибка `Listen` оборачивается с префиксом `grpcserver:`
+- [x] Стабильно под `-count=10`
 
 **Verification:**
-- [ ] `cd platform && go test -race -shuffle=on -count=10 ./grpc/grpcserver/ ./grpc/grpcclient/`
+- [x] `cd platform && go test -race -shuffle=on -count=10 ./grpc/grpcserver/ ./grpc/grpcclient/`
 
 **Dependencies:** Task 1
 

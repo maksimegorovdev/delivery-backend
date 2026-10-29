@@ -25,16 +25,16 @@ testify и английские имена кейсов, fuzz для парсе�
 - [x] Task 1: `platform/testkit/grpctest` с собственным тестом
 - [x] Task 2: Тесты `platform/apperr`
 - [x] Task 3: Тесты `apperr/grpcerr`, `apperr/ozzoerr`, `apperr/pgerr`
-- [ ] Task 4: Тесты `appctx`, `closer`, `http/response`, `internal/otelenv`
-- [ ] Task 5: Тесты и fuzz `http/bind`, задача `task fuzz`
+- [x] Task 4: Тесты `appctx`, `closer`, `http/response`, `internal/otelenv`
+- [x] Task 5: Тесты и fuzz `http/bind`, задача `task fuzz`
 
 ### Checkpoint 1: platform-фундамент
 - [ ] `task -d platform test` и `task -d platform lint` зелёные, `task -d platform fuzz` работает
 - [ ] Обзор API `grpctest` и образца табличного теста с пользователем
 
 ### Phase 2: platform — транспорт и горутины
-- [ ] Task 7: Тесты `grpc/interceptors` на `grpctest`
-- [ ] Task 8: Тесты `grpcserver` и `grpcclient`, `goleak`
+- [x] Task 7: Тесты `grpc/interceptors` на `grpctest`
+- [x] Task 8: Тесты `grpcserver` и `grpcclient`, `goleak`
 - [ ] Task 9: Тесты `http/middleware`
 - [ ] Task 10: Тесты `httpserver` (graceful shutdown), `goleak`
 - [ ] Task 11: Unit-тесты `kafkaconsumer`
