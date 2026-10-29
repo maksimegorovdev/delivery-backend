@@ -139,14 +139,14 @@ mockery: хелпер `newDeps(t)` собирает моки и сервис. `T
 строк `orders` и позиций прямым SQL. Второй тест параллельно проверяет изоляцию: в его БД записей нет.
 
 **Acceptance criteria:**
-- [ ] Заказ и позиции сохранены с корректными полями
-- [ ] Параллельный тест не видит данных первого
-- [ ] Под `task test` (без тега) тест не компилируется и не запускается
+- [x] Заказ и позиции сохранены с корректными полями
+- [x] Параллельный тест не видит данных первого
+- [x] Под `task test` (без тега) тест не компилируется и не запускается
 
 **Verification:**
-- [ ] `task -d services/order test-integration`
-- [ ] `task -d services/order test` с остановленным Docker → зелёный
-- [ ] `task -d services/order lint` зелёный (с тегом: `golangci-lint run --build-tags=integration`)
+- [x] `task -d services/order test-integration`
+- [x] `task -d services/order test` с остановленным Docker → зелёный
+- [x] `task -d services/order lint` зелёный (с тегом: `golangci-lint run --build-tags=integration`)
 
 **Dependencies:** Task 1, Task 3
 

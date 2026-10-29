@@ -45,7 +45,7 @@ Task 9 AGENTS.md (в конце, фиксирует итоговые конве�
 - [x] Task 3: Задачи Taskfile `test` и `test-integration` во всех модулях
 - [x] Task 4: mockery v3: установка, `.mockery.yml`, `task mocks`, моки `order/internal/service`
 - [x] Task 5: Пилотный unit-тест `OrderService.CreateOrder`
-- [ ] Task 6: Пилотный integration-тест `OrderRepo.Create`
+- [x] Task 6: Пилотный integration-тест `OrderRepo.Create`
 
 ### Checkpoint: Пилот
 - [ ] `task test` (без Docker) и `task test-integration` зелёные из корня
