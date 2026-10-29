@@ -55,6 +55,12 @@ tasks:
       - for: { var: MODULES, split: ',' }
         cmd: task -d {{.ITEM}} test-integration
 
+  mocks:
+    desc: Generate mocks in every module that has .mockery.yml
+    cmds:
+      - for: { var: MODULES, split: ',' }
+        cmd: '[ ! -f {{.ITEM}}/.mockery.yml ] || task -d {{.ITEM}} mocks'
+
   tidy:
     desc: Tidy go.mod/go.sum for every module
     cmds:

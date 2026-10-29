@@ -91,13 +91,13 @@
 Перед этим сверить ключи конфига с документацией mockery v3.
 
 **Acceptance criteria:**
-- [ ] `services/order/internal/service/mocks/mocks.go` содержит `MockTxManager`, `MockOrderRepo`, `MockOutboxRepo`, `MockOrderEvents`, `MockUserProvider`, `MockProductProvider` с `EXPECT()` и `NewMock…(t)`
-- [ ] Повторный `task mocks` не меняет файлы
-- [ ] Файл помечен `// Code generated`, `golangci-lint` его не проверяет
+- [x] `services/order/internal/service/mocks/mocks.go` содержит `MockTxManager`, `MockOrderRepo`, `MockOutboxRepo`, `MockOrderEvents`, `MockUserProvider`, `MockProductProvider` с `EXPECT()` и `NewMock…(t)`
+- [x] Повторный `task mocks` не меняет файлы
+- [x] Файл помечен `// Code generated`, `golangci-lint` его не проверяет
 
 **Verification:**
-- [ ] `task mocks && git diff --exit-code services/order/internal/service/mocks`
-- [ ] `go build ./...` и `task -d services/order lint` зелёные
+- [x] `task mocks && git diff --exit-code services/order/internal/service/mocks`
+- [x] `go build ./...` и `task -d services/order lint` зелёные
 
 **Dependencies:** Task 3
 
