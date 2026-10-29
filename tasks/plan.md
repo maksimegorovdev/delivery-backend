@@ -22,9 +22,9 @@ testify и английские имена кейсов, fuzz для парсе�
 ## Task List
 
 ### Phase 1: platform — фундамент и чистые функции
-- [ ] Task 1: `platform/testkit/grpctest` с собственным тестом
-- [ ] Task 2: Тесты `platform/apperr`
-- [ ] Task 3: Тесты `apperr/grpcerr`, `apperr/ozzoerr`, `apperr/pgerr`
+- [x] Task 1: `platform/testkit/grpctest` с собственным тестом
+- [x] Task 2: Тесты `platform/apperr`
+- [x] Task 3: Тесты `apperr/grpcerr`, `apperr/ozzoerr`, `apperr/pgerr`
 - [ ] Task 4: Тесты `appctx`, `closer`, `http/response`, `internal/otelenv`
 - [ ] Task 5: Тесты и fuzz `http/bind`, задача `task fuzz`
 

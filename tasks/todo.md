@@ -43,12 +43,12 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 `errors.Is`/`errors.As`), кодов (`code.go`: строковое представление, HTTP- и gRPC-соответствия) и `reason.go`.
 
 **Acceptance criteria:**
-- [ ] Каждый конструктор проверен на код и сообщение
-- [ ] `Wrap` сохраняет причину: `errors.Is`/`errors.As` находят и `*apperr.Error`, и исходную ошибку
-- [ ] Покрытие пакета ≥ 80%
+- [x] Каждый конструктор проверен на код и сообщение
+- [x] `Wrap` сохраняет причину: `errors.Is`/`errors.As` находят и `*apperr.Error`, и исходную ошибку
+- [x] Покрытие пакета ≥ 80%
 
 **Verification:**
-- [ ] `cd platform && go test -race -shuffle=on -count=1 -cover ./apperr/`
+- [x] `cd platform && go test -race -shuffle=on -count=1 -cover ./apperr/`
 
 **Dependencies:** None
 
@@ -66,12 +66,12 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 `pgerr`: `pgconn.PgError` с кодами (unique, FK, not null и т. д.) и `pgx.ErrNoRows` → коды `apperr`.
 
 **Acceptance criteria:**
-- [ ] Маппинг кодов gRPC проверен в обе стороны для всех кодов `apperr`
-- [ ] Ошибки валидации ozzo дают `InvalidArgument` с перечнем полей
-- [ ] Покрытие каждого пакета ≥ 80%
+- [x] Маппинг кодов gRPC проверен в обе стороны для всех кодов `apperr`
+- [x] Ошибки валидации ozzo дают `InvalidArgument` с перечнем полей
+- [x] Покрытие каждого пакета ≥ 80%
 
 **Verification:**
-- [ ] `cd platform && go test -race -shuffle=on -count=1 -cover ./apperr/...`
+- [x] `cd platform && go test -race -shuffle=on -count=1 -cover ./apperr/...`
 
 **Dependencies:** Task 2
 
