@@ -132,25 +132,6 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 
 **Estimated scope:** M
 
-## Task 6: Порог 80% для пакетов `platform` без I/O
-
-**Description:** В `platform/.testcoverage.yml` удалить неработающие правила `/domain$` и `/service$`,
-добавить override 80% для `appctx|apperr|apperr/grpcerr|apperr/ozzoerr|apperr/pgerr|http/bind|http/response`.
-
-**Acceptance criteria:**
-- [ ] `task -d platform cover` зелёный с новым правилом
-- [ ] Временное удаление одного тест-файла `apperr` делает `cover` красным (проверка, что правило матчится), файл возвращён
-
-**Verification:**
-- [ ] `task -d platform cover` (Docker запущен)
-
-**Dependencies:** Tasks 2–5
-
-**Files likely touched:**
-- `platform/.testcoverage.yml`
-
-**Estimated scope:** XS
-
 ## Checkpoint 1: platform-фундамент
 - [ ] `task -d platform test` и `task -d platform lint` зелёные
 - [ ] `task fuzz FUZZTIME=5s` работает
@@ -277,9 +258,34 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 
 **Estimated scope:** S
 
+## Task 6: Порог 80% на каждый пакет `platform`, I/O-исключения по замеру
+
+> Номер сохранён, выполняется после Task 11: пороги исключений измеряются, когда у всех пакетов `platform` есть unit-тесты.
+
+**Description:** В `platform/.testcoverage.yml` удалить неработающие правила `/domain$` и `/service$`, задать
+`threshold.package: 80`. Прогнать `task -d platform cover` и для каждого пакета ниже 80% решить: дописать тесты
+(если логика без I/O) или добавить в override с измеренным порогом (округление вниз до целого) и комментарием,
+почему пакет упирается в I/O. Ожидаемые исключения — `postgres`, `kafka/kafkaconsumer`; итоговый список — по замеру.
+
+**Acceptance criteria:**
+- [ ] `task -d platform cover` зелёный: каждый пакет ≥ 80%, кроме перечисленных в override
+- [ ] Каждое исключение — I/O-пакет с комментарием и измеренным порогом; пакетов без I/O в исключениях нет
+- [ ] Список исключений и пороги перечислены в резюме задачи
+
+**Verification:**
+- [ ] `task -d platform cover` (Docker запущен)
+- [ ] Временный пустой пакет с одной непокрытой функцией делает `cover` красным (новый пакет под порогом), пакет удалён
+
+**Dependencies:** Tasks 2–5, 7–11
+
+**Files likely touched:**
+- `platform/.testcoverage.yml`
+
+**Estimated scope:** XS
+
 ## Checkpoint 2: platform готов
 - [ ] `task -d platform test`, `task -d platform lint` зелёные
-- [ ] `task -d platform cover` — пороги 80% выполнены
+- [ ] `task -d platform cover` зелёный с новыми порогами
 
 ---
 
@@ -656,9 +662,14 @@ Taskfile `notification`, модуль в `FUZZ_MODULES`.
 
 **Dependencies:** Все задачи
 
+Дополнительно: в README описать, как новый модуль попадает под контроль покрытия (сервис — копия
+`.testcoverage.yml` с правилами `/domain$` и `/service$` и запись в `COVER_MODULES` корневого `Taskfile.yml`;
+пакет `platform` — автоматически под 80%).
+
 **Files likely touched:**
 - `spec/testing/SPEC-testing-map.md`
 - `spec/testing/SPEC-unit.md`
+- `README.md`
 
 **Estimated scope:** XS
 

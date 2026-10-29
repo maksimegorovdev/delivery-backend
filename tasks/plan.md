@@ -15,7 +15,7 @@ testify и английские имена кейсов, fuzz для парсе�
 - **Нарезка по пакетам, а не по видам тестов.** Задача = пакет (или пара мелких пакетов) целиком: новые тесты + перевод уже существующих тестов этого пакета + моки. Так каждая задача закрывает строку таблицы «Покрытие по пакетам» и не оставляет пакет полупереведённым.
 - **Сначала `platform`, потом `order`, потом остальные сервисы.** Пакеты `apperr*` используются в ассертах всех сервисов, интерцепторы — в тестах транспорта. `order` — эталонный сервис: на нём закрепляются образцы тестов клиента и транспорта, остальные сервисы их копируют.
 - **Fuzz-инфраструктура вводится вместе с первой целью (`bind`).** Корневой `task fuzz` обходит список `FUZZ_MODULES`, а не все модули: модуль попадает в список в той же задаче, где появляется его первая fuzz-цель. Модули без целей не получают пустую задачу `fuzz`.
-- **Порог 80% для пакетов `platform` включается после их тестов** (Task 6), иначе `task cover` краснеет посреди фазы.
+- **Порог `platform` — 80% на каждый пакет по умолчанию, I/O-пакеты — явные исключения.** Новый пакет сразу под порогом, забытое исключение делает проверку строже. Пороги исключений не угадываются, а измеряются, поэтому Task 6 выполняется после всех unit-тестов `platform` (после Task 11).
 - **`.mockery.yml` в сервисе создаётся в задаче, где впервые нужны его моки.** Новые пакеты (`transport/...`) добавляются в конфиг там же.
 - **Перевод существующих тестов без собственного пакета в плане** (telemetry, logger, postgres, конфиги сервисов) — отдельными механическими задачами в конце, больше 5 файлов допустимо.
 
@@ -27,7 +27,6 @@ testify и английские имена кейсов, fuzz для парсе�
 - [ ] Task 3: Тесты `apperr/grpcerr`, `apperr/ozzoerr`, `apperr/pgerr`
 - [ ] Task 4: Тесты `appctx`, `closer`, `http/response`, `internal/otelenv`
 - [ ] Task 5: Тесты и fuzz `http/bind`, задача `task fuzz`
-- [ ] Task 6: Порог 80% для пакетов `platform` без I/O
 
 ### Checkpoint 1: platform-фундамент
 - [ ] `task -d platform test` и `task -d platform lint` зелёные, `task -d platform fuzz` работает
@@ -39,9 +38,10 @@ testify и английские имена кейсов, fuzz для парсе�
 - [ ] Task 9: Тесты `http/middleware`
 - [ ] Task 10: Тесты `httpserver` (graceful shutdown), `goleak`
 - [ ] Task 11: Unit-тесты `kafkaconsumer`
+- [ ] Task 6: Порог 80% на каждый пакет `platform`, I/O-исключения по замеру
 
 ### Checkpoint 2: platform готов
-- [ ] `task -d platform test`, `task -d platform lint` зелёные; `task -d platform cover` — пороги 80% выполнены
+- [ ] `task -d platform test`, `task -d platform lint` зелёные; `task -d platform cover` зелёный с новыми порогами
 
 ### Phase 3: order — эталонный сервис
 - [ ] Task 12: Тесты `order/internal/domain`
@@ -86,7 +86,7 @@ Task 1 grpctest ──┬── Task 7 interceptors ──┬── Task 15 orde
                   └── Task 8 grpcserver/client
 Task 2 apperr ── Task 3 apperr/* ── (ассерты ошибок во всех сервисах)
 Task 5 bind + task fuzz ── Task 13 order/event fuzz, Task 21 notification fuzz
-Task 2..5 ── Task 6 порог platform
+Tasks 2..5, 7..11 ── Task 6 порог platform (по замеру)
 Checkpoint 3 ── Phase 4 (задачи 17–23 независимы друг от друга)
 Phase 4 ── Phase 5 ── Task 27
 ```
