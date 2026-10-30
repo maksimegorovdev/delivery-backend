@@ -56,7 +56,7 @@ testify и английские имена кейсов, fuzz для парсе�
 
 ### Phase 4: остальные сервисы (задачи независимы, можно параллельно)
 - [ ] Task 17: user — моки и тесты `service`
-- [ ] Task 18: user — тесты `transport/grpc`
+- [x] Task 18: user — тесты `transport/grpc`
 - [ ] Task 19: product — моки, тесты `service` и `transport/grpc`
 - [ ] Task 20: notification — моки и тесты `service`
 - [ ] Task 21: notification — тесты и fuzz `transport/kafka`

@@ -439,11 +439,11 @@ proto → domain (все поля, время), маппинг кодов gRPC �
 **Description:** Handler-ы `User` и `Address` на `grpctest` с моками сервисов и интерцепторами как в `app`.
 
 **Acceptance criteria:**
-- [ ] Каждый RPC: успех с проверкой ответа, ошибка сервиса → код gRPC
-- [ ] Используется `grpctest.NewConn`
+- [x] Каждый RPC: успех с проверкой ответа, ошибка сервиса → код gRPC
+- [x] Используется `grpctest.NewConn`
 
 **Verification:**
-- [ ] `cd services/user && go test -race -shuffle=on -count=1 -cover ./internal/transport/grpc/`
+- [x] `cd services/user && go test -race -shuffle=on -count=1 -cover ./internal/transport/grpc/`
 
 **Dependencies:** Task 17
 
