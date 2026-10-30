@@ -460,12 +460,12 @@ proto → domain (все поля, время), маппинг кодов gRPC �
 `ProductService` и handler-а на `grpctest`.
 
 **Acceptance criteria:**
-- [ ] Use case и RPC: успех и ошибка
-- [ ] Покрытие `service` ≥ 80%
-- [ ] `task mocks` повторно без diff
+- [x] Use case и RPC: успех и ошибка
+- [x] Покрытие `service` ≥ 80%
+- [x] `task mocks` повторно без diff
 
 **Verification:**
-- [ ] `cd services/product && go test -race -shuffle=on -count=1 -cover ./internal/...`
+- [x] `cd services/product && go test -race -shuffle=on -count=1 -cover ./internal/...`
 
 **Dependencies:** Checkpoint 3
 
