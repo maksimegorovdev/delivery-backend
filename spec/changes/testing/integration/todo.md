@@ -236,13 +236,13 @@
 (фиксация текущего поведения).
 
 **Acceptance criteria:**
-- [ ] Эталон обрабатывается, строки в `inbox_events`/`notifications` по одной на событие/канал
-- [ ] Повторная доставка того же события не создаёт дублей
-- [ ] Неизвестный тип не блокирует партицию; невалидное сообщение ретраится (текущее поведение зафиксировано)
+- [x] Эталон обрабатывается, строки в `inbox_events`/`notifications` по одной на событие/канал
+- [x] Повторная доставка того же события не создаёт дублей
+- [x] Неизвестный тип не блокирует партицию; невалидное сообщение ретраится (текущее поведение зафиксировано)
 
 **Verification:**
-- [ ] `cd services/notification && go test -race -shuffle=on -count=5 -tags=integration ./internal/transport/kafka/...` (стабильность)
-- [ ] `task -d services/notification lint`
+- [x] `cd services/notification && go test -race -shuffle=on -count=5 -tags=integration ./internal/transport/kafka/...` (стабильность)
+- [x] `task -d services/notification lint`
 
 **Dependencies:** Task 2, Task 3, Task 6, Task 8
 
