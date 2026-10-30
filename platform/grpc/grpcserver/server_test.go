@@ -17,37 +17,67 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcserver"
 )
 
-const reflectionService = "grpc.reflection.v1.ServerReflection"
+const (
+	reflectionService = "grpc.reflection.v1.ServerReflection"
+	waitTimeout       = 5 * time.Second
+)
 
-// freeAddr резервирует свободный loopback-порт: Run принимает адрес строкой и не отдаёт выбранный порт.
-func freeAddr(t *testing.T) string {
+// listen открывает loopback-листенер на порту, выданном ОС.
+func listen(t *testing.T) net.Listener {
 	t.Helper()
 
 	var lc net.ListenConfig
 	lis, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	addr := lis.Addr().String()
-	require.NoError(t, lis.Close())
+	t.Cleanup(func() { _ = lis.Close() })
 
-	return addr
+	return lis
 }
 
-// runServer регистрирует health-сервис, запускает Run и возвращает клиента и канал результата Run.
+// requireClosed проверяет, что листенер закрыт: Accept на закрытом листенере сразу возвращает [net.ErrClosed].
+// Дедлайн не даёт тесту зависнуть, если листенер остался открытым.
+func requireClosed(t *testing.T, lis net.Listener) {
+	t.Helper()
+
+	if tcp, ok := lis.(*net.TCPListener); ok {
+		// На закрытом листенере SetDeadline возвращает ошибку — это и есть ожидаемый случай.
+		_ = tcp.SetDeadline(time.Now().Add(waitTimeout))
+	}
+	_, err := lis.Accept()
+	require.ErrorIs(t, err, net.ErrClosed, "listener must be closed after Serve returns")
+}
+
+func receive[T any](t *testing.T, ch <-chan T, what string) T {
+	t.Helper()
+
+	select {
+	case v := <-ch:
+		return v
+	case <-time.After(waitTimeout):
+		require.FailNow(t, "timed out waiting for "+what)
+	}
+
+	var zero T
+
+	return zero
+}
+
+// runServer регистрирует health-сервис, запускает Serve на lis и возвращает клиента и канал результата Serve.
 func runServer(
 	ctx context.Context,
 	t *testing.T,
-	addr string,
+	lis net.Listener,
 	opts ...grpcserver.Option,
 ) (grpc_health_v1.HealthClient, <-chan error) {
 	t.Helper()
 
-	srv := grpcserver.New(addr, opts...)
+	srv := grpcserver.New("unused", opts...)
 	grpc_health_v1.RegisterHealthServer(srv.Server(), health.NewServer())
 
 	result := make(chan error, 1)
-	go func() { result <- srv.Run(ctx) }()
+	go func() { result <- srv.Serve(ctx, lis) }()
 
-	conn, err := grpcclient.New(addr)
+	conn, err := grpcclient.New(lis.Addr().String())
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
 
@@ -90,26 +120,35 @@ func hasService(srv *grpc.Server, name string) bool {
 	return ok
 }
 
-func TestRun_ServesUntilContextCanceled(t *testing.T) {
+func TestRun_ListenError(t *testing.T) {
+	t.Parallel()
+
+	busy := listen(t)
+	srv := grpcserver.New(busy.Addr().String())
+
+	err := srv.Run(t.Context())
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "grpcserver: listen")
+}
+
+func TestServe_ServesUntilContextCanceled(t *testing.T) {
 	t.Parallel()
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	client, result := runServer(ctx, t, freeAddr(t))
+	lis := listen(t)
+	client, result := runServer(ctx, t, lis)
 	require.NoError(t, check(ctx, client))
 
 	cancel()
 
-	select {
-	case err := <-result:
-		require.NoError(t, err)
-	case <-time.After(5 * time.Second):
-		require.Fail(t, "Run did not return after context cancellation")
-	}
+	require.NoError(t, receive(t, result, "Serve result"))
+	requireClosed(t, lis)
 }
 
-func TestRun_AppliesServerOptions(t *testing.T) {
+func TestServe_AppliesServerOptions(t *testing.T) {
 	t.Parallel()
 
 	var calls atomic.Int32
@@ -127,37 +166,21 @@ func TestRun_AppliesServerOptions(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	client, result := runServer(ctx, t, freeAddr(t), grpcserver.WithServerOptions(grpc.UnaryInterceptor(counter)))
+	client, result := runServer(ctx, t, listen(t), grpcserver.WithServerOptions(grpc.UnaryInterceptor(counter)))
 	require.NoError(t, check(ctx, client))
 	assert.EqualValues(t, 1, calls.Load())
 
 	cancel()
-	require.NoError(t, <-result)
+	require.NoError(t, receive(t, result, "Serve result"))
 }
 
-func TestRun_ListenError(t *testing.T) {
-	t.Parallel()
-
-	var lc net.ListenConfig
-	busy, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = busy.Close() })
-
-	srv := grpcserver.New(busy.Addr().String())
-
-	err = srv.Run(t.Context())
-
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "grpcserver: listen")
-}
-
-func TestRun_GracefulStopTimeout(t *testing.T) {
+func TestServe_GracefulStopTimeout(t *testing.T) {
 	t.Parallel()
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	client, result := runServer(ctx, t, freeAddr(t), grpcserver.WithShutdownTimeout(50*time.Millisecond))
+	client, result := runServer(ctx, t, listen(t), grpcserver.WithShutdownTimeout(50*time.Millisecond))
 	require.NoError(t, check(ctx, client))
 
 	// Watch держит активный стрим, поэтому GracefulStop не завершается и срабатывает таймаут.
@@ -170,10 +193,5 @@ func TestRun_GracefulStopTimeout(t *testing.T) {
 
 	cancel()
 
-	select {
-	case runErr := <-result:
-		require.ErrorContains(t, runErr, "grpcserver: graceful stop timed out")
-	case <-time.After(5 * time.Second):
-		require.Fail(t, "Run did not return after shutdown timeout")
-	}
+	require.ErrorContains(t, receive(t, result, "Serve result"), "grpcserver: graceful stop timed out")
 }

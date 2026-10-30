@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,39 +16,56 @@ import (
 
 const waitTimeout = 5 * time.Second
 
-// freeAddr резервирует свободный loopback-порт: Run принимает адрес строкой и не отдаёт выбранный порт.
-func freeAddr(t *testing.T) string {
+// listener — loopback-листенер на порту, выданном ОС, который сообщает о своём закрытии.
+// Shutdown закрывает листенер первым шагом, поэтому closed отмечает начало остановки.
+type listener struct {
+	net.Listener
+
+	once   sync.Once
+	closed chan struct{}
+}
+
+func listen(t *testing.T) *listener {
 	t.Helper()
 
 	var lc net.ListenConfig
 	lis, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	addr := lis.Addr().String()
-	require.NoError(t, lis.Close())
 
-	return addr
+	l := &listener{Listener: lis, closed: make(chan struct{})}
+	t.Cleanup(func() { _ = l.Close() })
+
+	return l
 }
 
-// canDial сообщает, принимает ли addr новые соединения.
-func canDial(ctx context.Context, addr string) bool {
-	var d net.Dialer
-	conn, err := d.DialContext(ctx, "tcp", addr)
-	if err != nil {
-		return false
-	}
-	_ = conn.Close()
+func (l *listener) Close() error {
+	l.once.Do(func() { close(l.closed) })
 
-	return true
+	return l.Listener.Close()
 }
 
-// start запускает srv.Run в горутине и ждёт, пока сервер начнёт принимать соединения.
-func start(ctx context.Context, t *testing.T, srv *httpserver.Server, addr string) <-chan error {
+func (l *listener) url(path string) string {
+	return "http://" + l.Addr().String() + path
+}
+
+// requireClosed проверяет, что листенер закрыт: Accept на закрытом листенере сразу возвращает [net.ErrClosed].
+// Дедлайн не даёт тесту зависнуть, если листенер остался открытым.
+func requireClosed(t *testing.T, l *listener) {
 	t.Helper()
 
-	result := make(chan error, 1)
-	go func() { result <- srv.Run(ctx) }()
+	if tcp, ok := l.Listener.(*net.TCPListener); ok {
+		// На закрытом листенере SetDeadline возвращает ошибку — это и есть ожидаемый случай.
+		_ = tcp.SetDeadline(time.Now().Add(waitTimeout))
+	}
+	_, err := l.Accept()
+	require.ErrorIs(t, err, net.ErrClosed, "listener must be closed after Serve returns")
+}
 
-	require.Eventually(t, func() bool { return canDial(ctx, addr) }, waitTimeout, time.Millisecond)
+// startServe запускает srv.Serve в горутине. Листенер уже слушает, поэтому соединения
+// ждут в очереди до Accept и ждать готовности сервера не нужно.
+func startServe(ctx context.Context, srv *httpserver.Server, lis net.Listener) <-chan error {
+	result := make(chan error, 1)
+	go func() { result <- srv.Serve(ctx, lis) }()
 
 	return result
 }
@@ -100,48 +118,44 @@ func TestServer_Router(t *testing.T) {
 	assert.NotNil(t, httpserver.New("127.0.0.1:0").Router())
 }
 
-func TestRun_ServesUntilContextCanceled(t *testing.T) {
-	t.Parallel()
-
-	addr := freeAddr(t)
-	srv := httpserver.New(addr)
-	srv.Router().Get("/ping", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
-
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	result := start(ctx, t, srv, addr)
-
-	resp := receive(t, get(ctx, "http://"+addr+"/ping"), "response")
-	require.NoError(t, resp.err)
-	assert.Equal(t, http.StatusNoContent, resp.status)
-
-	cancel()
-
-	require.NoError(t, receive(t, result, "Run result"))
-	assert.False(t, canDial(t.Context(), addr), "listener must be closed after Run returns")
-}
-
 func TestRun_ListenError(t *testing.T) {
 	t.Parallel()
 
-	var lc net.ListenConfig
-	busy, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = busy.Close() })
-
+	busy := listen(t)
 	srv := httpserver.New(busy.Addr().String())
 
-	err = srv.Run(t.Context())
+	err := srv.Run(t.Context())
 
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "httpserver: listen")
 }
 
-func TestRun_GracefulShutdownWaitsForActiveRequest(t *testing.T) {
+func TestServe_ServesUntilContextCanceled(t *testing.T) {
 	t.Parallel()
 
-	addr := freeAddr(t)
-	srv := httpserver.New(addr)
+	lis := listen(t)
+	srv := httpserver.New("unused")
+	srv.Router().Get("/ping", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	result := startServe(ctx, srv, lis)
+
+	resp := receive(t, get(ctx, lis.url("/ping")), "response")
+	require.NoError(t, resp.err)
+	assert.Equal(t, http.StatusNoContent, resp.status)
+
+	cancel()
+
+	require.NoError(t, receive(t, result, "Serve result"))
+	requireClosed(t, lis)
+}
+
+func TestServe_GracefulShutdownWaitsForActiveRequest(t *testing.T) {
+	t.Parallel()
+
+	lis := listen(t)
+	srv := httpserver.New("unused")
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	srv.Router().Get("/slow", func(w http.ResponseWriter, _ *http.Request) {
@@ -152,18 +166,18 @@ func TestRun_GracefulShutdownWaitsForActiveRequest(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	result := start(ctx, t, srv, addr)
+	result := startServe(ctx, srv, lis)
 
-	resp := get(t.Context(), "http://"+addr+"/slow")
+	resp := get(t.Context(), lis.url("/slow"))
 	receive(t, entered, "handler entry")
 
 	cancel()
 
-	// Listener закрывается в начале Shutdown: новые соединения отклоняются, а Run ждёт активный запрос.
-	require.Eventually(t, func() bool { return !canDial(t.Context(), addr) }, waitTimeout, time.Millisecond)
+	// Shutdown начался с закрытия листенера, а Serve ждёт активный запрос.
+	receive(t, lis.closed, "listener close")
 	select {
 	case err := <-result:
-		require.FailNow(t, "Run returned before the active request finished", "err: %v", err)
+		require.FailNow(t, "Serve returned before the active request finished", "err: %v", err)
 	default:
 	}
 
@@ -172,14 +186,14 @@ func TestRun_GracefulShutdownWaitsForActiveRequest(t *testing.T) {
 	got := receive(t, resp, "response")
 	require.NoError(t, got.err)
 	assert.Equal(t, http.StatusNoContent, got.status)
-	require.NoError(t, receive(t, result, "Run result"))
+	require.NoError(t, receive(t, result, "Serve result"))
 }
 
-func TestRun_GracefulShutdownTimeout(t *testing.T) {
+func TestServe_GracefulShutdownTimeout(t *testing.T) {
 	t.Parallel()
 
-	addr := freeAddr(t)
-	srv := httpserver.New(addr, httpserver.WithShutdownTimeout(50*time.Millisecond))
+	lis := listen(t)
+	srv := httpserver.New("unused", httpserver.WithShutdownTimeout(50*time.Millisecond))
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	srv.Router().Get("/stuck", func(w http.ResponseWriter, _ *http.Request) {
@@ -190,14 +204,14 @@ func TestRun_GracefulShutdownTimeout(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	result := start(ctx, t, srv, addr)
+	result := startServe(ctx, srv, lis)
 
-	resp := get(t.Context(), "http://"+addr+"/stuck")
+	resp := get(t.Context(), lis.url("/stuck"))
 	receive(t, entered, "handler entry")
 
 	cancel()
 
-	err := receive(t, result, "Run result")
+	err := receive(t, result, "Serve result")
 	require.Error(t, err)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.ErrorContains(t, err, "graceful stop timed out after 50ms")
