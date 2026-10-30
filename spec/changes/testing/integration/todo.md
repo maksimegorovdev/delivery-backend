@@ -22,13 +22,13 @@
 `testdata` проходят; набор с неполным `down` ловится.
 
 **Acceptance criteria:**
-- [ ] Валидный каталог проходит полный цикл, БД удаляется после теста
-- [ ] Неполный `down` (таблица остаётся) приводит к падению — проверено тестом на внутренней функции, возвращающей ошибку
-- [ ] `NewDB` в том же бинаре продолжает работать (шаблон не изменён)
+- [x] Валидный каталог проходит полный цикл, БД удаляется после теста
+- [x] Неполный `down` (таблица остаётся) приводит к падению — проверено тестом на внутренней функции, возвращающей ошибку
+- [x] `NewDB` в том же бинаре продолжает работать (шаблон не изменён)
 
 **Verification:**
-- [ ] `cd platform && go test -race -shuffle=on -count=1 -tags=integration ./testkit/pgtest/...`
-- [ ] `task -d platform lint`
+- [x] `cd platform && go test -race -shuffle=on -count=1 -tags=integration ./testkit/pgtest/...`
+- [x] `task -d platform lint`
 
 **Dependencies:** None
 
