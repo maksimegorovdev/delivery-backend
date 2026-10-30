@@ -9,17 +9,25 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/maksimegorovdev/delivery-backend/platform/apperr"
+
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/domain"
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/service"
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/service/mocks"
 )
 
 // fakeTx выполняет fn сразу и отмечает, что код находится внутри транзакции.
+// Если задан err, транзакция не открывается и fn не вызывается.
 type fakeTx struct {
 	isInTx bool
+	err    error
 }
 
 func (f *fakeTx) WithinTx(ctx context.Context, fn func(ctx context.Context) error) error {
+	if f.err != nil {
+		return f.err
+	}
+
 	f.isInTx = true
 	defer func() { f.isInTx = false }()
 
@@ -101,18 +109,36 @@ func TestOrderService_CreateOrder(t *testing.T) {
 
 	errUnavailable := errors.New("user service unavailable")
 	errDB := errors.New("db is down")
+	errEvent := errors.New("marshal failed")
 
 	tests := []struct {
 		name    string
 		setup   func(d deps)
-		wantErr error
+		wantErr []error
 	}{
 		{
 			name: "propagates user service error without saving order",
 			setup: func(d deps) {
 				d.users.EXPECT().GetUser(mock.Anything, "user-1").Return(domain.User{}, errUnavailable)
 			},
-			wantErr: errUnavailable,
+			wantErr: []error{errUnavailable},
+		},
+		{
+			name: "propagates address lookup error",
+			setup: func(d deps) {
+				d.users.EXPECT().GetUser(mock.Anything, "user-1").Return(domain.User{ID: "user-1"}, nil)
+				d.users.EXPECT().GetAddress(mock.Anything, "address-1").Return(domain.Address{}, errUnavailable)
+			},
+			wantErr: []error{errUnavailable},
+		},
+		{
+			name: "propagates product catalog error",
+			setup: func(d deps) {
+				expectUserResolved(d)
+				d.products.EXPECT().GetProducts(mock.Anything, []string{"product-1", "product-2"}).
+					Return(nil, errUnavailable)
+			},
+			wantErr: []error{errUnavailable},
 		},
 		{
 			name: "returns product not found when catalog misses an item",
@@ -121,7 +147,26 @@ func TestOrderService_CreateOrder(t *testing.T) {
 				d.products.EXPECT().GetProducts(mock.Anything, []string{"product-1", "product-2"}).
 					Return(fixtureProducts()[:1], nil)
 			},
-			wantErr: domain.ErrProductNotFound,
+			wantErr: []error{domain.ErrProductNotFound, apperr.NotFound()},
+		},
+		{
+			name: "propagates event builder error without opening transaction",
+			setup: func(d deps) {
+				expectUserResolved(d)
+				d.products.EXPECT().GetProducts(mock.Anything, []string{"product-1", "product-2"}).
+					Return(fixtureProducts(), nil)
+				d.events.EXPECT().OrderCreated(mock.Anything).Return(domain.OutboxEvent{}, errEvent)
+			},
+			wantErr: []error{errEvent},
+		},
+		{
+			// Create и Save без EXPECT: строгие моки упадут, если репозитории вызовутся при отказе транзакции.
+			name: "propagates transaction error without touching repos",
+			setup: func(d deps) {
+				expectOrderPrepared(d)
+				d.tx.err = errDB
+			},
+			wantErr: []error{errDB},
 		},
 		{
 			// Save без EXPECT: строгий мок упадёт, если outbox вызовется после ошибки Create.
@@ -130,7 +175,7 @@ func TestOrderService_CreateOrder(t *testing.T) {
 				expectOrderPrepared(d)
 				d.orders.EXPECT().Create(mock.Anything, mock.Anything).Return(errDB)
 			},
-			wantErr: errDB,
+			wantErr: []error{errDB},
 		},
 		{
 			name: "propagates outbox error",
@@ -139,7 +184,7 @@ func TestOrderService_CreateOrder(t *testing.T) {
 				d.orders.EXPECT().Create(mock.Anything, mock.Anything).Return(nil)
 				d.outbox.EXPECT().Save(mock.Anything, event).Return(errDB)
 			},
-			wantErr: errDB,
+			wantErr: []error{errDB},
 		},
 	}
 
@@ -154,7 +199,9 @@ func TestOrderService_CreateOrder(t *testing.T) {
 
 			_, err := d.service().CreateOrder(t.Context(), fixtureInput())
 
-			must.ErrorIs(err, tt.wantErr)
+			for _, want := range tt.wantErr {
+				must.ErrorIs(err, want)
+			}
 		})
 	}
 }
@@ -198,4 +245,22 @@ func TestOrderService_CreateOrder_Success(t *testing.T) {
 	is.Equal(int64(100), got.Items[0].UnitPrice)
 	is.Equal("Bread", got.Items[1].ProductName)
 	is.Equal(int64(50), got.Items[1].UnitPrice)
+}
+
+func TestOrderService_CreateOrder_EmptyItems(t *testing.T) {
+	t.Parallel()
+
+	must := require.New(t)
+
+	d := newDeps(t)
+	expectUserResolved(d)
+	d.products.EXPECT().GetProducts(mock.Anything, []string{}).Return(nil, nil)
+
+	input := fixtureInput()
+	input.Items = nil
+
+	_, err := d.service().CreateOrder(t.Context(), input)
+
+	must.ErrorIs(err, domain.ErrOrderNoItems)
+	must.ErrorIs(err, apperr.InvalidArgument())
 }

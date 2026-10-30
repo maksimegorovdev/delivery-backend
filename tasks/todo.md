@@ -343,11 +343,11 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 (например, `GetOrder`), добавить кейсы: ошибка каждой зависимости, порядок вызовов в транзакции.
 
 **Acceptance criteria:**
-- [ ] Каждый публичный метод `OrderService` имеет тест успеха и ошибки каждой зависимости
-- [ ] Покрытие `service` не ниже текущего и ≥ 80%
+- [x] Каждый публичный метод `OrderService` имеет тест успеха и ошибки каждой зависимости
+- [x] Покрытие `service` не ниже текущего и ≥ 80%
 
 **Verification:**
-- [ ] `cd services/order && go test -race -shuffle=on -count=1 -coverprofile=/tmp/order.out ./internal/service/ && go tool cover -func=/tmp/order.out`
+- [x] `cd services/order && go test -race -shuffle=on -count=1 -coverprofile=/tmp/order.out ./internal/service/ && go tool cover -func=/tmp/order.out`
 
 **Dependencies:** None
 
