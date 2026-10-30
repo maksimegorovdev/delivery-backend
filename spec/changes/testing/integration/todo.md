@@ -349,12 +349,12 @@
 `GetX`) по своей фикстуре на `Addr()`.
 
 **Acceptance criteria:**
-- [ ] Оба сервиса отдают `Addr()`, `New` падает на занятом порту
-- [ ] Smoke-тест каждого сервиса обслуживает один запрос и корректно закрывается
+- [x] Оба сервиса отдают `Addr()`, `New` падает на занятом порту
+- [x] Smoke-тест каждого сервиса обслуживает один запрос и корректно закрывается
 
 **Verification:**
-- [ ] `task -d services/user test-integration` и `task -d services/product test-integration`
-- [ ] `task -d services/user lint` и `task -d services/product lint`
+- [x] `task -d services/user test-integration` и `task -d services/product test-integration`
+- [x] `task -d services/user lint` и `task -d services/product lint`
 
 **Dependencies:** Task 12
 

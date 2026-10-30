@@ -3,7 +3,9 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"net"
 	"time"
 
 	"buf.build/go/protovalidate"
@@ -29,9 +31,9 @@ import (
 const initCloseTimeout = 5 * time.Second
 
 type App struct {
-	cfg        *config.Config
 	log        *slog.Logger
 	grpcServer *grpcserver.Server
+	lis        net.Listener
 	closer     *closer.Closer
 }
 
@@ -105,14 +107,39 @@ func New(ctx context.Context) (_ *App, err error) {
 		ProductService: productService,
 	})
 
+	lis, err := listen(ctx, cl, cfg.GRPCServer.Addr)
+	if err != nil {
+		return nil, err
+	}
+
 	app := &App{
-		cfg:        cfg,
 		log:        log,
 		grpcServer: grpcServer,
+		lis:        lis,
 		closer:     cl,
 	}
 
 	return app, nil
+}
+
+// listen открывает листенер в New, чтобы занятый порт был ошибкой старта, а Addr() знал фактический адрес.
+func listen(ctx context.Context, cl *closer.Closer, addr string) (net.Listener, error) {
+	var lc net.ListenConfig
+	lis, err := lc.Listen(ctx, "tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("app: listen %s: %w", addr, err)
+	}
+
+	// Serve уже закрывает листенер при остановке; повторное закрытие — не ошибка.
+	cl.Add(closer.WrapErr(func() error {
+		if cerr := lis.Close(); cerr != nil && !errors.Is(cerr, net.ErrClosed) {
+			return cerr
+		}
+
+		return nil
+	}))
+
+	return lis, nil
 }
 
 func newTelemetry(ctx context.Context, cfg *config.Config) (*telemetry.Telemetry, error) {
@@ -133,19 +160,24 @@ func newLogger(cfg *config.Config, tel *telemetry.Telemetry) *slog.Logger {
 	)
 }
 
+// Addr возвращает фактический адрес gRPC-сервера; при порте 0 в конфиге — порт, выданный ОС.
+func (a *App) Addr() net.Addr {
+	return a.lis.Addr()
+}
+
 func (a *App) Run(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		a.log.InfoContext(ctx,
 			"grpc server started",
-			slog.String("addr", a.cfg.GRPCServer.Addr),
+			slog.String("addr", a.lis.Addr().String()),
 		)
 		defer a.log.InfoContext(ctx,
 			"grpc server stopped",
-			slog.String("addr", a.cfg.GRPCServer.Addr),
+			slog.String("addr", a.lis.Addr().String()),
 		)
-		return a.grpcServer.Run(ctx)
+		return a.grpcServer.Serve(ctx, a.lis)
 	})
 
 	return g.Wait()
