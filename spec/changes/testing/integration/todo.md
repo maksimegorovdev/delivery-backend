@@ -373,13 +373,13 @@ Smoke: фейковый `order` gRPC-сервер на loopback, HTTP `GET` че
 статус и тело → отмена ctx → `Close` без ошибок.
 
 **Acceptance criteria:**
-- [ ] `gateway` отдаёт `Addr()`, `New` падает на занятом порту
-- [ ] HTTP-запрос проходит gateway → фейковый `order` и возвращает ожидаемый ответ
-- [ ] `Run`/`Close` без ошибок
+- [x] `gateway` отдаёт `Addr()`, `New` падает на занятом порту
+- [x] HTTP-запрос проходит gateway → фейковый `order` и возвращает ожидаемый ответ
+- [x] `Run`/`Close` без ошибок
 
 **Verification:**
-- [ ] `task -d services/gateway test-integration`
-- [ ] `task -d services/gateway lint`
+- [x] `task -d services/gateway test-integration`
+- [x] `task -d services/gateway lint`
 
 **Dependencies:** Task 12
 

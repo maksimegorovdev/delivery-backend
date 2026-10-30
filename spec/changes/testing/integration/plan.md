@@ -79,7 +79,7 @@ notification repo (T8) ───────────────────
 ### Phase 5: шов App.Addr() и smoke app
 - [x] Task 12: Шов `App.Addr()` и smoke-тест `order`
 - [ ] Task 13: Шов и smoke-тесты `user` и `product`
-- [ ] Task 14: Шов и smoke-тест `gateway`
+- [x] Task 14: Шов и smoke-тест `gateway`
 - [ ] Task 15: Smoke-тест `notification`
 - [ ] Task 16: `task cover` зелёный, итоги в карте эпика
 
