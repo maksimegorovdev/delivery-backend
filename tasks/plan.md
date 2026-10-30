@@ -48,7 +48,7 @@ testify и английские имена кейсов, fuzz для парсе�
 - [x] Task 13: Тесты и fuzz `order/internal/event`
 - [ ] Task 14: Дополнить тесты `order/internal/service`
 - [ ] Task 15: Тесты `order/internal/client` на `grpctest`
-- [ ] Task 16: Тесты `order/internal/transport/grpc` на `grpctest`
+- [x] Task 16: Тесты `order/internal/transport/grpc` на `grpctest`
 
 ### Checkpoint 3: образцы закреплены
 - [ ] `task -d services/order test`, `lint`, `cover` зелёные

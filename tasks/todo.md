@@ -386,13 +386,13 @@ proto → domain (все поля, время), маппинг кодов gRPC �
 те же интерцепторы, что в `app` сервиса. Образец — блок кода в спеке.
 
 **Acceptance criteria:**
-- [ ] Каждый RPC: успех с проверкой ответа и аргументов мока, ошибка сервиса → ожидаемый код
-- [ ] Цепочка интерцепторов совпадает с `app` (валидация отсекает невалидный запрос до сервиса)
-- [ ] `task mocks` повторно без diff
+- [x] Каждый RPC: успех с проверкой ответа и аргументов мока, ошибка сервиса → ожидаемый код
+- [x] Цепочка интерцепторов совпадает с `app` (валидация отсекает невалидный запрос до сервиса)
+- [x] `task mocks` повторно без diff
 
 **Verification:**
-- [ ] `task -d services/order mocks && git diff --exit-code services/order`
-- [ ] `cd services/order && go test -race -shuffle=on -count=1 -cover ./internal/transport/grpc/`
+- [x] `task -d services/order mocks && git diff --exit-code services/order`
+- [x] `cd services/order && go test -race -shuffle=on -count=1 -cover ./internal/transport/grpc/`
 
 **Dependencies:** Tasks 1, 7
 
