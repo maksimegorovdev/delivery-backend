@@ -46,18 +46,18 @@ notification repo (T8) ───────────────────
 ## Task List
 
 ### Phase 1: testkit и kafkaconsumer
-- [ ] Task 1: `pgtest.CheckMigrations` с собственным тестом
-- [ ] Task 2: `kafkatest.Produce` с собственным тестом
-- [ ] Task 3: Интеграционные тесты `kafkaconsumer` на Redpanda
+- [x] Task 1: `pgtest.CheckMigrations` с собственным тестом
+- [x] Task 2: `kafkatest.Produce` с собственным тестом
+- [x] Task 3: Интеграционные тесты `kafkaconsumer` на Redpanda
 
 ### Checkpoint 1: инфраструктура
 - [ ] `task -d platform test-integration`, `task -d platform lint` зелёные, `goleak` чистый
 - [ ] Обзор API `CheckMigrations`/`Produce` и образца асинхронной проверки с пользователем
 
 ### Phase 2: order — эталонный сервис и контракт
-- [ ] Task 4: `order` — репозитории (`OrderRepo`, `OutboxRepo`) и миграции
-- [ ] Task 5: `order` — атомарность заказа и outbox
-- [ ] Task 6: Эталон `order.created` и тест продюсера
+- [x] Task 4: `order` — репозитории (`OrderRepo`, `OutboxRepo`) и миграции
+- [x] Task 5: `order` — атомарность заказа и outbox
+- [x] Task 6: Эталон `order.created` и тест продюсера
 - [ ] Task 7: `order` — компонентный gRPC-стек
 
 ### Checkpoint 2: order

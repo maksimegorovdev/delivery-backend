@@ -132,7 +132,7 @@
 - [x] Успешная транзакция фиксирует все три таблицы
 
 **Verification:**
-- [ ] `task -d services/order test-integration`
+- [x] `task -d services/order test-integration`
 
 **Dependencies:** Task 4
 
@@ -151,14 +151,14 @@
 в `helpers_integration_test.go`.
 
 **Acceptance criteria:**
-- [ ] `contracts/events/order.created.json` создан через `-update`, содержимое приведено в резюме
-- [ ] Без `-update` тест сравнивает и проходит; ручная правка любого поля эталона роняет тест
-- [ ] `event_id` проверен как UUIDv7, `traceparent`/`tracestate` в эталон не входят
+- [x] `contracts/events/order.created.json` создан через `-update`, содержимое приведено в резюме
+- [x] Без `-update` тест сравнивает и проходит; ручная правка любого поля эталона роняет тест
+- [x] `event_id` проверен как UUIDv7, `traceparent`/`tracestate` в эталон не входят
 
 **Verification:**
-- [ ] `cd services/order && go test -tags=integration -run TestOrderCreated_Golden ./internal/repository/pg -update`, затем без `-update`
-- [ ] Ручная проверка: изменить поле в эталоне → тест красный → вернуть
-- [ ] `task -d services/order lint`
+- [x] `cd services/order && go test -tags=integration -run TestOrderCreated_Golden ./internal/repository/pg -update`, затем без `-update`
+- [x] Ручная проверка: изменить поле в эталоне → тест красный → вернуть
+- [x] `task -d services/order lint`
 
 **Dependencies:** Task 4
 

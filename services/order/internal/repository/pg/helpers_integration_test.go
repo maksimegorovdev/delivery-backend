@@ -3,6 +3,7 @@
 package pg_test
 
 import (
+	"flag"
 	"testing"
 	"time"
 
@@ -14,6 +15,14 @@ import (
 )
 
 const migrationsDir = "../../../migrations/pg"
+
+// contractsDir — каталог эталонов событий в корне репозитория.
+const contractsDir = "../../../../../contracts/events"
+
+// update перезаписывает эталоны фактическим значением: только при осознанном изменении контракта.
+//
+//nolint:gochecknoglobals // флаг go test регистрируется на уровне пакета
+var update = flag.Bool("update", false, "перезаписать эталоны в contracts/events")
 
 // Фиксированные идентификаторы собственных фикстур: на seed-миграции тесты не опираются.
 const (
