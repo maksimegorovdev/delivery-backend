@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"testing"
+	"uuid"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -18,6 +19,11 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/services/notification/internal/transport/kafka"
 	"github.com/maksimegorovdev/delivery-backend/services/notification/internal/transport/kafka/order"
 	"github.com/maksimegorovdev/delivery-backend/services/notification/internal/transport/kafka/order/mocks"
+)
+
+const (
+	eventID = "0192f0c1-0000-7000-8000-0000000000e1"
+	orderID = "0192f0c1-0000-7000-8000-0000000000a1"
 )
 
 func newHandler(t *testing.T) (*order.Handler, *mocks.MockNotificationService) {
@@ -44,18 +50,18 @@ func orderCreatedMessage(value string) kafkaconsumer.Message {
 func TestHandler_Handle_OrderCreated(t *testing.T) {
 	t.Parallel()
 
-	const payload = `{"event_id":"event-1","order_id":"order-1","user_id":"user-1","total_amount":430}`
+	const payload = `{"event_id":"` + eventID + `","order_id":"` + orderID + `","user_id":"user-1","total_amount":430}`
 
 	h, svc := newHandler(t)
 	svc.EXPECT().
 		CreateNotification(mock.Anything, service.CreateNotificationInput{
 			Event: domain.InboxEvent{
-				EventID:     "event-1",
+				EventID:     eventID,
 				Topic:       order.Topic,
 				Partition:   2,
 				Offset:      42,
 				EventType:   domain.EventTypeOrderCreated,
-				AggregateID: "order-1",
+				AggregateID: orderID,
 			},
 			Payload:  []byte(payload),
 			Channels: []domain.Channel{domain.ChannelLog},
@@ -71,12 +77,12 @@ func TestHandler_Handle_OrderCreated(t *testing.T) {
 func TestHandler_Handle_OrderCreated_IgnoresUnknownFields(t *testing.T) {
 	t.Parallel()
 
-	const payload = `{"event_id":"event-1","order_id":"order-1","field_from_the_future":{"a":1}}`
+	const payload = `{"event_id":"` + eventID + `","order_id":"` + orderID + `","field_from_the_future":{"a":1}}`
 
 	h, svc := newHandler(t)
 	svc.EXPECT().
 		CreateNotification(mock.Anything, mock.MatchedBy(func(in service.CreateNotificationInput) bool {
-			return in.Event.EventID == "event-1" && in.Event.AggregateID == "order-1"
+			return in.Event.EventID == eventID && in.Event.AggregateID == orderID
 		})).
 		Return(nil).
 		Once()
@@ -97,7 +103,7 @@ func TestHandler_Handle_OrderCreated_ServiceError(t *testing.T) {
 		Return(errService).
 		Once()
 
-	err := h.Handle(t.Context(), orderCreatedMessage(`{"event_id":"event-1","order_id":"order-1"}`))
+	err := h.Handle(t.Context(), orderCreatedMessage(`{"event_id":"`+eventID+`","order_id":"`+orderID+`"}`))
 
 	require.ErrorIs(t, err, errService)
 }
@@ -114,6 +120,12 @@ func TestHandler_Handle_InvalidPayload(t *testing.T) {
 		{name: "wrong field type", value: `{"event_id":123}`},
 		{name: "truncated json", value: `{"event_id":"event-1"`},
 		{name: "invalid utf-8", value: "{\"event_id\":\"\xff\xfe\"}"},
+		{name: "empty object", value: `{}`},
+		{name: "null", value: `null`},
+		{name: "missing event_id", value: `{"order_id":"` + orderID + `"}`},
+		{name: "event_id is not a uuid", value: `{"event_id":"event-1","order_id":"` + orderID + `"}`},
+		{name: "missing order_id", value: `{"event_id":"` + eventID + `"}`},
+		{name: "order_id is not a uuid", value: `{"event_id":"` + eventID + `","order_id":"order-1"}`},
 	}
 
 	for _, tt := range tests {
@@ -170,8 +182,9 @@ func (r *recordingService) CreateNotification(_ context.Context, in service.Crea
 }
 
 func FuzzHandleOrderCreated(f *testing.F) {
-	f.Add([]byte(`{"event_id":"event-1","order_id":"order-1","user_id":"user-1","total_amount":430}`))
-	f.Add([]byte(`{"event_id":"event-1","order_id":"order-1","field_from_the_future":{"a":1}}`))
+	f.Add([]byte(`{"event_id":"` + eventID + `","order_id":"` + orderID + `","user_id":"user-1","total_amount":430}`))
+	f.Add([]byte(`{"event_id":"` + eventID + `","order_id":"` + orderID + `","field_from_the_future":{"a":1}}`))
+	f.Add([]byte(`{"event_id":"event-1","order_id":"order-1"}`))
 	f.Add([]byte(`{}`))
 	f.Add([]byte(``))
 	f.Add([]byte(`null`))
@@ -199,6 +212,11 @@ func FuzzHandleOrderCreated(f *testing.F) {
 			return
 		}
 		require.Len(t, svc.inputs, 1)
+		// Идентификаторы пишутся в UUID-колонки inbox: в сервис доходят только валидные UUID.
+		_, err = uuid.Parse(svc.inputs[0].Event.EventID)
+		require.NoError(t, err, "event_id must be a UUID")
+		_, err = uuid.Parse(svc.inputs[0].Event.AggregateID)
+		require.NoError(t, err, "order_id must be a UUID")
 		require.Equal(t, value, svc.inputs[0].Payload)
 		require.Equal(t, domain.EventTypeOrderCreated, svc.inputs[0].Event.EventType)
 		require.Equal(t, msg.Topic, svc.inputs[0].Event.Topic)

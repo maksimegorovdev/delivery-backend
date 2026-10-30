@@ -2,6 +2,8 @@ package order
 
 import (
 	"context"
+	"fmt"
+	"uuid"
 
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -16,6 +18,9 @@ import (
 func (h *Handler) handleOrderCreated(ctx context.Context, msg kafkaconsumer.Message) error {
 	var pb orderv1.OrderCreated
 	if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(msg.Value, &pb); err != nil {
+		return apperr.InvalidArgument().Wrap(err)
+	}
+	if err := validateOrderCreated(&pb); err != nil {
 		return apperr.InvalidArgument().Wrap(err)
 	}
 
@@ -34,4 +39,17 @@ func (h *Handler) handleOrderCreated(ctx context.Context, msg kafkaconsumer.Mess
 			Channels: []domain.Channel{domain.ChannelLog},
 		},
 	)
+}
+
+// validateOrderCreated проверяет идентификаторы, которые попадают в UUID-колонки inbox.
+// Без проверки `{}` или `null` проходят разбор, падают только на INSERT и ретраятся бесконечно.
+func validateOrderCreated(pb *orderv1.OrderCreated) error {
+	if _, err := uuid.Parse(pb.GetEventId()); err != nil {
+		return fmt.Errorf("event_id: %w", err)
+	}
+	if _, err := uuid.Parse(pb.GetOrderId()); err != nil {
+		return fmt.Errorf("order_id: %w", err)
+	}
+
+	return nil
 }
