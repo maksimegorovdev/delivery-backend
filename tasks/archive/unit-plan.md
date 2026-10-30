@@ -1,6 +1,6 @@
 # Implementation Plan: unit
 
-> Спек: [SPEC-unit.md](../spec/testing/SPEC-unit.md) · Карта: [SPEC-testing-map.md](../spec/testing/SPEC-testing-map.md) · Задачи: [todo.md](todo.md)
+> Спек: [SPEC-unit.md](../../spec/testing/SPEC-unit.md) · Карта: [SPEC-testing-map.md](../../spec/testing/SPEC-testing-map.md) · Задачи: [unit-todo.md](unit-todo.md)
 
 ## Overview
 

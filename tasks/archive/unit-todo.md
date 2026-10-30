@@ -1,6 +1,6 @@
 # Tasks: unit
 
-> План: [plan.md](plan.md) · Спек: [SPEC-unit.md](../spec/testing/SPEC-unit.md)
+> План: [unit-plan.md](unit-plan.md) · Спек: [SPEC-unit.md](../../spec/testing/SPEC-unit.md)
 
 Общее для каждой задачи (Definition of Done, в задачах не повторяется):
 - тесты в `package x_test`, testify, английские `name`, `t.Parallel`, без `time.Sleep`;

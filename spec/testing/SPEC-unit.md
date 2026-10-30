@@ -1,6 +1,6 @@
 # Spec: unit
 
-> Эпик: [testing](SPEC-testing-map.md) · Статус: **draft** · Зависит от: [test-foundation](SPEC-test-foundation.md)
+> Эпик: [testing](SPEC-testing-map.md) · Статус: **done** · Зависит от: [test-foundation](SPEC-test-foundation.md)
 
 ## Objective
 
