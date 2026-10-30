@@ -628,12 +628,12 @@ Taskfile `notification`, модуль в `FUZZ_MODULES`.
 и английские имена.
 
 **Acceptance criteria:**
-- [ ] Количество кейсов до и после совпадает
-- [ ] Нет кириллицы в `name`/`t.Run` во всём репозитории
+- [x] Количество кейсов до и после совпадает (5 config × 4 кейса, outbox 3)
+- [x] Нет кириллицы в `name`/`t.Run` во всём репозитории
 
 **Verification:**
-- [ ] `task test`
-- [ ] `grep -rnE '(name:|t\.Run\()\s*"[^"]*[А-Яа-я]' platform services --include='*_test.go'` — пусто
+- [x] `task test`
+- [x] `grep -rnE '(name:|t\.Run\()\s*"[^"]*[А-Яа-я]' platform services --include='*_test.go'` — пусто
 
 **Dependencies:** None
 
