@@ -363,12 +363,12 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 proto → domain (все поля, время), маппинг кодов gRPC → `apperr` через `grpcerr.Map`.
 
 **Acceptance criteria:**
-- [ ] Для каждого метода: успех с проверкой всех полей domain и ошибка `NotFound` → `apperr` NotFound
-- [ ] Фейковый сервер проверяет полученный `Id`
-- [ ] Своей bufconn-обвязки нет
+- [x] Для каждого метода: успех с проверкой всех полей domain и ошибка `NotFound` → `apperr` NotFound
+- [x] Фейковый сервер проверяет полученный `Id`
+- [x] Своей bufconn-обвязки нет
 
 **Verification:**
-- [ ] `cd services/order && go test -race -shuffle=on -count=1 -cover ./internal/client/`
+- [x] `cd services/order && go test -race -shuffle=on -count=1 -cover ./internal/client/`
 
 **Dependencies:** Tasks 1, 3
 
