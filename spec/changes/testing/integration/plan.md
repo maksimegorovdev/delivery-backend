@@ -58,14 +58,14 @@ notification repo (T8) ───────────────────
 - [x] Task 4: `order` — репозитории (`OrderRepo`, `OutboxRepo`) и миграции
 - [x] Task 5: `order` — атомарность заказа и outbox
 - [x] Task 6: Эталон `order.created` и тест продюсера
-- [ ] Task 7: `order` — компонентный gRPC-стек
+- [x] Task 7: `order` — компонентный gRPC-стек
 
 ### Checkpoint 2: order
 - [ ] `task -d services/order test-integration` и `lint` зелёные
 - [ ] Эталон `contracts/events/order.created.json` согласован с пользователем
 
 ### Phase 3: notification
-- [ ] Task 8: `notification` — репозитории и миграции
+- [x] Task 8: `notification` — репозитории и миграции
 - [ ] Task 9: `notification` — компонентный Kafka-стек на эталоне
 
 ### Phase 4: user и product

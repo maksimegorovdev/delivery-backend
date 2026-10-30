@@ -208,13 +208,13 @@
 список каналов — без запросов; недопустимый канал → ошибка `apperr`. `CheckMigrations` для миграций сервиса.
 
 **Acceptance criteria:**
-- [ ] `Claim` идемпотентен по `event_id` и возвращает признак повтора согласно контракту метода
-- [ ] `CreateForChannels` покрывает все четыре кейса спека
-- [ ] Миграции `notification` проходят up → down → up
+- [x] `Claim` идемпотентен по `event_id` и возвращает признак повтора согласно контракту метода
+- [x] `CreateForChannels` покрывает все четыре кейса спека
+- [x] Миграции `notification` проходят up → down → up
 
 **Verification:**
-- [ ] `task -d services/notification test-integration`
-- [ ] `task -d services/notification lint`
+- [x] `task -d services/notification test-integration`
+- [x] `task -d services/notification lint`
 
 **Dependencies:** Task 1
 
