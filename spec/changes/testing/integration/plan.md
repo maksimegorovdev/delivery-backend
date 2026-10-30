@@ -51,8 +51,8 @@ notification repo (T8) ───────────────────
 - [x] Task 3: Интеграционные тесты `kafkaconsumer` на Redpanda
 
 ### Checkpoint 1: инфраструктура
-- [ ] `task -d platform test-integration`, `task -d platform lint` зелёные, `goleak` чистый
-- [ ] Обзор API `CheckMigrations`/`Produce` и образца асинхронной проверки с пользователем
+- [x] `task -d platform test-integration`, `task -d platform lint` зелёные, `goleak` чистый
+- [x] Обзор API `CheckMigrations`/`Produce` и образца асинхронной проверки с пользователем
 
 ### Phase 2: order — эталонный сервис и контракт
 - [x] Task 4: `order` — репозитории (`OrderRepo`, `OutboxRepo`) и миграции
@@ -61,15 +61,15 @@ notification repo (T8) ───────────────────
 - [x] Task 7: `order` — компонентный gRPC-стек
 
 ### Checkpoint 2: order
-- [ ] `task -d services/order test-integration` и `lint` зелёные
-- [ ] Эталон `contracts/events/order.created.json` согласован с пользователем
+- [x] `task -d services/order test-integration` и `lint` зелёные
+- [x] Эталон `contracts/events/order.created.json` согласован с пользователем
 
 ### Phase 3: notification
 - [x] Task 8: `notification` — репозитории и миграции
-- [ ] Task 9: `notification` — компонентный Kafka-стек на эталоне
+- [x] Task 9: `notification` — компонентный Kafka-стек на эталоне
 
 ### Phase 4: user и product
-- [ ] Task 10: `user` — репозитории, миграции, компонентный gRPC-стек
+- [x] Task 10: `user` — репозитории, миграции, компонентный gRPC-стек
 - [ ] Task 11: `product` — репозиторий, миграции, компонентный gRPC-стек
 
 ### Checkpoint 3: все репозитории и компонентные стеки

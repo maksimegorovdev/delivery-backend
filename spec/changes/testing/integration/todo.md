@@ -87,9 +87,9 @@
 **Estimated scope:** S
 
 ## Checkpoint 1: инфраструктура
-- [ ] `task -d platform test-integration` и `task -d platform lint` зелёные
-- [ ] `task -d platform test` работает без Docker
-- [ ] Обзор API `CheckMigrations`/`Produce` и образца асинхронной проверки с пользователем
+- [x] `task -d platform test-integration` и `task -d platform lint` зелёные
+- [x] `task -d platform test` работает без Docker
+- [x] Обзор API `CheckMigrations`/`Produce` и образца асинхронной проверки с пользователем
 
 ---
 
@@ -194,8 +194,8 @@
 **Estimated scope:** M
 
 ## Checkpoint 2: order
-- [ ] `task -d services/order test-integration` и `task -d services/order lint` зелёные
-- [ ] Эталон `contracts/events/order.created.json` согласован с пользователем
+- [x] `task -d services/order test-integration` и `task -d services/order lint` зелёные
+- [x] Эталон `contracts/events/order.created.json` согласован с пользователем
 
 ---
 
@@ -264,13 +264,13 @@
 зависимостей): запрос → ответ, «не найдено» → код gRPC.
 
 **Acceptance criteria:**
-- [ ] Оба репозитория покрыты тремя кейсами спека
-- [ ] Миграции `user` проходят up → down → up
-- [ ] gRPC-стек: найдено / не найдено / невалидный id дают ожидаемые ответы и коды
+- [x] Оба репозитория покрыты тремя кейсами спека
+- [x] Миграции `user` проходят up → down → up
+- [x] gRPC-стек: найдено / не найдено / невалидный id дают ожидаемые ответы и коды
 
 **Verification:**
-- [ ] `task -d services/user test-integration`
-- [ ] `task -d services/user lint`
+- [x] `task -d services/user test-integration`
+- [x] `task -d services/user lint`
 
 **Dependencies:** Task 1, Task 7 (образец)
 
