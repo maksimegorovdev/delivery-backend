@@ -68,3 +68,24 @@ user 34.5%, product 32.0%, notification 44.8%. Остаток — `app` и `repo
 `grpcserver`/`httpserver` (`Run` — обёртка над ним, чтобы тесты слушали свой листенер);
 комментарий и `coverage-ignore` в `platform/internal/otelenv` (недостижимая ветка `panic`);
 конфигурация Taskfile/go.mod.
+
+## Итоги модуля `integration`
+
+Покрытие снято `task cover` (statements, без `mocks`, `cmd`, `docs`); `task cover` зелёный во всех модулях.
+
+| Сервис | `repository/pg` | `app` | `total` |
+|---|---|---|---|
+| gateway | — (нет БД) | 91.8% | 91.2% |
+| order | 100% | 88.9% | 96.5% |
+| user | 88.9% | 90.4% | 93.0% |
+| product | 92.9% | 90.0% | 93.2% |
+| notification | 93.8% | 81.0% | 91.4% |
+| platform | — | — | 92.2% (каждый пакет ≥ 80%) |
+
+`domain`/`service` во всех сервисах ≥ 80% (`service` — 100%; `domain` в `user`/`product`/`notification`/`gateway` — только типы, без тестов).
+
+Что сделано: `pgtest.CheckMigrations` (up → down → up, ловит неполный `down`) подключён во всех четырёх сервисах с миграциями; `kafkatest.Produce`; тесты `kafkaconsumer` на Redpanda (коммит, откат с ретраем, остановка по ctx, `goleak`); атомарность `order` (ошибка `OutboxRepo.Save` откатывает `orders`, `order_items`, `outbox_events`); единый эталон `contracts/events/order.created.json` (продюсер `order` сверяет, `notification` использует); компонентные gRPC-стеки `order`/`user`/`product`; компонентный Kafka-стек `notification` (обработка, идемпотентность, неизвестный тип не блокирует партицию); smoke-тесты `app` во всех пяти сервисах.
+
+Баги: интеграционные тесты новых багов не выявили. Зафиксировано текущее поведение: невалидное сообщение в `notification` ретраится и блокирует партицию (`kafkaconsumer` откатывает оффсет при любой ошибке; skip/DLQ — отдельная задача).
+
+Изменения боевого кода: шов `App.Addr()` в `gateway`/`order`/`user`/`product` (листенер открывается в `New`, `Run` вызывает `Serve(ctx, lis)`, повторное закрытие листенера не ошибка); в `notification` — правка замечаний линтера в `orderCreatedIDs` (именованные результаты убраны, ссылка `[uuid.Parse]`), поведение не менялось.

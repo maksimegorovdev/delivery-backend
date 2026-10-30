@@ -418,12 +418,12 @@ Smoke: фейковый `order` gRPC-сервер на loopback, HTTP `GET` че
 каждого сервиса, `total` по сервисам, найденные баги, изменения боевого кода.
 
 **Acceptance criteria:**
-- [ ] `task cover` зелёный во всех модулях
-- [ ] Итоги модуля записаны в карту эпика
-- [ ] Все Success Criteria спека отмечены
+- [x] `task cover` зелёный во всех модулях
+- [x] Итоги модуля записаны в карту эпика
+- [x] Все Success Criteria спека отмечены
 
 **Verification:**
-- [ ] `task cover`, `task test`, `task test-integration`, `task lint`
+- [x] `task cover`, `task test`, `task test-integration`, `task lint`
 
 **Dependencies:** Task 1–15
 
@@ -434,5 +434,5 @@ Smoke: фейковый `order` gRPC-сервер на loopback, HTTP `GET` че
 **Estimated scope:** S–M
 
 ## Checkpoint: Complete
-- [ ] Все Success Criteria спека выполнены
+- [x] Все Success Criteria спека выполнены
 - [ ] Резюме модуля готово, ревью с пользователем; затем архивирование по `spec-workflow`
