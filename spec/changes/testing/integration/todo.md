@@ -396,12 +396,12 @@ Smoke: фейковый `order` gRPC-сервер на loopback, HTTP `GET` че
 → отмена ctx → `Close` без ошибок.
 
 **Acceptance criteria:**
-- [ ] Одно сообщение обработано реальным `app`
-- [ ] `Run` завершается по ctx, `Close` без ошибок
+- [x] Одно сообщение обработано реальным `app`
+- [x] `Run` завершается по ctx, `Close` без ошибок
 
 **Verification:**
-- [ ] `task -d services/notification test-integration`
-- [ ] `task -d services/notification lint`
+- [x] `task -d services/notification test-integration`
+- [x] `task -d services/notification lint`
 
 **Dependencies:** Task 9
 
