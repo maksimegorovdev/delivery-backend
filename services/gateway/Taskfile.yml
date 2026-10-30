@@ -10,6 +10,7 @@ vars:
   GO_TEST_COVERAGE_VERSION: v2.21.0
   SWAG_VERSION: v1.16.6
   AIR_VERSION: v1.63.0
+  MOCKERY_VERSION: v3.9.0
 
 tasks:
   tools:
@@ -21,6 +22,12 @@ tasks:
       - go install github.com/swaggo/swag/cmd/swag@{{.SWAG_VERSION}}
       - go install github.com/air-verse/air@{{.AIR_VERSION}}
       - go install github.com/vladopajic/go-test-coverage/v2@{{.GO_TEST_COVERAGE_VERSION}}
+      - go install github.com/vektra/mockery/v3@{{.MOCKERY_VERSION}}
+
+  mocks:
+    desc: Generate mocks with mockery
+    cmds:
+      - '{{.LOCAL_BIN}}/mockery'
 
   test:
     desc: Run unit tests (no Docker required)

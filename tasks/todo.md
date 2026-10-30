@@ -533,12 +533,12 @@ Taskfile `notification`, модуль в `FUZZ_MODULES`.
 `OrderProvider`. Тесты `client/order.go` на `grpctest` по образцу Task 15.
 
 **Acceptance criteria:**
-- [ ] Use case-ы gateway: успех и ошибка провайдера
-- [ ] Клиент: маппинг proto ↔ domain и кодов gRPC → `apperr`
-- [ ] Покрытие `service` ≥ 80%
+- [x] Use case-ы gateway: успех и ошибка провайдера
+- [x] Клиент: маппинг proto ↔ domain и кодов gRPC → `apperr`
+- [x] Покрытие `service` ≥ 80%
 
 **Verification:**
-- [ ] `cd services/gateway && go test -race -shuffle=on -count=1 -cover ./internal/service/ ./internal/client/`
+- [x] `cd services/gateway && go test -race -shuffle=on -count=1 -cover ./internal/service/ ./internal/client/`
 
 **Dependencies:** Checkpoint 3
 
