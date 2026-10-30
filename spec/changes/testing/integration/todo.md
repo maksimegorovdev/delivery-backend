@@ -46,13 +46,13 @@
 читаются отдельным клиентом в том же порядке.
 
 **Acceptance criteria:**
-- [ ] Записи доходят до топика с ключом, заголовками и значением
-- [ ] Порядок записей в партиции сохранён
-- [ ] Клиент закрывается внутри `Produce`, утечек нет
+- [x] Записи доходят до топика с ключом, заголовками и значением
+- [x] Порядок записей в партиции сохранён
+- [x] Клиент закрывается внутри `Produce`, утечек нет
 
 **Verification:**
-- [ ] `cd platform && go test -race -shuffle=on -count=1 -tags=integration ./testkit/kafkatest/...`
-- [ ] `task -d platform lint`
+- [x] `cd platform && go test -race -shuffle=on -count=1 -tags=integration ./testkit/kafkatest/...`
+- [x] `task -d platform lint`
 
 **Dependencies:** None
 

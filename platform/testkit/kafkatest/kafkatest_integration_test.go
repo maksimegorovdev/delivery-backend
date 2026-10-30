@@ -71,3 +71,47 @@ func TestCreateTopic_ParallelTestsGetDifferentTopics(t *testing.T) {
 		})
 	}
 }
+
+func TestProduce_DeliversRecordsInOrder(t *testing.T) {
+	t.Parallel()
+
+	brokers := kafkatest.Brokers(t)
+	topic := kafkatest.CreateTopic(t, "produce")
+
+	kafkatest.Produce(t, topic,
+		&kgo.Record{
+			Key:     []byte("key-1"),
+			Value:   []byte("first"),
+			Headers: []kgo.RecordHeader{{Key: "event-type", Value: []byte("order.created")}},
+		},
+		&kgo.Record{Key: []byte("key-2"), Value: []byte("second")},
+		&kgo.Record{Key: []byte("key-3"), Value: []byte("third")},
+	)
+
+	client, err := kgo.NewClient(
+		kgo.SeedBrokers(brokers...),
+		kgo.ConsumeTopics(topic),
+		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
+	)
+	require.NoError(t, err)
+	t.Cleanup(client.Close)
+
+	ctx, cancel := context.WithTimeout(t.Context(), consumeTimeout)
+	defer cancel()
+
+	var got []*kgo.Record
+	for len(got) < 3 {
+		fetches := client.PollFetches(ctx)
+		require.NoError(t, fetches.Err())
+		got = append(got, fetches.Records()...)
+	}
+
+	require.Len(t, got, 3)
+	assert.Equal(t, "key-1", string(got[0].Key))
+	assert.Equal(t, "first", string(got[0].Value))
+	require.Len(t, got[0].Headers, 1)
+	assert.Equal(t, "event-type", got[0].Headers[0].Key)
+	assert.Equal(t, "order.created", string(got[0].Headers[0].Value))
+	assert.Equal(t, "second", string(got[1].Value))
+	assert.Equal(t, "third", string(got[2].Value))
+}
