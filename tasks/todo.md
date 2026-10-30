@@ -404,8 +404,8 @@ proto → domain (все поля, время), маппинг кодов gRPC �
 **Estimated scope:** M
 
 ## Checkpoint 3: образцы закреплены
-- [ ] `task -d services/order test`, `lint`, `cover` зелёные
-- [ ] Обзор образцов тестов клиента (Task 15) и транспорта (Task 16) с пользователем перед копированием
+- [x] `task -d services/order test`, `lint`, `cover` зелёные
+- [x] Обзор образцов тестов клиента (Task 15) и транспорта (Task 16) с пользователем перед копированием
 
 ---
 
@@ -417,12 +417,12 @@ proto → domain (все поля, время), маппинг кодов gRPC �
 Тесты `UserService` и `AddressService`: успех и ошибка репозитория для каждого метода.
 
 **Acceptance criteria:**
-- [ ] Каждый use case: успех, ошибка репозитория пробрасывается
-- [ ] Покрытие `service` ≥ 80%
-- [ ] `task mocks` повторно без diff
+- [x] Каждый use case: успех, ошибка репозитория пробрасывается
+- [x] Покрытие `service` ≥ 80%
+- [x] `task mocks` повторно без diff
 
 **Verification:**
-- [ ] `cd services/user && go test -race -shuffle=on -count=1 -cover ./internal/service/`
+- [x] `cd services/user && go test -race -shuffle=on -count=1 -cover ./internal/service/`
 
 **Dependencies:** Checkpoint 3
 

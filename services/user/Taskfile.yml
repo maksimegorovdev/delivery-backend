@@ -11,6 +11,7 @@ vars:
   MIGRATE_VERSION: v4.19.1
   GRPCUI_VERSION: v1.5.3
   AIR_VERSION: v1.63.0
+  MOCKERY_VERSION: v3.9.0
   MIGRATIONS_DIR: migrations/pg
 
 tasks:
@@ -23,7 +24,13 @@ tasks:
       - go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@{{.MIGRATE_VERSION}}
       - go install github.com/fullstorydev/grpcui/cmd/grpcui@{{.GRPCUI_VERSION}}
       - go install github.com/air-verse/air@{{.AIR_VERSION}}
+      - go install github.com/vektra/mockery/v3@{{.MOCKERY_VERSION}}
       - go install github.com/vladopajic/go-test-coverage/v2@{{.GO_TEST_COVERAGE_VERSION}}
+
+  mocks:
+    desc: Generate mocks with mockery
+    cmds:
+      - '{{.LOCAL_BIN}}/mockery'
 
   test:
     desc: Run unit tests (no Docker required)
