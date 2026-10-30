@@ -91,3 +91,36 @@ func TestNew_TelemetryValid(t *testing.T) {
 		})
 	}
 }
+
+func TestNew_GRPCServerReflection(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  bool
+	}{
+		{name: "enabled", value: "true", want: true},
+		{name: "disabled", value: "false", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setBaseEnv(t)
+			t.Setenv("OTEL_ENABLED", "false")
+			t.Setenv("GRPC_SERVER_REFLECTION", tt.value)
+
+			cfg, err := config.New()
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, cfg.GRPCServer.Reflection)
+		})
+	}
+}
+
+func TestNew_GRPCServerReflectionUnset(t *testing.T) {
+	setBaseEnv(t)
+	t.Setenv("OTEL_ENABLED", "false")
+	t.Setenv("GRPC_SERVER_REFLECTION", "") // восстанавливает исходное значение после теста
+	require.NoError(t, os.Unsetenv("GRPC_SERVER_REFLECTION"))
+
+	_, err := config.New()
+	require.Error(t, err)
+}

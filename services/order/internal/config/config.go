@@ -72,7 +72,8 @@ type GRPCServer struct {
 func (g GRPCServer) Validate() error {
 	return validation.ValidateStruct(&g,
 		validation.Field(&g.Addr, validation.Required),
-		validation.Field(&g.Reflection, validation.Required),
+		// Required на Reflection запрещён: false считается пустым значением;
+		// наличие переменной проверяет тег env required.
 	)
 }
 
