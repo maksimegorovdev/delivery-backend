@@ -1,0 +1,76 @@
+# Implementation Plan: test-foundation
+
+> Спек: [spec.md](spec.md) · Карта: [map.md](../../../../specs/testing/map.md) · Задачи: [todo.md](todo.md)
+
+## Overview
+
+Общая тестовая инфраструктура монорепо: пакет `platform/testkit/` (Postgres и Redpanda на testcontainers),
+задачи Taskfile `test`/`test-integration`/`mocks`/`cover`, генерация моков mockery v3, линтеры для тестов,
+порог покрытия. Работоспособность доказывается пилотом в `order`: unit-тест `CreateOrder` на моках
+и integration-тест `OrderRepo.Create`. Боевой код не меняется.
+
+## Architecture Decisions
+
+- **`testkit` — пакет `platform/testkit`, а не отдельный модуль.** Он нужен всем сервисам, как и остальной `platform`. Тестовые зависимости (`testcontainers`, `golang-migrate`) попадают в `platform/go.mod`; версии `otel`/`pgx` не конфликтуют (проверено в Task 1). Пакеты не импортируют другие пакеты `platform`, наружу отдаются только `*pgxpool.Pool`, DSN и адреса брокеров. Запрет на импорт из не-тестовых файлов обеспечивает `depguard`.
+- **Изоляция БД — клон шаблона.** На тестовый бинарь один контейнер (`sync.Once`), миграции применяются один раз в `template_app`, каждый `NewDB(t)` делает `CREATE DATABASE ... TEMPLATE`. Это совместимо с `t.Parallel`, snapshot/restore — нет.
+- **Миграции применяются библиотекой `golang-migrate`** из того же каталога `migrations/pg`, что и `task migrate-up`. Схема в тестах совпадает с боевой.
+- **Моки коммитятся.** `dir: {{.InterfaceDir}}/mocks`, `pkgname: mocks`, `structname: Mock{{.InterfaceName}}`. Свежесть проверяет `task mocks` + `git diff --exit-code`.
+- **Покрытие собирается по модулям в `coverage/<module>.out`** (каталог в `.gitignore`), `go-test-coverage` проверяет все профили одним конфигом в корне.
+- **Самый рискованный кусок — первым.** Это Docker + шаблонная БД + миграции в Task 1. Если подход не взлетит, остальное не начинаем.
+
+## Dependency Graph
+
+```
+Task 1 testkit/pgtest ──┬── Task 2 testkit/kafkatest
+                        │
+Task 3 Taskfile test/test-integration ──┬── Task 6 pilot integration (нужны 1, 3)
+                                        │
+Task 4 mockery + моки order ── Task 5 pilot unit (нужны 3, 4)
+                                        │
+Task 7 линтеры (после 5, 6 — есть что линтить)
+Task 8 покрытие (нужны 3, 5, 6)
+Task 9 AGENTS.md (в конце, фиксирует итоговые конвенции)
+```
+
+## Task List
+
+### Phase 1: testkit
+- [x] Task 1: Пакет `platform/testkit/pgtest` со smoke-тестом
+- [x] Task 2: `kafkatest` со smoke-тестом
+
+### Checkpoint: testkit
+- [x] `go test -tags=integration ./...` в `platform/testkit` зелёный, контейнеры удаляются после прогона
+
+### Phase 2: Команды и пилот
+- [x] Task 3: Задачи Taskfile `test` и `test-integration` во всех модулях
+- [x] Task 4: mockery v3: установка, `.mockery.yml`, `task mocks`, моки `order/internal/service`
+- [x] Task 5: Пилотный unit-тест `OrderService.CreateOrder`
+- [x] Task 6: Пилотный integration-тест `OrderRepo.Create`
+
+### Checkpoint: Пилот
+- [x] `task test` (без Docker) и `task test-integration` зелёные из корня
+- [x] Ревью пилотных тестов с пользователем: стиль закрепляется до массового написания
+
+### Phase 3: Контроль качества
+- [x] Task 7: Линтеры `thelper`, `testifylint` (enable-all), `depguard` для `testkit`/`mocks`
+- [x] Task 8: `task cover` + `.testcoverage.yml`
+- [x] Task 9: Раздел «Тесты» в `AGENTS.md` — отменена: команды видны в Taskfile, конвенции остаются в спеке
+
+### Checkpoint: Complete
+- [x] Все Success Criteria спека выполнены (кроме раздела в `AGENTS.md`: отменён)
+- [x] `task lint`, `task test`, `task test-integration` зелёные; `task cover` печатает отчёт
+
+## Risks and Mitigations
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| `CREATE DATABASE ... TEMPLATE` падает, пока к шаблону есть соединения | High | Закрывать migrate и пул до первого клона. Smoke-тест с 10 параллельными `NewDB` в Task 1 |
+| Ryuk не стартует в Docker Desktop/colima на macOS | Med | Проверить в Task 1. Fallback — `TESTCONTAINERS_RYUK_DISABLED` + явный `TerminateContainer`, решение с пользователем |
+| `testifylint enable-all`/`thelper` массово ругаются на существующие тесты | Med | В Task 7 посчитать нарушения. Если их больше ~20, остановиться и согласовать: чинить сейчас или в модуле `unit` |
+| `go-test-coverage` неправильно сопоставляет пути профилей разных модулей | Med | В Task 8 сверить синтаксис конфига по документации, проверить на двух модулях до подключения всех |
+| Пороги покрытия красные до модулей `unit`/`integration` | Low | Ожидаемо (спек). `task cover` честно падает, порог не занижается |
+| Новые зависимости тянут несовместимые версии `pgx`/`otel` в `go.work` | Low | `task sync` + `task tidy` после каждой задачи с новыми зависимостями |
+
+## Open Questions
+
+- Нет.
