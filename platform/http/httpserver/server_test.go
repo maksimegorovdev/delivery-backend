@@ -78,23 +78,24 @@ type response struct {
 // get отправляет GET в горутине без keep-alive, чтобы соединение не пережило запрос.
 func get(ctx context.Context, url string) <-chan response {
 	out := make(chan response, 1)
-	go func() {
-		client := &http.Client{Transport: &http.Transport{DisableKeepAlives: true}}
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-		if err != nil {
-			out <- response{err: err}
-			return
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			out <- response{err: err}
-			return
-		}
-		_ = resp.Body.Close()
-		out <- response{status: resp.StatusCode}
-	}()
+	go func() { out <- doGet(ctx, url) }()
 
 	return out
+}
+
+func doGet(ctx context.Context, url string) response {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return response{err: err}
+	}
+	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: true}}
+	resp, err := client.Do(req)
+	if err != nil {
+		return response{err: err}
+	}
+	_ = resp.Body.Close()
+
+	return response{status: resp.StatusCode}
 }
 
 func receive[T any](t *testing.T, ch <-chan T, what string) T {
