@@ -127,7 +127,9 @@ func TestHandler_Handle_OrderCreated_CanonicalizesIDs(t *testing.T) {
 				Return(nil).
 				Once()
 
-			err := h.Handle(t.Context(), orderCreatedMessage(`{"event_id":"`+tt.eventID+`","order_id":"`+tt.orderID+`"}`))
+			msg := orderCreatedMessage(`{"event_id":"` + tt.eventID + `","order_id":"` + tt.orderID + `"}`)
+
+			err := h.Handle(t.Context(), msg)
 
 			require.NoError(t, err)
 		})
