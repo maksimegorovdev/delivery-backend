@@ -43,5 +43,10 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "agent-skills@addy-agent-skills": true,
+    "cc-skills-golang@samber": true,
+    "modern-go-guidelines@goland-claude-marketplace": true
   }
 }
