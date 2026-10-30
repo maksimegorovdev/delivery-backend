@@ -1,0 +1,16 @@
+template: testify
+packages:
+  github.com/maksimegorovdev/delivery-backend/services/notification/internal/service:
+    config:
+      all: true
+      dir: "{{.InterfaceDir}}/mocks"
+      filename: mocks.go
+      pkgname: mocks
+      structname: "Mock{{.InterfaceName}}"
+  github.com/maksimegorovdev/delivery-backend/services/notification/internal/transport/kafka/order:
+    config:
+      all: true
+      dir: "{{.InterfaceDir}}/mocks"
+      filename: mocks.go
+      pkgname: mocks
+      structname: "Mock{{.InterfaceName}}"

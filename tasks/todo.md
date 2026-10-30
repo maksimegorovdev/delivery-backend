@@ -484,12 +484,12 @@ proto → domain (все поля, время), маппинг кодов gRPC �
 (в т. ч. «уже обработано» — идемпотентность inbox) → уведомление не создаётся; ошибка репозитория пробрасывается.
 
 **Acceptance criteria:**
-- [ ] Повторное событие (ошибка/результат `Claim` для дубля) не создаёт уведомление
-- [ ] Оба вызова сделаны внутри `WithinTx`
-- [ ] Покрытие `service` ≥ 80%
+- [x] Повторное событие (ошибка/результат `Claim` для дубля) не создаёт уведомление
+- [x] Оба вызова сделаны внутри `WithinTx`
+- [x] Покрытие `service` ≥ 80%
 
 **Verification:**
-- [ ] `cd services/notification && go test -race -shuffle=on -count=1 -cover ./internal/service/`
+- [x] `cd services/notification && go test -race -shuffle=on -count=1 -cover ./internal/service/`
 
 **Dependencies:** Checkpoint 3
 

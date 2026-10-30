@@ -8,6 +8,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/maksimegorovdev/delivery-backend/platform v0.0.0
 	github.com/maksimegorovdev/delivery-backend/proto v0.0.0-20261004115919-6422b79f7e72
+	github.com/stretchr/testify v1.12.1
 	golang.org/x/sync v0.24.0
 	google.golang.org/protobuf v1.36.12
 )
@@ -27,6 +28,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/klauspost/compress v1.20.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.30 // indirect
+	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/twmb/franz-go v1.22.1 // indirect
 	github.com/twmb/franz-go/pkg/kmsg v1.14.0 // indirect
 	github.com/twmb/franz-go/plugin/kotel v1.7.1 // indirect
@@ -45,6 +47,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
