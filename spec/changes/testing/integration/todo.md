@@ -128,8 +128,8 @@
 транзакцию. Плюс положительный кейс: заказ, позиции и событие видны после коммита.
 
 **Acceptance criteria:**
-- [ ] Ошибка `Save` не оставляет строк в `orders`, `order_items`, `outbox_events`
-- [ ] Успешная транзакция фиксирует все три таблицы
+- [x] Ошибка `Save` не оставляет строк в `orders`, `order_items`, `outbox_events`
+- [x] Успешная транзакция фиксирует все три таблицы
 
 **Verification:**
 - [ ] `task -d services/order test-integration`
