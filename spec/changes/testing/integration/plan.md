@@ -77,7 +77,7 @@ notification repo (T8) ───────────────────
 - [ ] Ревью найденных багов с пользователем
 
 ### Phase 5: шов App.Addr() и smoke app
-- [ ] Task 12: Шов `App.Addr()` и smoke-тест `order`
+- [x] Task 12: Шов `App.Addr()` и smoke-тест `order`
 - [ ] Task 13: Шов и smoke-тесты `user` и `product`
 - [ ] Task 14: Шов и smoke-тест `gateway`
 - [ ] Task 15: Smoke-тест `notification`

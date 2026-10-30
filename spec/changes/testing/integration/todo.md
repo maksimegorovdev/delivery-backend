@@ -326,14 +326,14 @@
 `Addr()` → отмена ctx → `Run` вернул nil → `Close` без ошибок.
 
 **Acceptance criteria:**
-- [ ] `Addr()` возвращает фактический порт, тест не ищет свободный порт заранее
-- [ ] Занятый порт → ошибка из `New`, ресурсы освобождены
-- [ ] Smoke: запрос обслужен, `Run` и `Close` завершаются без ошибок
+- [x] `Addr()` возвращает фактический порт, тест не ищет свободный порт заранее
+- [x] Занятый порт → ошибка из `New`, ресурсы освобождены
+- [x] Smoke: запрос обслужен, `Run` и `Close` завершаются без ошибок
 
 **Verification:**
-- [ ] `task -d services/order test-integration`
-- [ ] `task -d services/order test` (без Docker) и `task -d services/order lint`
-- [ ] Ручная проверка: `docker compose up` + `order` стартует и логирует фактический адрес
+- [x] `task -d services/order test-integration`
+- [x] `task -d services/order test` (без Docker) и `task -d services/order lint`
+- [x] Ручная проверка: `docker compose up` + `order` стартует и логирует фактический адрес
 
 **Dependencies:** Task 7
 
