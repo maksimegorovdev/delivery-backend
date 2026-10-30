@@ -1,6 +1,6 @@
 # Spec: integration
 
-> Status: **approved** · Depends on: [test-foundation](../../../specs/testing/test-foundation/spec.md)
+> Status: **done** · Depends on: [test-foundation](../2026-10-29-test-foundation/spec.md)
 
 ## Objective
 

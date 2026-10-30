@@ -1,6 +1,6 @@
 # Implementation Plan: integration
 
-> Спек: [spec.md](spec.md) · Карта: [map.md](../../../specs/testing/map.md) · Задачи: [todo.md](todo.md)
+> Спек: [spec.md](spec.md) · Карта: [map.md](../../../../specs/testing/map.md) · Задачи: [todo.md](todo.md)
 
 ## Overview
 
