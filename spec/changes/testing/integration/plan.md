@@ -73,7 +73,7 @@ notification repo (T8) ───────────────────
 - [x] Task 11: `product` — репозиторий, миграции, компонентный gRPC-стек
 
 ### Checkpoint 3: все репозитории и компонентные стеки
-- [ ] `task test-integration` зелёный во всех модулях, `task test` работает без Docker
+- [x] `task test-integration` зелёный во всех модулях, `task test` работает без Docker
 - [ ] Ревью найденных багов с пользователем
 
 ### Phase 5: шов App.Addr() и smoke app

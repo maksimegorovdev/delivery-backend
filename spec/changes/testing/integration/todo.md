@@ -308,8 +308,8 @@
 **Estimated scope:** M
 
 ## Checkpoint 3: все репозитории и компонентные стеки
-- [ ] `task test-integration` зелёный во всех модулях, `task test` работает без Docker
-- [ ] `task lint` зелёный
+- [x] `task test-integration` зелёный во всех модулях, `task test` работает без Docker
+- [x] `task lint` зелёный
 - [ ] Ревью найденных багов с пользователем
 
 ---
