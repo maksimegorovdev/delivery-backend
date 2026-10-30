@@ -556,12 +556,12 @@ Taskfile `notification`, модуль в `FUZZ_MODULES`.
 ошибки сервиса → HTTP-коды, `mapper` и `dto` (`Validate`).
 
 **Acceptance criteria:**
-- [ ] Каждый endpoint: успех (статус + тело), невалидное тело, ошибка сервиса
-- [ ] Валидация `dto` покрыта таблицей
-- [ ] Запрос идёт через роутер, как в `app`
+- [x] Каждый endpoint: успех (статус + тело), невалидное тело, ошибка сервиса
+- [x] Валидация `dto` покрыта таблицей
+- [x] Запрос идёт через роутер, как в `app`
 
 **Verification:**
-- [ ] `cd services/gateway && go test -race -shuffle=on -count=1 -cover ./internal/transport/...`
+- [x] `cd services/gateway && go test -race -shuffle=on -count=1 -cover ./internal/transport/...`
 
 **Dependencies:** Task 22
 
