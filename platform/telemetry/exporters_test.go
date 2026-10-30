@@ -11,6 +11,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/log"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
@@ -41,9 +43,7 @@ func TestDeltaTemporality(t *testing.T) {
 		t.Run(tt.kind.String(), func(t *testing.T) {
 			t.Parallel()
 
-			if got := deltaTemporality(tt.kind); got != tt.want {
-				t.Errorf("deltaTemporality(%v) = %v, want %v", tt.kind, got, tt.want)
-			}
+			assert.Equal(t, tt.want, deltaTemporality(tt.kind))
 		})
 	}
 }
@@ -77,8 +77,8 @@ func TestSpanLimits_TruncatesLongAttribute(t *testing.T) {
 		env  string // "" — OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT не задан
 		want int
 	}{
-		{name: "по умолчанию 1024", env: "", want: defaultAttributeValueLengthLimit},
-		{name: "env переопределяет", env: "16", want: 16},
+		{name: "default 1024", env: "", want: defaultAttributeValueLengthLimit},
+		{name: "env overrides", env: "16", want: 16},
 	}
 
 	for _, tt := range tests {
@@ -86,13 +86,9 @@ func TestSpanLimits_TruncatesLongAttribute(t *testing.T) {
 			t.Setenv("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", "")
 			t.Setenv("OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT", tt.env)
 			if tt.env == "" {
-				if err := os.Unsetenv("OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT"); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.Unsetenv("OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT"))
 			}
-			if err := os.Unsetenv("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT"); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.Unsetenv("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT"))
 
 			exp := tracetest.NewInMemoryExporter()
 			tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp), sdktrace.WithRawSpanLimits(spanLimits()))
@@ -103,12 +99,8 @@ func TestSpanLimits_TruncatesLongAttribute(t *testing.T) {
 			span.End()
 
 			got := exp.GetSpans()
-			if len(got) != 1 {
-				t.Fatalf("спанов = %d, want 1", len(got))
-			}
-			if n := len(got[0].Attributes[0].Value.AsString()); n != tt.want {
-				t.Errorf("длина атрибута = %d, want %d", n, tt.want)
-			}
+			require.Len(t, got, 1)
+			assert.Len(t, got[0].Attributes[0].Value.AsString(), tt.want)
 		})
 	}
 }
@@ -119,17 +111,15 @@ func TestLoggerProviderOptions_AttributeLimit(t *testing.T) {
 		env  string // "" — OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT не задан
 		want int
 	}{
-		{name: "по умолчанию 1024", env: "", want: defaultAttributeValueLengthLimit},
-		{name: "env переопределяет", env: "16", want: 16},
+		{name: "default 1024", env: "", want: defaultAttributeValueLengthLimit},
+		{name: "env overrides", env: "16", want: 16},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv(envLogAttributeValueLengthLimit, tt.env)
 			if tt.env == "" {
-				if err := os.Unsetenv(envLogAttributeValueLengthLimit); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.Unsetenv(envLogAttributeValueLengthLimit))
 			}
 
 			exp := &recordingLogExporter{}
@@ -138,21 +128,15 @@ func TestLoggerProviderOptions_AttributeLimit(t *testing.T) {
 			var rec log.Record
 			rec.AddAttributes(attribute.String("http.path", strings.Repeat("a", 4096)))
 			lp.Logger("test").Emit(context.Background(), rec)
-			if err := lp.Shutdown(context.Background()); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, lp.Shutdown(context.Background()))
 
-			if len(exp.records) != 1 {
-				t.Fatalf("записей = %d, want 1", len(exp.records))
-			}
+			require.Len(t, exp.records, 1)
 			var n int
 			exp.records[0].WalkAttributes(func(kv attribute.KeyValue) bool {
 				n = len(kv.Value.AsString())
 				return false
 			})
-			if n != tt.want {
-				t.Errorf("длина атрибута = %d, want %d", n, tt.want)
-			}
+			assert.Equal(t, tt.want, n)
 		})
 	}
 }
@@ -183,9 +167,9 @@ func TestNewPeriodicReader_Interval(t *testing.T) {
 		wantPre  int32 // экспортов к моменту before
 		wantPost int32 // экспортов через ещё 2s после before
 	}{
-		{name: "по умолчанию 10s", env: "", before: 9 * time.Second, wantPre: 0, wantPost: 1},
+		{name: "default 10s", env: "", before: 9 * time.Second, wantPre: 0, wantPost: 1},
 		{
-			name:     "OTEL_METRIC_EXPORT_INTERVAL=3000 переопределяет",
+			name:     "OTEL_METRIC_EXPORT_INTERVAL=3000 overrides",
 			env:      "3000",
 			before:   2 * time.Second,
 			wantPre:  0,
@@ -197,9 +181,7 @@ func TestNewPeriodicReader_Interval(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.env == "" {
 				t.Setenv("OTEL_METRIC_EXPORT_INTERVAL", "")
-				if err := os.Unsetenv("OTEL_METRIC_EXPORT_INTERVAL"); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.Unsetenv("OTEL_METRIC_EXPORT_INTERVAL"))
 			} else {
 				t.Setenv("OTEL_METRIC_EXPORT_INTERVAL", tt.env)
 			}
@@ -212,15 +194,11 @@ func TestNewPeriodicReader_Interval(t *testing.T) {
 
 				time.Sleep(tt.before)
 				synctest.Wait()
-				if got := exp.exports.Load(); got != tt.wantPre {
-					t.Errorf("экспортов за %v = %d, want %d", tt.before, got, tt.wantPre)
-				}
+				assert.Equal(t, tt.wantPre, exp.exports.Load(), "exports before the interval")
 
 				time.Sleep(2 * time.Second)
 				synctest.Wait()
-				if got := exp.exports.Load(); got != tt.wantPost {
-					t.Errorf("экспортов после интервала = %d, want %d", got, tt.wantPost)
-				}
+				assert.Equal(t, tt.wantPost, exp.exports.Load(), "exports after the interval")
 			})
 		})
 	}

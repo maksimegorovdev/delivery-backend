@@ -588,11 +588,11 @@ Taskfile `notification`, модуль в `FUZZ_MODULES`.
 кейсов не меняется. Механика, поэтому больше 5 файлов допустимо.
 
 **Acceptance criteria:**
-- [ ] Количество кейсов до и после совпадает
-- [ ] Нет кириллицы в `name`/`t.Run`; покрытие `telemetry` не упало (91%)
+- [x] Количество кейсов до и после совпадает
+- [x] Нет кириллицы в `name`/`t.Run`; покрытие `telemetry` не упало (91%)
 
 **Verification:**
-- [ ] `cd platform && go test -race -shuffle=on -count=1 -cover ./telemetry/`
+- [x] `cd platform && go test -race -shuffle=on -count=1 -cover ./telemetry/`
 
 **Dependencies:** None
 

@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/log"
@@ -16,12 +18,9 @@ func TestNew_Enabled_RegistersLoggerProvider(t *testing.T) {
 	tel := newEnabled(t)
 
 	lp, ok := tel.LoggerProvider().(*sdklog.LoggerProvider)
-	if !ok {
-		t.Fatalf("LoggerProvider() = %T, want *sdklog.LoggerProvider", tel.LoggerProvider())
-	}
-	if global := otel.GetLoggerProvider(); global != log.LoggerProvider(lp) {
-		t.Errorf("глобальный LoggerProvider = %T, не совпадает с Telemetry.LoggerProvider()", global)
-	}
+	require.True(t, ok, "LoggerProvider() = %T, want *sdklog.LoggerProvider", tel.LoggerProvider())
+	assert.Same(t, log.LoggerProvider(lp), otel.GetLoggerProvider(),
+		"global LoggerProvider differs from Telemetry.LoggerProvider()")
 }
 
 // Shutdown с накопленными данными всех трёх сигналов и недоступным Collector
@@ -39,9 +38,7 @@ func TestShutdown_UnreachableCollectorRespectsDeadline(t *testing.T) {
 	span.End()
 
 	counter, err := otel.Meter("test").Int64Counter("requests")
-	if err != nil {
-		t.Fatalf("Int64Counter: %v", err)
-	}
+	require.NoError(t, err)
 	counter.Add(ctx, 1)
 
 	var rec log.Record
@@ -53,9 +50,7 @@ func TestShutdown_UnreachableCollectorRespectsDeadline(t *testing.T) {
 
 	start := time.Now()
 	_ = tel.Shutdown(shutdownCtx)
-	if elapsed := time.Since(start); elapsed > deadline+slack {
-		t.Errorf("Shutdown занял %v, deadline %v", elapsed, deadline)
-	}
+	assert.LessOrEqual(t, time.Since(start), deadline+slack, "Shutdown must return by the context deadline")
 }
 
 //nolint:paralleltest // регистрирует глобальные провайдеры OTel, тест нельзя запускать параллельно

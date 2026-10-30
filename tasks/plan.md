@@ -46,8 +46,8 @@ testify и английские имена кейсов, fuzz для парсе�
 ### Phase 3: order — эталонный сервис
 - [x] Task 12: Тесты `order/internal/domain`
 - [x] Task 13: Тесты и fuzz `order/internal/event`
-- [ ] Task 14: Дополнить тесты `order/internal/service`
-- [ ] Task 15: Тесты `order/internal/client` на `grpctest`
+- [x] Task 14: Дополнить тесты `order/internal/service`
+- [x] Task 15: Тесты `order/internal/client` на `grpctest`
 - [x] Task 16: Тесты `order/internal/transport/grpc` на `grpctest`
 
 ### Checkpoint 3: образцы закреплены
@@ -55,19 +55,19 @@ testify и английские имена кейсов, fuzz для парсе�
 - [ ] Обзор образцов тестов клиента и транспорта с пользователем перед копированием в другие сервисы
 
 ### Phase 4: остальные сервисы (задачи независимы, можно параллельно)
-- [ ] Task 17: user — моки и тесты `service`
+- [x] Task 17: user — моки и тесты `service`
 - [x] Task 18: user — тесты `transport/grpc`
-- [ ] Task 19: product — моки, тесты `service` и `transport/grpc`
-- [ ] Task 20: notification — моки и тесты `service`
-- [ ] Task 21: notification — тесты и fuzz `transport/kafka`
-- [ ] Task 22: gateway — моки, тесты `service` и `client`
-- [ ] Task 23: gateway — тесты HTTP-транспорта `v1/order`
+- [x] Task 19: product — моки, тесты `service` и `transport/grpc`
+- [x] Task 20: notification — моки и тесты `service`
+- [x] Task 21: notification — тесты и fuzz `transport/kafka`
+- [x] Task 22: gateway — моки, тесты `service` и `client`
+- [x] Task 23: gateway — тесты HTTP-транспорта `v1/order`
 
 ### Checkpoint 4: все сервисы покрыты
 - [ ] `task test`, `task lint`, `task cover` из корня зелёные; `task mocks` без diff
 
 ### Phase 5: перевод оставшихся тестов
-- [ ] Task 24: Перевод тестов `platform/telemetry`
+- [x] Task 24: Перевод тестов `platform/telemetry`
 - [ ] Task 25: Перевод тестов `logger`, `postgres`, `grpc` (otel)
 - [ ] Task 26: Перевод тестов конфигов сервисов и `order/repository/pg/outbox_test.go`
 
