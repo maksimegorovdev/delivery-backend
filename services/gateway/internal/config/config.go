@@ -21,8 +21,8 @@ func (c Config) Validate() error {
 		validation.Field(&c.App, validation.Required),
 		validation.Field(&c.Log, validation.Required),
 		validation.Field(&c.HTTP, validation.Required),
+		validation.Field(&c.OrderService, validation.Required),
 		validation.Field(&c.FakeAuth, validation.Required),
-		// Без Required: нулевая Telemetry{false, ""} — валидный выключенный режим.
 		validation.Field(&c.Telemetry),
 	)
 }
@@ -86,7 +86,6 @@ type Telemetry struct {
 
 func (t Telemetry) Validate() error {
 	return validation.ValidateStruct(&t,
-		// Required на Enabled запрещён: false считается пустым значением.
 		validation.Field(&t.Endpoint, validation.When(t.Enabled, validation.Required)),
 	)
 }

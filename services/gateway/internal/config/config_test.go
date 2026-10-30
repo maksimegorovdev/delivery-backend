@@ -90,3 +90,29 @@ func TestNew_TelemetryValid(t *testing.T) {
 		})
 	}
 }
+
+func TestNew_Invalid(t *testing.T) {
+	tests := []struct {
+		name  string
+		key   string
+		value string
+	}{
+		{name: "APP_NAME empty", key: "APP_NAME", value: ""},
+		{name: "LOG_LEVEL unknown", key: "LOG_LEVEL", value: "trace"},
+		{name: "LOG_FORMAT unknown", key: "LOG_FORMAT", value: "xml"},
+		{name: "HTTP_ADDR empty", key: "HTTP_ADDR", value: ""},
+		{name: "ORDER_SERVICE_GRPC_ADDR empty", key: "ORDER_SERVICE_GRPC_ADDR", value: ""},
+		{name: "FAKE_AUTH_USER_ID empty", key: "FAKE_AUTH_USER_ID", value: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setBaseEnv(t)
+			t.Setenv("OTEL_ENABLED", "false")
+			t.Setenv(tt.key, tt.value)
+
+			_, err := config.New()
+			require.Error(t, err)
+		})
+	}
+}
