@@ -36,16 +36,16 @@ testify и английские имена кейсов, fuzz для парсе�
 - [x] Task 7: Тесты `grpc/interceptors` на `grpctest`
 - [x] Task 8: Тесты `grpcserver` и `grpcclient`, `goleak`
 - [x] Task 9: Тесты `http/middleware`
-- [ ] Task 10: Тесты `httpserver` (graceful shutdown), `goleak`
-- [ ] Task 11: Unit-тесты `kafkaconsumer`
+- [x] Task 10: Тесты `httpserver` (graceful shutdown), `goleak`
+- [x] Task 11: Unit-тесты `kafkaconsumer`
 - [x] Task 6: Порог 80% на каждый пакет `platform`
 
 ### Checkpoint 2: platform готов
 - [ ] `task -d platform test`, `task -d platform lint` зелёные; `task -d platform cover` зелёный с новыми порогами
 
 ### Phase 3: order — эталонный сервис
-- [ ] Task 12: Тесты `order/internal/domain`
-- [ ] Task 13: Тесты и fuzz `order/internal/event`
+- [x] Task 12: Тесты `order/internal/domain`
+- [x] Task 13: Тесты и fuzz `order/internal/event`
 - [ ] Task 14: Дополнить тесты `order/internal/service`
 - [ ] Task 15: Тесты `order/internal/client` на `grpctest`
 - [ ] Task 16: Тесты `order/internal/transport/grpc` на `grpctest`

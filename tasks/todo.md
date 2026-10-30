@@ -320,13 +320,13 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 `order`, модуль добавлен в `FUZZ_MODULES`.
 
 **Acceptance criteria:**
-- [ ] Round-trip тест проходит для заказа с несколькими позициями
-- [ ] `task -d services/order fuzz FUZZTIME=5s` запускает цель
-- [ ] `task fuzz` из корня запускает цели `platform` и `order`
+- [x] Round-trip тест проходит для заказа с несколькими позициями
+- [x] `task -d services/order fuzz FUZZTIME=5s` запускает цель
+- [x] `task fuzz` из корня запускает цели `platform` и `order`
 
 **Verification:**
-- [ ] `cd services/order && go test -race -shuffle=on -count=1 -cover ./internal/event/`
-- [ ] `task fuzz FUZZTIME=5s`
+- [x] `cd services/order && go test -race -shuffle=on -count=1 -cover ./internal/event/`
+- [x] `task fuzz FUZZTIME=5s`
 
 **Dependencies:** Task 5
 

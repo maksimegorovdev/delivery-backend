@@ -6,7 +6,7 @@ vars:
   MODULES: platform,proto,services/gateway,services/order,services/user,services/product,services/notification
   DB_SERVICES: order,user,product,notification
   # Модуль попадает в список вместе со своей первой fuzz-целью.
-  FUZZ_MODULES: platform
+  FUZZ_MODULES: platform,services/order
   COVER_MODULES: platform,services/gateway,services/order,services/user,services/product,services/notification
 
 tasks:
