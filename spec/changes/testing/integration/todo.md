@@ -103,13 +103,13 @@
 Общие хелперы пакета — в `helpers_integration_test.go`.
 
 **Acceptance criteria:**
-- [ ] `Create`: нарушение `CHECK` и дубль `id` дают ожидаемые коды `apperr`
-- [ ] `Save`: все колонки записаны; trace-контекст записан при span и пуст без него
-- [ ] Миграции `order` проходят up → down → up
+- [x] `Create`: нарушение `CHECK` и дубль `id` дают ожидаемые коды `apperr`
+- [x] `Save`: все колонки записаны; trace-контекст записан при span и пуст без него
+- [x] Миграции `order` проходят up → down → up
 
 **Verification:**
-- [ ] `task -d services/order test-integration`
-- [ ] `task -d services/order lint`
+- [x] `task -d services/order test-integration`
+- [x] `task -d services/order lint`
 
 **Dependencies:** Task 1
 
