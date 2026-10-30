@@ -6,6 +6,8 @@ import (
 	"runtime/debug"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
@@ -14,9 +16,7 @@ import (
 func attr(t *testing.T, res *resource.Resource, key string) string {
 	t.Helper()
 	v, ok := res.Set().Value(attribute.Key(key))
-	if !ok {
-		t.Fatalf("атрибут %q отсутствует в Resource: %v", key, res.Attributes())
-	}
+	require.True(t, ok, "attribute %q is missing in Resource: %v", key, res.Attributes())
 	return v.AsString()
 }
 
@@ -24,22 +24,12 @@ func TestNewResource_ServiceAttributes(t *testing.T) {
 	t.Parallel()
 
 	res, err := newResource(context.Background(), "order")
-	if err != nil {
-		t.Fatalf("newResource: %v", err)
-	}
+	require.NoError(t, err)
 
-	if got := attr(t, res, "service.name"); got != "order" {
-		t.Errorf("service.name = %q, want %q", got, "order")
-	}
-	if got := attr(t, res, "service.version"); got == "" {
-		t.Error("service.version пуст")
-	}
-	if got := attr(t, res, "service.instance.id"); got == "" {
-		t.Error("service.instance.id пуст")
-	}
-	if got := res.SchemaURL(); got != semconv.SchemaURL {
-		t.Errorf("SchemaURL = %q, want %q", got, semconv.SchemaURL)
-	}
+	assert.Equal(t, "order", attr(t, res, "service.name"))
+	assert.NotEmpty(t, attr(t, res, "service.version"))
+	assert.NotEmpty(t, attr(t, res, "service.instance.id"))
+	assert.Equal(t, semconv.SchemaURL, res.SchemaURL())
 }
 
 func TestNewResource_FromEnv(t *testing.T) {
@@ -50,14 +40,14 @@ func TestNewResource_FromEnv(t *testing.T) {
 		want string
 	}{
 		{
-			name: "атрибут из OTEL_RESOURCE_ATTRIBUTES",
+			name: "attribute from OTEL_RESOURCE_ATTRIBUTES",
 			env:  "deployment.environment.name=staging,team=delivery",
 			key:  "team",
 			want: "delivery",
 		},
-		{name: "service.name из конфига главнее env", env: "service.name=other", key: "service.name", want: "order"},
+		{name: "service.name from config wins over env", env: "service.name=other", key: "service.name", want: "order"},
 		{
-			name: "service.instance.id из env главнее сгенерированного",
+			name: "service.instance.id from env wins over generated",
 			env:  "service.instance.id=pod-1",
 			key:  "service.instance.id",
 			want: "pod-1",
@@ -69,12 +59,8 @@ func TestNewResource_FromEnv(t *testing.T) {
 			t.Setenv("OTEL_RESOURCE_ATTRIBUTES", tt.env)
 
 			res, err := newResource(context.Background(), "order")
-			if err != nil {
-				t.Fatalf("newResource: %v", err)
-			}
-			if got := attr(t, res, tt.key); got != tt.want {
-				t.Errorf("%s = %q, want %q", tt.key, got, tt.want)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, attr(t, res, tt.key))
 		})
 	}
 }
@@ -87,10 +73,10 @@ func TestServiceVersion(t *testing.T) {
 		info *debug.BuildInfo
 		want string
 	}{
-		{name: "нет build info", info: nil, want: "unknown"},
-		{name: "нет vcs.revision", info: &debug.BuildInfo{}, want: "unknown"},
+		{name: "no build info", info: nil, want: "unknown"},
+		{name: "no vcs.revision", info: &debug.BuildInfo{}, want: "unknown"},
 		{
-			name: "vcs.revision из настроек сборки",
+			name: "vcs.revision from build settings",
 			info: &debug.BuildInfo{Settings: []debug.BuildSetting{
 				{Key: "vcs", Value: "git"},
 				{Key: "vcs.revision", Value: "ced9d3b"},
@@ -98,7 +84,7 @@ func TestServiceVersion(t *testing.T) {
 			want: "ced9d3b",
 		},
 		{
-			name: "пустой vcs.revision",
+			name: "empty vcs.revision",
 			info: &debug.BuildInfo{Settings: []debug.BuildSetting{{Key: "vcs.revision", Value: ""}}},
 			want: "unknown",
 		},
@@ -108,9 +94,7 @@ func TestServiceVersion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := serviceVersion(tt.info); got != tt.want {
-				t.Errorf("serviceVersion() = %q, want %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, serviceVersion(tt.info))
 		})
 	}
 }

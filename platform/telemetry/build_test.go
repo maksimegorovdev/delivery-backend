@@ -4,10 +4,11 @@ package telemetry
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
@@ -46,28 +47,18 @@ func TestBuild_LoggerFailure_ShutsDownCreatedProviders(t *testing.T) {
 
 	cfg := Config{Enabled: true, ServiceName: "test-service", Endpoint: "http://127.0.0.1:1"}
 	tel, err := build(context.Background(), cfg, f)
-	if !errors.Is(err, failure) {
-		t.Fatalf("build: err = %v, want %v", err, failure)
-	}
-	if tel != nil {
-		t.Errorf("build вернул %v вместе с ошибкой", tel)
-	}
+	require.ErrorIs(t, err, failure)
+	assert.Nil(t, tel, "build must not return Telemetry together with an error")
 
-	if otel.GetTracerProvider() != tracerBefore {
-		t.Error("TracerProvider изменился после неудачного build")
-	}
-	if otel.GetMeterProvider() != meterBefore {
-		t.Error("MeterProvider изменился после неудачного build")
-	}
+	assert.Same(t, tracerBefore, otel.GetTracerProvider(), "TracerProvider changed after failed build")
+	assert.Same(t, meterBefore, otel.GetMeterProvider(), "MeterProvider changed after failed build")
 
 	_, span := tp.Tracer("test").Start(context.Background(), "op")
-	if span.IsRecording() {
-		t.Error("TracerProvider не закрыт после неудачного build")
-	}
+	defer span.End()
+	assert.False(t, span.IsRecording(), "TracerProvider is not shut down after failed build")
+
 	// Повторный Shutdown закрытого MeterProvider возвращает ошибку reader'а.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if shutdownErr := mp.Shutdown(ctx); shutdownErr == nil || !strings.Contains(shutdownErr.Error(), "shutdown") {
-		t.Errorf("MeterProvider не закрыт после неудачного build: повторный Shutdown = %v", shutdownErr)
-	}
+	assert.ErrorContains(t, mp.Shutdown(ctx), "shutdown", "MeterProvider is not shut down after failed build")
 }

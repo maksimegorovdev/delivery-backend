@@ -57,7 +57,7 @@
 
 ## Checkpoint: testkit
 - [x] `go test -tags=integration ./...` в `platform/testkit` зелёный, контейнеры удаляются
-- [ ] Показать пользователю API `pgtest`/`kafkatest` перед использованием в сервисах
+- [x] Показать пользователю API `pgtest`/`kafkatest` перед использованием в сервисах
 
 ## Task 3: Задачи Taskfile `test` и `test-integration` во всех модулях
 

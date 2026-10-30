@@ -5,6 +5,8 @@ version: '3'
 vars:
   MODULES: platform,proto,services/gateway,services/order,services/user,services/product,services/notification
   DB_SERVICES: order,user,product,notification
+  # Модуль попадает в список вместе со своей первой fuzz-целью.
+  FUZZ_MODULES: platform,services/order,services/notification
   COVER_MODULES: platform,services/gateway,services/order,services/user,services/product,services/notification
 
 tasks:
@@ -49,6 +51,12 @@ tasks:
     cmds:
       - for: { var: MODULES, split: ',' }
         cmd: task -d {{.ITEM}} test
+
+  fuzz:
+    desc: Run fuzz targets in every module that has them (FUZZTIME per target, default 30s)
+    cmds:
+      - for: { var: FUZZ_MODULES, split: ',' }
+        cmd: task -d {{.ITEM}} fuzz FUZZTIME={{.FUZZTIME | default "30s"}}
 
   test-integration:
     desc: Run integration tests across every module (requires Docker)

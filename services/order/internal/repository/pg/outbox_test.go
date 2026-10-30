@@ -5,6 +5,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -13,18 +15,12 @@ func TestTraceContext(t *testing.T) {
 	t.Parallel()
 
 	traceID, err := trace.TraceIDFromHex("4bf92f3577b34da6a3ce929d0e0e4736")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	spanID, err := trace.SpanIDFromHex("00f067aa0ba902b7")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	tracestate, err := trace.ParseTraceState("vendor=value")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	withSpan := func(state trace.TraceState) context.Context {
 		return trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
@@ -48,18 +44,18 @@ func TestTraceContext(t *testing.T) {
 		wantTracestate  *string
 	}{
 		{
-			name:            "span с tracestate",
+			name:            "span with tracestate",
 			ctx:             withSpan(tracestate),
 			wantTraceparent: new(wantTraceparent),
 			wantTracestate:  new(wantTracestate),
 		},
 		{
-			name:            "span без tracestate",
+			name:            "span without tracestate",
 			ctx:             withSpan(trace.TraceState{}),
 			wantTraceparent: new(wantTraceparent),
 		},
 		{
-			name: "без span",
+			name: "no span",
 			ctx:  context.Background(),
 		},
 	}
@@ -70,23 +66,8 @@ func TestTraceContext(t *testing.T) {
 
 			gotTraceparent, gotTracestate := traceContext(tt.ctx, propagation.TraceContext{})
 
-			assertOptString(t, "traceparent", gotTraceparent, tt.wantTraceparent)
-			assertOptString(t, "tracestate", gotTracestate, tt.wantTracestate)
+			assert.Equal(t, tt.wantTraceparent, gotTraceparent)
+			assert.Equal(t, tt.wantTracestate, gotTracestate)
 		})
 	}
-}
-
-func assertOptString(t *testing.T, name string, got, want *string) {
-	t.Helper()
-
-	if deref(got) != deref(want) {
-		t.Errorf("%s = %q, want %q", name, deref(got), deref(want))
-	}
-}
-
-func deref(s *string) string {
-	if s == nil {
-		return "<nil>"
-	}
-	return *s
 }

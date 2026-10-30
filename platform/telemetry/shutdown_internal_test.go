@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -30,20 +32,14 @@ func TestShutdown_HungTraceExportDoesNotStarveMetrics(t *testing.T) {
 	metricExp := &countingExporter{}
 	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExp)))
 	counter, err := mp.Meter("test").Int64Counter("requests")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	counter.Add(context.Background(), 1)
 
 	tel := &Telemetry{tracerProvider: tp, meterProvider: mp}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
-	if err = tel.Shutdown(ctx); err == nil {
-		t.Error("Shutdown() = nil, want ошибку зависшего экспорта трейсов")
-	}
+	require.Error(t, tel.Shutdown(ctx), "hung trace export must surface as a Shutdown error")
 
-	if got := metricExp.exports.Load(); got != 1 {
-		t.Errorf("экспортов метрик при Shutdown = %d, want 1", got)
-	}
+	assert.Equal(t, int32(1), metricExp.exports.Load(), "metric exports during Shutdown")
 }

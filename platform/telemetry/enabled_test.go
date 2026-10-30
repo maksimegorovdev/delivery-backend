@@ -2,10 +2,11 @@ package telemetry_test
 
 import (
 	"context"
-	"slices"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -29,9 +30,7 @@ func newEnabled(t *testing.T) *telemetry.Telemetry {
 		ServiceName: "test-service",
 		Endpoint:    "http://127.0.0.1:1",
 	})
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
+	require.NoError(t, err)
 
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
@@ -48,25 +47,15 @@ func newEnabled(t *testing.T) *telemetry.Telemetry {
 func TestNew_Enabled_RegistersMeterProvider(t *testing.T) {
 	newEnabled(t)
 
-	if _, ok := otel.GetMeterProvider().(*sdkmetric.MeterProvider); !ok {
-		t.Errorf("глобальный MeterProvider = %T, want *sdkmetric.MeterProvider", otel.GetMeterProvider())
-	}
+	assert.IsType(t, &sdkmetric.MeterProvider{}, otel.GetMeterProvider())
 }
 
 //nolint:paralleltest // регистрирует глобальные провайдеры OTel и/или меняет env, тест нельзя запускать параллельно
 func TestNew_Enabled_RegistersTracerProviderAndPropagator(t *testing.T) {
 	newEnabled(t)
 
-	if _, ok := otel.GetTracerProvider().(*sdktrace.TracerProvider); !ok {
-		t.Errorf("глобальный TracerProvider = %T, want *sdktrace.TracerProvider", otel.GetTracerProvider())
-	}
-
-	fields := otel.GetTextMapPropagator().Fields()
-	for _, want := range []string{"traceparent", "baggage"} {
-		if !slices.Contains(fields, want) {
-			t.Errorf("пропагатор не содержит поле %q: %v", want, fields)
-		}
-	}
+	assert.IsType(t, &sdktrace.TracerProvider{}, otel.GetTracerProvider())
+	assert.Subset(t, otel.GetTextMapPropagator().Fields(), []string{"traceparent", "baggage"})
 }
 
 func TestNew_Enabled_Sampler(t *testing.T) {
@@ -75,7 +64,7 @@ func TestNew_Enabled_Sampler(t *testing.T) {
 		sampler string // значение OTEL_TRACES_SAMPLER, "" — не задан
 		want    bool
 	}{
-		{name: "по умолчанию ParentBased(AlwaysSample)", sampler: "", want: true},
+		{name: "default ParentBased(AlwaysSample)", sampler: "", want: true},
 		{name: "OTEL_TRACES_SAMPLER=always_off", sampler: "always_off", want: false},
 	}
 
@@ -89,9 +78,7 @@ func TestNew_Enabled_Sampler(t *testing.T) {
 			_, span := otel.Tracer("test").Start(context.Background(), "op")
 			defer span.End()
 
-			if got := span.SpanContext().IsSampled(); got != tt.want {
-				t.Errorf("IsSampled() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, span.SpanContext().IsSampled())
 		})
 	}
 }
@@ -106,7 +93,5 @@ func TestNew_Enabled_ChildFollowsParentSampling(t *testing.T) {
 	_, child := tracer.Start(ctx, "child")
 	defer child.End()
 
-	if !child.SpanContext().IsSampled() {
-		t.Error("дочерний спан сэмплируемого родителя не сэмплируется")
-	}
+	assert.True(t, child.SpanContext().IsSampled(), "child of a sampled parent must be sampled")
 }

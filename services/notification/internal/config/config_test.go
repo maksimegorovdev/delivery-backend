@@ -4,6 +4,9 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/maksimegorovdev/delivery-backend/services/notification/internal/config"
 )
 
@@ -14,9 +17,7 @@ func setBaseEnv(t *testing.T) {
 
 	for _, key := range []string{"OTEL_ENABLED", "OTEL_EXPORTER_OTLP_ENDPOINT"} {
 		t.Setenv(key, "") // восстанавливает исходное значение после теста
-		if err := os.Unsetenv(key); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Unsetenv(key))
 	}
 
 	t.Setenv("APP_NAME", "notification")
@@ -35,11 +36,11 @@ func TestNew_TelemetryInvalid(t *testing.T) {
 		env  map[string]string
 	}{
 		{
-			name: "OTEL_ENABLED не задан",
+			name: "OTEL_ENABLED unset",
 			env:  map[string]string{},
 		},
 		{
-			name: "enabled без endpoint",
+			name: "enabled without endpoint",
 			env:  map[string]string{"OTEL_ENABLED": "true"},
 		},
 	}
@@ -51,9 +52,8 @@ func TestNew_TelemetryInvalid(t *testing.T) {
 				t.Setenv(k, v)
 			}
 
-			if _, err := config.New(); err == nil {
-				t.Fatal("New() error = nil, want error")
-			}
+			_, err := config.New()
+			require.Error(t, err)
 		})
 	}
 }
@@ -65,12 +65,12 @@ func TestNew_TelemetryValid(t *testing.T) {
 		want config.Telemetry
 	}{
 		{
-			name: "disabled без endpoint",
+			name: "disabled without endpoint",
 			env:  map[string]string{"OTEL_ENABLED": "false"},
 			want: config.Telemetry{Enabled: false},
 		},
 		{
-			name: "enabled с endpoint",
+			name: "enabled with endpoint",
 			env: map[string]string{
 				"OTEL_ENABLED":                "true",
 				"OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4317",
@@ -87,12 +87,8 @@ func TestNew_TelemetryValid(t *testing.T) {
 			}
 
 			cfg, err := config.New()
-			if err != nil {
-				t.Fatalf("New() unexpected error: %v", err)
-			}
-			if cfg.Telemetry != tt.want {
-				t.Errorf("Telemetry = %+v, want %+v", cfg.Telemetry, tt.want)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, cfg.Telemetry)
 		})
 	}
 }

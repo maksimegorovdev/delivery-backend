@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,6 +18,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.uber.org/goleak"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/http/httpserver"
 	"github.com/maksimegorovdev/delivery-backend/platform/internal/otelenv"
@@ -45,7 +45,7 @@ func TestMain(m *testing.M) {
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	))
-	os.Exit(m.Run())
+	goleak.VerifyTestMain(m)
 }
 
 // serve выполняет GET target через хендлер сервера с маршрутом route, отвечающим status.
@@ -218,8 +218,8 @@ func TestServer_SpanStatus(t *testing.T) {
 		status int
 		want   codes.Code
 	}{
-		{name: "500 помечает спан ошибкой", status: http.StatusInternalServerError, want: codes.Error},
-		{name: "404 не ошибка на сервере", status: http.StatusNotFound, want: codes.Unset},
+		{name: "500 marks the span as error", status: http.StatusInternalServerError, want: codes.Error},
+		{name: "404 is not a server error", status: http.StatusNotFound, want: codes.Unset},
 	}
 
 	for _, tt := range tests {

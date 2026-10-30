@@ -7,3 +7,10 @@ packages:
       filename: mocks.go
       pkgname: mocks
       structname: "Mock{{.InterfaceName}}"
+  github.com/maksimegorovdev/delivery-backend/services/order/internal/transport/grpc:
+    config:
+      all: true
+      dir: "{{.InterfaceDir}}/mocks"
+      filename: mocks.go
+      pkgname: mocks
+      structname: "Mock{{.InterfaceName}}"

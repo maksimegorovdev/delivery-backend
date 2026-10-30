@@ -5,6 +5,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -15,9 +17,7 @@ func collectMetricNames(t *testing.T, reader sdkmetric.Reader) map[string]bool {
 	t.Helper()
 
 	var rm metricdata.ResourceMetrics
-	if err := reader.Collect(context.Background(), &rm); err != nil {
-		t.Fatalf("Collect: %v", err)
-	}
+	require.NoError(t, reader.Collect(context.Background(), &rm))
 
 	names := make(map[string]bool)
 	for _, sm := range rm.ScopeMetrics {
@@ -50,16 +50,12 @@ func TestBuild_Enabled_RegistersRuntimeMetrics(t *testing.T) {
 
 	cfg := Config{Enabled: true, ServiceName: "test-service", Endpoint: "http://127.0.0.1:1"}
 	tel, err := build(context.Background(), cfg, f)
-	if err != nil {
-		t.Fatalf("build: %v", err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() { _ = tel.Shutdown(context.Background()) })
 
 	names := collectMetricNames(t, reader)
 	for _, want := range []string{"go.goroutine.count", "go.memory.used", "go.memory.gc.goal"} {
-		if !names[want] {
-			t.Errorf("нет runtime-метрики %q, собраны: %v", want, keys(names))
-		}
+		assert.True(t, names[want], "runtime metric %q is missing, collected: %v", want, keys(names))
 	}
 }
 
@@ -75,15 +71,9 @@ func TestBuild_Disabled_DoesNotStartRuntimeMetrics(t *testing.T) {
 	}
 
 	tel, err := build(context.Background(), Config{Enabled: false}, f)
-	if err != nil {
-		t.Fatalf("build: %v", err)
-	}
-	if called {
-		t.Error("MeterProvider создан при Enabled=false")
-	}
-	if tel.meterProvider != nil {
-		t.Error("meterProvider не nil при Enabled=false")
-	}
+	require.NoError(t, err)
+	assert.False(t, called, "MeterProvider created with Enabled=false")
+	assert.Nil(t, tel.meterProvider)
 }
 
 func keys(m map[string]bool) []string {

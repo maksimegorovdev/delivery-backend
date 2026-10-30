@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/internal/otelenv"
@@ -23,32 +25,20 @@ func TestNew_Disabled(t *testing.T) {
 	loggerBefore := otel.GetLoggerProvider()
 
 	tel, err := telemetry.New(context.Background(), telemetry.Config{Enabled: false})
-	if err != nil {
-		t.Fatalf("New: unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	t.Run("не меняет глобальные провайдеры", func(t *testing.T) {
-		if got := otel.GetTracerProvider(); got != tracerBefore {
-			t.Errorf("TracerProvider изменился: %T -> %T", tracerBefore, got)
-		}
-		if got := otel.GetMeterProvider(); got != meterBefore {
-			t.Errorf("MeterProvider изменился: %T -> %T", meterBefore, got)
-		}
-		if got := otel.GetLoggerProvider(); got != loggerBefore {
-			t.Errorf("LoggerProvider изменился: %T -> %T", loggerBefore, got)
-		}
+	t.Run("does not change global providers", func(t *testing.T) {
+		assert.Same(t, tracerBefore, otel.GetTracerProvider())
+		assert.Same(t, meterBefore, otel.GetMeterProvider())
+		assert.Same(t, loggerBefore, otel.GetLoggerProvider())
 	})
 
-	t.Run("LoggerProvider не nil", func(t *testing.T) {
-		if tel.LoggerProvider() == nil {
-			t.Error("LoggerProvider() == nil")
-		}
+	t.Run("LoggerProvider is not nil", func(t *testing.T) {
+		assert.NotNil(t, tel.LoggerProvider())
 	})
 
-	t.Run("Shutdown возвращает nil", func(t *testing.T) {
-		if shutdownErr := tel.Shutdown(context.Background()); shutdownErr != nil {
-			t.Errorf("Shutdown: %v", shutdownErr)
-		}
+	t.Run("Shutdown returns nil", func(t *testing.T) {
+		assert.NoError(t, tel.Shutdown(context.Background()))
 	})
 }
 
@@ -59,25 +49,25 @@ func TestNew_InvalidConfig(t *testing.T) {
 		name string
 		cfg  telemetry.Config
 	}{
-		{name: "пустой Endpoint", cfg: telemetry.Config{Enabled: true, ServiceName: "order"}},
-		{name: "пустой ServiceName", cfg: telemetry.Config{Enabled: true, Endpoint: "http://localhost:4317"}},
+		{name: "empty Endpoint", cfg: telemetry.Config{Enabled: true, ServiceName: "order"}},
+		{name: "empty ServiceName", cfg: telemetry.Config{Enabled: true, Endpoint: "http://localhost:4317"}},
 		{
-			name: "Endpoint без схемы",
+			name: "Endpoint without scheme",
 			cfg:  telemetry.Config{Enabled: true, ServiceName: "order", Endpoint: "localhost:4317"},
 		},
 		{
-			name: "Endpoint IP без схемы",
+			name: "Endpoint IP without scheme",
 			cfg:  telemetry.Config{Enabled: true, ServiceName: "order", Endpoint: "127.0.0.1:4317"},
 		},
 		{
-			name: "Endpoint со схемой grpc",
+			name: "Endpoint with grpc scheme",
 			cfg:  telemetry.Config{Enabled: true, ServiceName: "order", Endpoint: "grpc://localhost:4317"},
 		},
 		{
-			name: "Endpoint без хоста",
+			name: "Endpoint without host",
 			cfg:  telemetry.Config{Enabled: true, ServiceName: "order", Endpoint: "http://"},
 		},
-		{name: "всё пусто", cfg: telemetry.Config{Enabled: true}},
+		{name: "everything empty", cfg: telemetry.Config{Enabled: true}},
 	}
 
 	for _, tt := range tests {
@@ -85,12 +75,9 @@ func TestNew_InvalidConfig(t *testing.T) {
 			t.Parallel()
 
 			tel, err := telemetry.New(context.Background(), tt.cfg)
-			if err == nil {
-				t.Fatalf("New: ожидалась ошибка, получен %v", tel)
-			}
-			if !strings.HasPrefix(err.Error(), "telemetry: ") {
-				t.Errorf("ошибка без префикса %q: %v", "telemetry: ", err)
-			}
+			require.Error(t, err)
+			assert.Nil(t, tel)
+			assert.True(t, strings.HasPrefix(err.Error(), "telemetry: "), "error without prefix: %v", err)
 		})
 	}
 }

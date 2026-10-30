@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // captureDefaultLogger подменяет [slog.Default] на текстовый логгер в буфере.
@@ -40,38 +43,27 @@ func TestErrorHandler_Throttling(t *testing.T) {
 	// Первая ошибка логируется сразу.
 	h.Handle(exportErr)
 	lines := logLines(buf)
-	if len(lines) != 1 {
-		t.Fatalf("после первой ошибки строк лога = %d, want 1: %q", len(lines), lines)
-	}
-	if !strings.Contains(lines[0], "level=WARN") || !strings.Contains(lines[0], "connection refused") {
-		t.Errorf("первая строка не WARN с ошибкой: %s", lines[0])
-	}
+	require.Len(t, lines, 1)
+	assert.Contains(t, lines[0], "level=WARN")
+	assert.Contains(t, lines[0], "connection refused")
 
 	// Ошибки внутри интервала подавляются.
 	for range 3 {
 		now = now.Add(5 * time.Second)
 		h.Handle(exportErr)
 	}
-	if got := logLines(buf); len(got) != 1 {
-		t.Fatalf("внутри интервала строк лога = %d, want 1: %q", len(got), got)
-	}
+	require.Len(t, logLines(buf), 1)
 
 	// После интервала — один WARN с числом пропущенных.
 	now = now.Add(30 * time.Second)
 	h.Handle(exportErr)
 	lines = logLines(buf)
-	if len(lines) != 2 {
-		t.Fatalf("после интервала строк лога = %d, want 2: %q", len(lines), lines)
-	}
-	if !strings.Contains(lines[1], "suppressed=3") {
-		t.Errorf("вторая строка без suppressed=3: %s", lines[1])
-	}
+	require.Len(t, lines, 2)
+	assert.Contains(t, lines[1], "suppressed=3")
 
 	// Счётчик сброшен: следующая ошибка снова подавляется.
 	h.Handle(exportErr)
-	if got := logLines(buf); len(got) != 2 {
-		t.Errorf("сразу после WARN строк лога = %d, want 2", len(got))
-	}
+	assert.Len(t, logLines(buf), 2)
 }
 
 //nolint:paralleltest // подменяет slog.Default, тест нельзя запускать параллельно
@@ -82,7 +74,5 @@ func TestErrorHandler_UsesCurrentDefaultLogger(t *testing.T) {
 	buf := captureDefaultLogger(t)
 	h.Handle(errors.New("boom"))
 
-	if lines := logLines(buf); len(lines) != 1 {
-		t.Errorf("строк лога = %d, want 1", len(lines))
-	}
+	assert.Len(t, logLines(buf), 1)
 }

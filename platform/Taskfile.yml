@@ -21,6 +21,17 @@ tasks:
     cmds:
       - go test -race -shuffle=on -count=1 ./...
 
+  fuzz:
+    desc: Run every fuzz target for FUZZTIME each (default 30s)
+    vars:
+      # go test -fuzz принимает одну цель на пакет, поэтому цели запускаются по очереди.
+      FUZZ_TARGETS: ./http/bind:FuzzJSON
+    cmds:
+      - for: { var: FUZZ_TARGETS, split: ',' }
+        cmd: |
+          t="{{.ITEM}}"
+          go test -run='^$' -fuzz="^${t##*:}\$" -fuzztime={{.FUZZTIME | default "30s"}} "${t%%:*}"
+
   test-integration:
     desc: Run integration tests (requires Docker)
     cmds:

@@ -110,6 +110,13 @@ func (s *Server) Run(ctx context.Context) error {
 		return fmt.Errorf("httpserver: listen: %w", err)
 	}
 
+	return s.Serve(ctx, lis)
+}
+
+// Serve обслуживает соединения lis до отмены ctx, затем выполняет graceful shutdown.
+// Serve закрывает lis. Run — это Serve на листенере по адресу из New; Serve нужен,
+// когда листенер создаёт вызывающий (например, тест на порту, выданном ОС).
+func (s *Server) Serve(ctx context.Context, lis net.Listener) error {
 	serveErr := make(chan error, 1)
 	go func() {
 		if serr := s.server.Serve(lis); serr != nil && !errors.Is(serr, http.ErrServerClosed) {
