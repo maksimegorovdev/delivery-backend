@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
-	"strings"
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/log"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
@@ -76,44 +77,25 @@ func TestWithLoggerProvider_RecordFields(t *testing.T) {
 	l.WarnContext(ctx, "hello", slog.Group("http", slog.String("method", "GET"), slog.Int("status", 200)))
 
 	records := rec.snapshot()
-	if len(records) != 1 {
-		t.Fatalf("otel records = %d, want 1", len(records))
-	}
+	require.Len(t, records, 1, "otel records")
 
 	got := records[0]
-	if id := got.TraceID().String(); id != testTraceID {
-		t.Errorf("TraceID = %s, want %s", id, testTraceID)
-	}
-	if id := got.SpanID().String(); id != testSpanID {
-		t.Errorf("SpanID = %s, want %s", id, testSpanID)
-	}
-	if got.Severity() != log.SeverityWarn {
-		t.Errorf("Severity = %v, want %v", got.Severity(), log.SeverityWarn)
-	}
-	if got.Body().String() != "hello" {
-		t.Errorf("Body = %q, want hello", got.Body().String())
-	}
+	assert.Equal(t, testTraceID, got.TraceID().String())
+	assert.Equal(t, testSpanID, got.SpanID().String())
+	assert.Equal(t, log.SeverityWarn, got.Severity())
+	assert.Equal(t, "hello", got.Body().String())
 
 	a := attrs(got)
-	if a["request_id"] != "req-1" {
-		t.Errorf("request_id = %q, want req-1; attrs=%v", a["request_id"], a)
-	}
-	if _, ok := a["trace_id"]; ok {
-		t.Errorf("trace_id must not be duplicated in otel attributes: %v", a)
-	}
-	if _, ok := a["span_id"]; ok {
-		t.Errorf("span_id must not be duplicated in otel attributes: %v", a)
-	}
-	if a["http.method"] != "GET" || a["http.status"] != "200" {
-		t.Errorf("group http must be expanded to http.*, attrs=%v", a)
-	}
+	assert.Equal(t, "req-1", a["request_id"], "attrs=%v", a)
+	assert.NotContains(t, a, "trace_id", "trace_id must not be duplicated in otel attributes")
+	assert.NotContains(t, a, "span_id", "span_id must not be duplicated in otel attributes")
+	assert.Equal(t, "GET", a["http.method"], "group http must be expanded to http.*, attrs=%v", a)
+	assert.Equal(t, "200", a["http.status"], "group http must be expanded to http.*, attrs=%v", a)
 
 	// stdout по-прежнему получает trace_id/span_id от traceHandler.
 	out := stdout.String()
 	for _, want := range []string{"trace_id=" + testTraceID, "span_id=" + testSpanID, "request_id=req-1"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("stdout %q misses %q", out, want)
-		}
+		assert.Contains(t, out, want)
 	}
 }
 
@@ -128,12 +110,8 @@ func TestWithLoggerProvider_WithAttrsAndGroupReachOTel(t *testing.T) {
 	l.Info("started")
 
 	records := rec.snapshot()
-	if len(records) != 1 {
-		t.Fatalf("otel records = %d, want 1", len(records))
-	}
-	if got := attrs(records[0])["app_name"]; got != "gateway" {
-		t.Errorf("app_name = %q, want gateway", got)
-	}
+	require.Len(t, records, 1, "otel records")
+	assert.Equal(t, "gateway", attrs(records[0])["app_name"])
 }
 
 func TestWithLoggerProvider_LevelAppliedBeforeFanOut(t *testing.T) {
@@ -167,12 +145,8 @@ func TestWithLoggerProvider_LevelAppliedBeforeFanOut(t *testing.T) {
 			)
 			tt.emit(l)
 
-			if got := stdout.Len() > 0; got != tt.wantEmits {
-				t.Errorf("stdout written = %v, want %v", got, tt.wantEmits)
-			}
-			if got := len(rec.snapshot()) > 0; got != tt.wantEmits {
-				t.Errorf("otel written = %v, want %v", got, tt.wantEmits)
-			}
+			assert.Equal(t, tt.wantEmits, stdout.Len() > 0, "stdout written")
+			assert.Equal(t, tt.wantEmits, len(rec.snapshot()) > 0, "otel written")
 		})
 	}
 }
@@ -185,9 +159,7 @@ func TestWithLoggerProvider_NilKeepsStdoutOnly(t *testing.T) {
 	l := logger.New(logger.WithWriter(&stdout), logger.WithLoggerProvider(nil))
 	l.Info("hello")
 
-	if stdout.Len() == 0 {
-		t.Fatal("stdout is empty")
-	}
+	require.NotEmpty(t, stdout.String(), "stdout is empty")
 }
 
 func TestWithLoggerProvider_FlattensGroups(t *testing.T) {
@@ -202,21 +174,11 @@ func TestWithLoggerProvider_FlattensGroups(t *testing.T) {
 	l.Info("hello", slog.Group("http", slog.Group("route", slog.String("path", "/orders"))), slog.Group("empty"))
 
 	records := rec.snapshot()
-	if len(records) != 1 {
-		t.Fatalf("otel records = %d, want 1", len(records))
-	}
+	require.Len(t, records, 1, "otel records")
 
-	a := attrs(records[0])
 	want := map[string]string{
 		"req.user.id":         "u1",
 		"req.http.route.path": "/orders",
 	}
-	for k, v := range want {
-		if a[k] != v {
-			t.Errorf("attr %s = %q, want %q; attrs=%v", k, a[k], v, a)
-		}
-	}
-	if len(a) != len(want) {
-		t.Errorf("attrs = %v, want exactly %v", a, want)
-	}
+	assert.Equal(t, want, attrs(records[0]))
 }

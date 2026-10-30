@@ -606,11 +606,11 @@ Taskfile `notification`, модуль в `FUZZ_MODULES`.
 на testify и английские имена.
 
 **Acceptance criteria:**
-- [ ] Количество кейсов до и после совпадает, покрытие не упало
-- [ ] Нет кириллицы в `name`/`t.Run`
+- [x] Количество кейсов до и после совпадает (43), покрытие не упало (logger 90.7%)
+- [x] Нет кириллицы в `name`/`t.Run`
 
 **Verification:**
-- [ ] `cd platform && go test -race -shuffle=on -count=1 -cover ./logger/ ./postgres/ ./grpc/`
+- [x] `cd platform && go test -race -shuffle=on -count=1 -cover ./logger/ ./postgres/ ./grpc/`
 
 **Dependencies:** None
 

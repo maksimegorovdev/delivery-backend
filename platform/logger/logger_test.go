@@ -6,9 +6,10 @@ import (
 	"encoding/json"
 	"log/slog"
 	"regexp"
-	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/appctx"
@@ -26,13 +27,9 @@ func spanContext(t *testing.T) context.Context {
 	t.Helper()
 
 	traceID, err := trace.TraceIDFromHex(testTraceID)
-	if err != nil {
-		t.Fatalf("trace id: %v", err)
-	}
+	require.NoError(t, err, "trace id")
 	spanID, err := trace.SpanIDFromHex(testSpanID)
-	if err != nil {
-		t.Fatalf("span id: %v", err)
-	}
+	require.NoError(t, err, "span id")
 
 	sc := trace.NewSpanContext(trace.SpanContextConfig{
 		TraceID:    traceID,
@@ -89,9 +86,7 @@ func TestTraceHandler_Text(t *testing.T) {
 			log.InfoContext(tt.ctx(t), "hello")
 
 			got := timeAttr.ReplaceAllString(buf.String(), "")
-			if got != tt.want {
-				t.Errorf("output mismatch\n got: %q\nwant: %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -141,19 +136,10 @@ func TestTraceHandler_JSON(t *testing.T) {
 			log.InfoContext(tt.ctx(t), "hello")
 
 			var got map[string]any
-			if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-				t.Fatalf("invalid json %q: %v", buf.String(), err)
-			}
+			require.NoError(t, json.Unmarshal(buf.Bytes(), &got), "invalid json %q", buf.String())
 			delete(got, "time")
 
-			if len(got) != len(tt.want) {
-				t.Errorf("fields mismatch\n got: %v\nwant: %v", got, tt.want)
-			}
-			for k, v := range tt.want {
-				if got[k] != v {
-					t.Errorf("field %q: got %v, want %v", k, got[k], v)
-				}
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -168,9 +154,7 @@ func TestTraceHandler_JSONGoldenWithoutSpan(t *testing.T) {
 
 	got := regexp.MustCompile(`"time":"[^"]+",`).ReplaceAllString(buf.String(), "")
 	want := `{"level":"INFO","msg":"hello","k":"v"}` + "\n"
-	if got != want {
-		t.Errorf("output mismatch\n got: %q\nwant: %q", got, want)
-	}
+	assert.Equal(t, want, got)
 }
 
 func TestTraceHandler_WithAttrsKeepsWrapper(t *testing.T) {
@@ -186,9 +170,7 @@ func TestTraceHandler_WithAttrsKeepsWrapper(t *testing.T) {
 
 		out := buf.String()
 		for _, want := range []string{"svc=gateway", "trace_id=" + testTraceID, "span_id=" + testSpanID} {
-			if !strings.Contains(out, want) {
-				t.Errorf("output %q does not contain %q", out, want)
-			}
+			assert.Contains(t, out, want)
 		}
 	})
 }
@@ -249,9 +231,7 @@ func TestLogger_WithGroupKeepsCtxAttrsAtTopLevel(t *testing.T) {
 			log.InfoContext(appctx.WithRequestID(spanContext(t), "req-1"), "hello", tt.args...)
 
 			got := timeAttr.ReplaceAllString(buf.String(), "")
-			if got != tt.want {
-				t.Errorf("output mismatch\n got: %q\nwant: %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -265,22 +245,15 @@ func TestLogger_WithGroupKeepsCtxAttrsAtTopLevelJSON(t *testing.T) {
 	log.InfoContext(appctx.WithRequestID(spanContext(t), "req-1"), "hello", "k", "v")
 
 	var got map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("unmarshal %q: %v", buf.String(), err)
-	}
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &got), "unmarshal %q", buf.String())
 
 	for key, want := range map[string]string{
 		"request_id": "req-1",
 		"trace_id":   testTraceID,
 		"span_id":    testSpanID,
 	} {
-		if got[key] != want {
-			t.Errorf("top-level %q = %v, want %q", key, got[key], want)
-		}
+		assert.Equal(t, want, got[key], "top-level %q", key)
 	}
 
-	group, ok := got["http"].(map[string]any)
-	if !ok || len(group) != 1 || group["k"] != "v" {
-		t.Errorf(`"http" = %v, want {"k":"v"}`, got["http"])
-	}
+	assert.Equal(t, map[string]any{"k": "v"}, got["http"], `"http" group`)
 }
