@@ -92,6 +92,48 @@ func TestHandler_Handle_OrderCreated_IgnoresUnknownFields(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestHandler_Handle_OrderCreated_CanonicalizesIDs(t *testing.T) {
+	t.Parallel()
+
+	// uuid.Parse принимает эти формы, а Postgres отвергает urn:uuid: в UUID-колонке.
+	tests := []struct {
+		name    string
+		eventID string
+		orderID string
+	}{
+		{name: "urn form", eventID: "urn:uuid:" + eventID, orderID: "urn:uuid:" + orderID},
+		{name: "braced form", eventID: "{" + eventID + "}", orderID: "{" + orderID + "}"},
+		{
+			name:    "no hyphens",
+			eventID: "0192f0c1000070008000" + "0000000000e1",
+			orderID: "0192f0c1000070008000" + "0000000000a1",
+		},
+		{
+			name:    "upper case",
+			eventID: "0192F0C1-0000-7000-8000-0000000000E1",
+			orderID: "0192F0C1-0000-7000-8000-0000000000A1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			h, svc := newHandler(t)
+			svc.EXPECT().
+				CreateNotification(mock.Anything, mock.MatchedBy(func(in service.CreateNotificationInput) bool {
+					return in.Event.EventID == eventID && in.Event.AggregateID == orderID
+				})).
+				Return(nil).
+				Once()
+
+			err := h.Handle(t.Context(), orderCreatedMessage(`{"event_id":"`+tt.eventID+`","order_id":"`+tt.orderID+`"}`))
+
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestHandler_Handle_OrderCreated_ServiceError(t *testing.T) {
 	t.Parallel()
 
@@ -181,7 +223,16 @@ func (r *recordingService) CreateNotification(_ context.Context, in service.Crea
 	return nil
 }
 
+func requireCanonicalUUID(t *testing.T, s, field string) {
+	t.Helper()
+
+	id, err := uuid.Parse(s)
+	require.NoError(t, err, "%s must be a UUID", field)
+	require.Equal(t, id.String(), s, "%s must be in canonical form", field)
+}
+
 func FuzzHandleOrderCreated(f *testing.F) {
+	f.Add([]byte(`{"event_id":"urn:uuid:` + eventID + `","order_id":"{` + orderID + `}"}`))
 	f.Add([]byte(`{"event_id":"` + eventID + `","order_id":"` + orderID + `","user_id":"user-1","total_amount":430}`))
 	f.Add([]byte(`{"event_id":"` + eventID + `","order_id":"` + orderID + `","field_from_the_future":{"a":1}}`))
 	f.Add([]byte(`{"event_id":"event-1","order_id":"order-1"}`))
@@ -212,11 +263,10 @@ func FuzzHandleOrderCreated(f *testing.F) {
 			return
 		}
 		require.Len(t, svc.inputs, 1)
-		// Идентификаторы пишутся в UUID-колонки inbox: в сервис доходят только валидные UUID.
-		_, err = uuid.Parse(svc.inputs[0].Event.EventID)
-		require.NoError(t, err, "event_id must be a UUID")
-		_, err = uuid.Parse(svc.inputs[0].Event.AggregateID)
-		require.NoError(t, err, "order_id must be a UUID")
+		// Идентификаторы пишутся в UUID-колонки inbox: в сервис доходят только канонические
+		// UUID, ведь uuid.Parse принимает и формы, которые Postgres отвергает (urn:uuid:).
+		requireCanonicalUUID(t, svc.inputs[0].Event.EventID, "event_id")
+		requireCanonicalUUID(t, svc.inputs[0].Event.AggregateID, "order_id")
 		require.Equal(t, value, svc.inputs[0].Payload)
 		require.Equal(t, domain.EventTypeOrderCreated, svc.inputs[0].Event.EventType)
 		require.Equal(t, msg.Topic, svc.inputs[0].Event.Topic)
