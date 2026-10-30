@@ -298,12 +298,12 @@ in-memory gRPC-сервер на `bufconn`, клиент через `grpc.NewCli
 и `OrderID` (формат UUID), статус `created`, время в UTC; `OrderItem.Subtotal`.
 
 **Acceptance criteria:**
-- [ ] Все ветки `NewOrder` покрыты
-- [ ] UUID и время проверяются по формату (`uuid.Parse`, `Location() == time.UTC`), не по значению
-- [ ] Покрытие `domain` ≥ 80%
+- [x] Все ветки `NewOrder` покрыты
+- [x] UUID и время проверяются по формату (`uuid.Parse`, `Location() == time.UTC`), не по значению
+- [x] Покрытие `domain` ≥ 80%
 
 **Verification:**
-- [ ] `cd services/order && go test -race -shuffle=on -count=1 -cover ./internal/domain/`
+- [x] `cd services/order && go test -race -shuffle=on -count=1 -cover ./internal/domain/`
 
 **Dependencies:** None
 
