@@ -174,7 +174,7 @@ func TestOrderHandler_GetOrder(t *testing.T) {
 
 Модуль сам состоит из тестов. Уровень — только unit: без внешней сети, без Docker,
 без файловой системы вне `testdata/`. Каждый тест проходит под `-race -shuffle=on`.
-gRPC-вызовы идут через in-memory `bufconn`. Жизненный цикл серверов (`grpcserver.Run`, `httpserver`)
+gRPC-вызовы идут через in-memory `bufconn`. Жизненный цикл серверов (`Serve` в `grpcserver`, `httpserver`)
 проверяется на loopback-листенере `127.0.0.1:0`: так же работает `httptest.NewServer`, порт выдаёт ОС.
 
 Порядок работы по пакету: тесты на текущее поведение → если тест выявил баг, сначала красный тест,
@@ -241,7 +241,7 @@ exclude:
 1. ~~Общий хелпер bufconn~~ — решено: `platform/testkit/grpctest`, интерцепторы передаются через `opts`.
 2. ~~Порог для пакетов `platform`~~ — решено: 80% на каждый пакет, без пороговых override; I/O-пакеты покрываются
    интеграционными тестами (см. «Изменения конфигурации»).
-3. ~~Запуск `grpcserver.Run`/`httpserver` в unit-тестах~~ — решено: loopback `127.0.0.1:0`, см. Testing Strategy.
+3. ~~Запуск серверов `grpcserver`/`httpserver` в unit-тестах~~ — решено: loopback `127.0.0.1:0`, см. Testing Strategy.
 4. ~~Входные данные fuzz `order/internal/event`~~ — решено: `testing.F` принимает только примитивы, заказ собирается
    из них (id, суммы, строки, число позиций).
 5. ~~Неизвестный тип события в `notification`~~ — решено: пропускается с `nil` (tolerant reader: новые типы

@@ -65,7 +65,7 @@ user 34.5%, product 32.0%, notification 44.8%. Остаток — `app` и `repo
 отсев poison-сообщений (skip/DLQ) — отдельная задача.
 
 Изменения вне тестов: проверка UUID в `notification`; `Serve(ctx, lis)` в
-`grpcserver`/`httpserver` (`Run` — обёртка над ним, чтобы тесты слушали свой листенер);
+`grpcserver`/`httpserver` — единственная точка запуска, листенер открывает `platform/listener.Listen`;
 комментарий и `coverage-ignore` в `platform/internal/otelenv` (недостижимая ветка `panic`);
 конфигурация Taskfile/go.mod.
 

@@ -54,9 +54,8 @@ func TestListen(t *testing.T) {
 		cl := closer.New()
 		lis, err := listener.Listen(t.Context(), cl, busy.Addr().String())
 
-		require.Error(t, err)
+		require.ErrorContains(t, err, "listener: listen")
 		assert.Nil(t, lis)
-		assert.ErrorContains(t, err, "listener: listen")
 		require.NoError(t, cl.Close(context.Background()))
 	})
 }

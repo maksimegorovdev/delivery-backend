@@ -61,8 +61,9 @@ func New(addr string, opts ...Option) *Server {
 // tracedHandler оборачивает роутер в otelhttp: server-спан и метрики на каждый запрос.
 // Шаблон маршрута в спан и метрики переносит middleware.Route.
 //
-// server.address и server.port берутся из адреса прослушивания: без WithServerName
-// otelhttp читает их из заголовка Host, и клиент плодит серии метрик.
+// server.address и server.port берутся из addr, переданного в New, а не из фактического
+// листенера (при порте 0 в метриках будет 0): без WithServerName otelhttp читает их
+// из заголовка Host, и клиент плодит серии метрик.
 func (s *Server) tracedHandler() http.Handler {
 	opts := []otelhttp.Option{
 		otelhttp.WithServerName(s.addr),
@@ -103,19 +104,8 @@ func (s *Server) Router() *chi.Mux {
 	return s.router
 }
 
-func (s *Server) Run(ctx context.Context) error {
-	var lc net.ListenConfig
-	lis, err := lc.Listen(ctx, "tcp", s.addr)
-	if err != nil {
-		return fmt.Errorf("httpserver: listen: %w", err)
-	}
-
-	return s.Serve(ctx, lis)
-}
-
 // Serve обслуживает соединения lis до отмены ctx, затем выполняет graceful shutdown.
-// Serve закрывает lis. Run — это Serve на листенере по адресу из New; Serve нужен,
-// когда листенер создаёт вызывающий (например, тест на порту, выданном ОС).
+// Листенер создаёт вызывающий (обычно через listener.Listen); Serve закрывает lis.
 func (s *Server) Serve(ctx context.Context, lis net.Listener) error {
 	serveErr := make(chan error, 1)
 	go func() {

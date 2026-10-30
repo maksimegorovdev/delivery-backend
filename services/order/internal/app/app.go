@@ -124,7 +124,6 @@ func New(ctx context.Context) (_ *App, err error) {
 
 	// gRPC Server
 	grpcServer := grpcserver.New(
-		cfg.GRPCServer.Addr,
 		grpcserver.WithReflection(cfg.GRPCServer.Reflection),
 		grpcserver.WithServerOptions(
 			grpc.ChainUnaryInterceptor(
