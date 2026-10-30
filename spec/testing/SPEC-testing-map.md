@@ -44,10 +44,10 @@ Build order: `test-foundation` → `unit`, `integration` (параллельно
 
 | Пакет | Покрытие |
 |---|---|
-| `platform` (все пакеты), итого | 92.8% (каждый пакет ≥ 80%) |
+| `platform` (все пакеты), итого | 92.6% (каждый пакет ≥ 80%) |
 | `platform/apperr`, `apperr/*`, `appctx`, `closer`, `grpc/grpcclient`, `http/bind`, `http/middleware`, `http/response` | 100% |
-| `platform/grpc/interceptors`, `grpc/grpcserver` | 97.4%, 94.3% |
-| `platform/http/httpserver`, `postgres`, `telemetry`, `logger` | 94.7%, 92.5%, 91.3%, 90.7% |
+| `platform/grpc/interceptors`, `grpc/grpcserver` | 97.4%, 91.7% |
+| `platform/http/httpserver`, `postgres`, `telemetry`, `logger` | 92.3%, 92.5%, 91.3%, 90.7% |
 | `platform/kafka/kafkaconsumer`, `testkit/grpctest` | 85.9%, 85.0% |
 | `order/internal/domain`, `event`, `service`, `client`, `transport/grpc` | 100% |
 | `user`, `product`: `service`, `transport/grpc` | 100% |
@@ -55,7 +55,15 @@ Build order: `test-foundation` → `unit`, `integration` (параллельно
 | `gateway`: `service`, `client`, `transport/http/v1/order` | 100% |
 
 `total` по сервисам (порог 70% — общая цель с модулем `integration`): gateway 58.4%, order 69.0%,
-user 34.5%, product 32.0%, notification 38.9%. Остаток — `app` и `repository/pg`. `task cover` красный по `total` до модуля `integration` — принято осознанно, гейт `total` для `unit` не действует.
+user 34.5%, product 32.0%, notification 44.8%. Остаток — `app` и `repository/pg`. `task cover` красный по `total` до модуля `integration` — принято осознанно, гейт `total` для `unit` не действует.
 
-Баги: найдены не были. Изменения вне тестов — только комментарий и `coverage-ignore` в
-`platform/internal/otelenv` (недостижимая ветка `panic`) и конфигурация Taskfile/go.mod.
+Баги: в `notification` `order.created` с не-UUID `event_id`/`order_id` проходил разбор и падал
+только на INSERT в inbox. Теперь идентификаторы проверяются и приводятся к канонической форме
+(`uuid.Parse` принимает и `urn:uuid:`, который Postgres отвергает). Невалидное сообщение
+по-прежнему откатывает оффсет и блокирует партицию: `kafkaconsumer` ретраит любую ошибку,
+отсев poison-сообщений (skip/DLQ) — отдельная задача.
+
+Изменения вне тестов: проверка UUID в `notification`; `Serve(ctx, lis)` в
+`grpcserver`/`httpserver` (`Run` — обёртка над ним, чтобы тесты слушали свой листенер);
+комментарий и `coverage-ignore` в `platform/internal/otelenv` (недостижимая ветка `panic`);
+конфигурация Taskfile/go.mod.
