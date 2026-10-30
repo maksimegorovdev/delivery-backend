@@ -19,15 +19,13 @@ const (
 
 type Server struct {
 	server          *grpc.Server
-	addr            string
 	serverOpts      []grpc.ServerOption
 	shutdownTimeout time.Duration
 	reflection      bool
 }
 
-func New(addr string, opts ...Option) *Server {
+func New(opts ...Option) *Server {
 	srv := &Server{
-		addr:            addr,
 		shutdownTimeout: defaultShutdownTimeout,
 	}
 
@@ -59,19 +57,8 @@ func (s *Server) Server() *grpc.Server {
 	return s.server
 }
 
-func (s *Server) Run(ctx context.Context) error {
-	var lc net.ListenConfig
-	lis, err := lc.Listen(ctx, "tcp", s.addr)
-	if err != nil {
-		return fmt.Errorf("grpcserver: listen: %w", err)
-	}
-
-	return s.Serve(ctx, lis)
-}
-
 // Serve обслуживает соединения lis до отмены ctx, затем выполняет graceful stop.
-// Serve закрывает lis. Run — это Serve на листенере по адресу из New; Serve нужен,
-// когда листенер создаёт вызывающий (например, тест на порту, выданном ОС).
+// Листенер создаёт вызывающий (обычно через listener.Listen); Serve закрывает lis.
 func (s *Server) Serve(ctx context.Context, lis net.Listener) error {
 	serveErr := make(chan error, 1)
 	go func() {

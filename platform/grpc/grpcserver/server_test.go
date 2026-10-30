@@ -71,7 +71,7 @@ func runServer(
 ) (grpc_health_v1.HealthClient, <-chan error) {
 	t.Helper()
 
-	srv := grpcserver.New("unused", opts...)
+	srv := grpcserver.New(opts...)
 	grpc_health_v1.RegisterHealthServer(srv.Server(), health.NewServer())
 
 	result := make(chan error, 1)
@@ -106,7 +106,7 @@ func TestNew_Reflection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			srv := grpcserver.New("127.0.0.1:0", tt.opts...)
+			srv := grpcserver.New(tt.opts...)
 
 			require.NotNil(t, srv.Server())
 			assert.Equal(t, tt.want, hasService(srv.Server(), reflectionService))
@@ -118,18 +118,6 @@ func hasService(srv *grpc.Server, name string) bool {
 	_, ok := srv.GetServiceInfo()[name]
 
 	return ok
-}
-
-func TestRun_ListenError(t *testing.T) {
-	t.Parallel()
-
-	busy := listen(t)
-	srv := grpcserver.New(busy.Addr().String())
-
-	err := srv.Run(t.Context())
-
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "grpcserver: listen")
 }
 
 func TestServe_ServesUntilContextCanceled(t *testing.T) {

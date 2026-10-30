@@ -43,13 +43,13 @@ func (h *Handler) handleOrderCreated(ctx context.Context, msg kafkaconsumer.Mess
 }
 
 // orderCreatedIDs разбирает идентификаторы, которые попадают в UUID-колонки inbox, и
-// возвращает их в канонической форме. uuid.Parse принимает и urn:uuid:, {…}, запись без
+// возвращает их в канонической форме. [uuid.Parse] принимает и urn:uuid:, {…}, запись без
 // дефисов, а Postgres отвергает urn:uuid:; каноническая форма к тому же делает event_id
 // стабильным ключом идемпотентности.
 //
 // Проверка переносит отказ с INSERT на разбор, но не убирает ретрай: консьюмер откатывает
 // оффсет при любой ошибке, и невалидное сообщение по-прежнему блокирует партицию.
-func orderCreatedIDs(pb *orderv1.OrderCreated) (eventID, orderID string, err error) {
+func orderCreatedIDs(pb *orderv1.OrderCreated) (string, string, error) {
 	eventUUID, err := uuid.Parse(pb.GetEventId())
 	if err != nil {
 		return "", "", fmt.Errorf("event_id: %w", err)

@@ -119,18 +119,6 @@ func TestServer_Router(t *testing.T) {
 	assert.NotNil(t, httpserver.New("127.0.0.1:0").Router())
 }
 
-func TestRun_ListenError(t *testing.T) {
-	t.Parallel()
-
-	busy := listen(t)
-	srv := httpserver.New(busy.Addr().String())
-
-	err := srv.Run(t.Context())
-
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "httpserver: listen")
-}
-
 func TestServe_ServesUntilContextCanceled(t *testing.T) {
 	t.Parallel()
 

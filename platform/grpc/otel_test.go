@@ -89,7 +89,7 @@ func newConn(t *testing.T) *grpc.ClientConn {
 	t.Helper()
 
 	lis := bufconn.Listen(bufferSize)
-	srv := grpcserver.New("bufnet", grpcserver.WithReflection(true))
+	srv := grpcserver.New(grpcserver.WithReflection(true))
 	srv.Server().RegisterService(echoDesc(), struct{}{})
 	go func() { _ = srv.Server().Serve(lis) }()
 	t.Cleanup(srv.Server().Stop)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -12,6 +13,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcclient"
 	"github.com/maksimegorovdev/delivery-backend/platform/http/httpserver"
 	"github.com/maksimegorovdev/delivery-backend/platform/http/middleware"
+	"github.com/maksimegorovdev/delivery-backend/platform/listener"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
 	"github.com/maksimegorovdev/delivery-backend/platform/telemetry"
 
@@ -27,9 +29,9 @@ import (
 const initCloseTimeout = 5 * time.Second
 
 type App struct {
-	cfg        *config.Config
 	log        *slog.Logger
 	httpServer *httpserver.Server
+	lis        net.Listener
 	closer     *closer.Closer
 }
 
@@ -97,10 +99,15 @@ func New(ctx context.Context) (_ *App, err error) {
 		OrderHandler: orderHandler,
 	})
 
+	lis, err := listener.Listen(ctx, cl, cfg.HTTP.Addr)
+	if err != nil {
+		return nil, err
+	}
+
 	app := &App{
-		cfg:        cfg,
 		log:        log,
 		httpServer: httpServer,
+		lis:        lis,
 		closer:     cl,
 	}
 
@@ -125,19 +132,24 @@ func newLogger(cfg *config.Config, tel *telemetry.Telemetry) *slog.Logger {
 	)
 }
 
+// Addr возвращает фактический адрес HTTP-сервера; при порте 0 в конфиге — порт, выданный ОС.
+func (a *App) Addr() net.Addr {
+	return a.lis.Addr()
+}
+
 func (a *App) Run(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		a.log.InfoContext(ctx,
 			"http server started",
-			slog.String("addr", a.cfg.HTTP.Addr),
+			slog.String("addr", a.lis.Addr().String()),
 		)
 		defer a.log.InfoContext(ctx,
 			"http server stopped",
-			slog.String("addr", a.cfg.HTTP.Addr),
+			slog.String("addr", a.lis.Addr().String()),
 		)
-		return a.httpServer.Run(ctx)
+		return a.httpServer.Serve(ctx, a.lis)
 	})
 
 	return g.Wait()

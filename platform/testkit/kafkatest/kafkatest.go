@@ -78,6 +78,30 @@ func CreateTopic(tb testing.TB, name string) string {
 	return topic
 }
 
+// Produce синхронно публикует records в topic и падает при любой ошибке брокера.
+//
+// Topic каждой записи перезаписывается значением topic. Порядок записей одной партиции сохраняется.
+func Produce(tb testing.TB, topic string, records ...*kgo.Record) {
+	tb.Helper()
+
+	client, err := kgo.NewClient(kgo.SeedBrokers(Brokers(tb)...))
+	if err != nil {
+		tb.Fatalf("kafkatest: create client: %v", err)
+	}
+	defer client.Close()
+
+	ctx, cancel := context.WithTimeout(tb.Context(), opTimeout)
+	defer cancel()
+
+	for _, rec := range records {
+		rec.Topic = topic
+	}
+
+	if err = client.ProduceSync(ctx, records...).FirstErr(); err != nil {
+		tb.Fatalf("kafkatest: produce to %q: %v", topic, err)
+	}
+}
+
 // sharedBroker запускает контейнер при первом вызове и возвращает его адрес всем последующим.
 func sharedBroker() (string, error) {
 	once.Do(func() {
