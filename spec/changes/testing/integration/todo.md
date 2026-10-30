@@ -177,13 +177,13 @@
 и валидации дают ожидаемые коды gRPC.
 
 **Acceptance criteria:**
-- [ ] `CreateOrder` возвращает заказ, в БД есть заказ, позиции и событие `order.created`
-- [ ] «Не найдено» от `user`/`product` → соответствующий код gRPC, в БД ничего не записано
-- [ ] Невалидный запрос отсекается интерцептором валидации
+- [x] `CreateOrder` возвращает заказ, в БД есть заказ, позиции и событие `order.created`
+- [x] «Не найдено» от `user`/`product` → соответствующий код gRPC, в БД ничего не записано
+- [x] Невалидный запрос отсекается интерцептором валидации
 
 **Verification:**
-- [ ] `task -d services/order test-integration`
-- [ ] `task -d services/order lint`
+- [x] `task -d services/order test-integration`
+- [x] `task -d services/order lint`
 
 **Dependencies:** Task 4
 
