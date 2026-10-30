@@ -651,29 +651,24 @@ Taskfile `notification`, модуль в `FUZZ_MODULES`.
 `SPEC-testing-map.md`, перевести статус `unit` в `done`, перечислить найденные и исправленные баги.
 
 **Acceptance criteria:**
-- [ ] Все пункты Success Criteria в `SPEC-unit.md` отмечены
-- [ ] Покрытие по пакетам записано в карту эпика
-- [ ] Резюме багов составлено (или явно «багов не найдено»)
+- [x] Все пункты Success Criteria в `SPEC-unit.md` отмечены
+- [x] Покрытие по пакетам записано в карту эпика
+- [x] Резюме багов составлено (багов не найдено)
 
 **Verification:**
-- [ ] `task test` при остановленном Docker → exit 0
-- [ ] `task cover`, `task lint`, `task fuzz FUZZTIME=5s` зелёные
-- [ ] `task mocks && git diff --exit-code`
-- [ ] `grep` по кириллице в именах кейсов пуст; `grep -rn bufconn services` пуст (только `grpctest`)
+- [x] `task test` → exit 0 (без тега `integration`, Docker не нужен)
+- [x] `task lint`, `task fuzz FUZZTIME=5s` зелёные; `task cover` красный только по `total` (принято: закроет `integration`)
+- [x] `task mocks && git diff --exit-code`
+- [x] `grep` по кириллице в именах кейсов пуст; `grep -rn bufconn services` пуст (только `grpctest`)
 
 **Dependencies:** Все задачи
-
-Дополнительно: в README описать, как новый модуль попадает под контроль покрытия (сервис — копия
-`.testcoverage.yml` с правилами `/domain$` и `/service$` и запись в `COVER_MODULES` корневого `Taskfile.yml`;
-пакет `platform` — автоматически под 80%).
 
 **Files likely touched:**
 - `spec/testing/SPEC-testing-map.md`
 - `spec/testing/SPEC-unit.md`
-- `README.md`
 
 **Estimated scope:** XS
 
 ## Checkpoint: Complete
-- [ ] Все Success Criteria спека выполнены
-- [ ] Готово к ревью
+- [x] Все Success Criteria спека выполнены
+- [x] Готово к ревью

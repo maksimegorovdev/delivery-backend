@@ -224,17 +224,17 @@ exclude:
 
 ## Success Criteria
 
-- [ ] `task test` зелёный во всех модулях, работает без Docker.
-- [ ] `task cover`: пакеты `domain` и `service` всех сервисов ≥ 80% (`total` ≥ 70% — общая цель с модулем `integration`, здесь не гейт).
-- [ ] `task cover`: каждый пакет `platform` ≥ 80%, пороговых override нет.
-- [ ] `platform/testkit/grpctest` используется в тестах транспорта `order`, `user`, `product` и клиентов `order`, `gateway`; копий bufconn-обвязки в сервисах нет.
-- [ ] Каждый пакет из таблицы «Покрытие по пакетам» имеет тесты; итоговое покрытие по пакетам записано в карту эпика.
-- [ ] Все тесты используют testify, ни одного русского `name` или имени `t.Run` (проверка: `grep` по кириллице в `name:` и `t.Run("` пуст).
-- [ ] `goleak.VerifyTestMain` в `grpcserver` и `httpserver` зелёный.
-- [ ] `task fuzz` запускает все три fuzz-цели; `task test` прогоняет их seed-корпус.
-- [ ] `.mockery.yml` есть во всех сервисах, `task mocks` повторно не даёт diff.
-- [ ] `task lint` зелёный.
-- [ ] Найденные и исправленные баги перечислены в резюме модуля.
+- [x] `task test` зелёный во всех модулях, работает без Docker.
+- [x] `task cover`: пакеты `domain` и `service` всех сервисов ≥ 80% (`total` ≥ 70% — общая цель с модулем `integration`, здесь не гейт).
+- [x] `task cover`: каждый пакет `platform` ≥ 80%, пороговых override нет.
+- [x] `platform/testkit/grpctest` используется в тестах транспорта `order`, `user`, `product` и клиентов `order`, `gateway`; копий bufconn-обвязки в сервисах нет.
+- [x] Каждый пакет из таблицы «Покрытие по пакетам» имеет тесты; итоговое покрытие по пакетам записано в карту эпика.
+- [x] Все тесты используют testify, ни одного русского `name` или имени `t.Run` (проверка: `grep` по кириллице в `name:` и `t.Run("` пуст).
+- [x] `goleak.VerifyTestMain` в `grpcserver` и `httpserver` зелёный.
+- [x] `task fuzz` запускает все три fuzz-цели; `task test` прогоняет их seed-корпус.
+- [x] `.mockery.yml` есть во всех сервисах, `task mocks` повторно не даёт diff.
+- [x] `task lint` зелёный.
+- [x] Найденные и исправленные баги перечислены в резюме модуля.
 
 ## Open Questions
 

@@ -19,7 +19,7 @@ Build order: `test-foundation` → `unit`, `integration` (параллельно
 | Module id | Спек | Статус |
 |---|---|---|
 | `test-foundation` | [SPEC-test-foundation.md](SPEC-test-foundation.md) | approved |
-| `unit` | [SPEC-unit.md](SPEC-unit.md) | draft |
+| `unit` | [SPEC-unit.md](SPEC-unit.md) | done |
 | `integration` | — | todo |
 | `e2e` | — | todo |
 | `load` | — | todo |
@@ -36,3 +36,26 @@ Build order: `test-foundation` → `unit`, `integration` (параллельно
 - Контракты gRPC проверяет уже настроенный `buf breaking` (`task -d proto breaking`, правило `FILE`); отдельного модуля под контракты нет.
 - Контракт событий Kafka — golden-тесты в модуле `integration`: один эталон в `testdata/` используется и продюсером (`order`), и консьюмером (`notification`).
 - Нагрузка: целевых SLO нет, задача — найти предел и узкое место, зафиксировать baseline.
+
+## Итоги модуля `unit`
+
+Покрытие снято `task cover` (statements, без `mocks`, `cmd`, `docs`). Пакеты без тестов:
+`domain` в `user`/`product`/`notification` (только типы), `app`, `repository/pg` — их покрывает модуль `integration`.
+
+| Пакет | Покрытие |
+|---|---|
+| `platform` (все пакеты), итого | 92.8% (каждый пакет ≥ 80%) |
+| `platform/apperr`, `apperr/*`, `appctx`, `closer`, `grpc/grpcclient`, `http/bind`, `http/middleware`, `http/response` | 100% |
+| `platform/grpc/interceptors`, `grpc/grpcserver` | 97.4%, 94.3% |
+| `platform/http/httpserver`, `postgres`, `telemetry`, `logger` | 94.7%, 92.5%, 91.3%, 90.7% |
+| `platform/kafka/kafkaconsumer`, `testkit/grpctest` | 85.9%, 85.0% |
+| `order/internal/domain`, `event`, `service`, `client`, `transport/grpc` | 100% |
+| `user`, `product`: `service`, `transport/grpc` | 100% |
+| `notification`: `service`, `transport/kafka`, `transport/kafka/order` | 100% |
+| `gateway`: `service`, `client`, `transport/http/v1/order` | 100% |
+
+`total` по сервисам (порог 70% — общая цель с модулем `integration`): gateway 58.4%, order 69.0%,
+user 34.5%, product 32.0%, notification 38.9%. Остаток — `app` и `repository/pg`. `task cover` красный по `total` до модуля `integration` — принято осознанно, гейт `total` для `unit` не действует.
+
+Баги: найдены не были. Изменения вне тестов — только комментарий и `coverage-ignore` в
+`platform/internal/otelenv` (недостижимая ветка `panic`) и конфигурация Taskfile/go.mod.
