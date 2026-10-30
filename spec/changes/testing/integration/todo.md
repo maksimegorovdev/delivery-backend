@@ -289,13 +289,13 @@
 `apperr`. `CheckMigrations`. Компонентный gRPC-стек по образцу T10.
 
 **Acceptance criteria:**
-- [ ] `GetByIDs` покрыт четырьмя кейсами спека
-- [ ] Миграции `product` проходят up → down → up
-- [ ] gRPC-стек: ответ и коды ошибок соответствуют поведению сервиса
+- [x] `GetByIDs` покрыт четырьмя кейсами спека
+- [x] Миграции `product` проходят up → down → up
+- [x] gRPC-стек: ответ и коды ошибок соответствуют поведению сервиса
 
 **Verification:**
-- [ ] `task -d services/product test-integration`
-- [ ] `task -d services/product lint`
+- [x] `task -d services/product test-integration`
+- [x] `task -d services/product lint`
 
 **Dependencies:** Task 1, Task 7 (образец)
 

@@ -70,7 +70,7 @@ notification repo (T8) ───────────────────
 
 ### Phase 4: user и product
 - [x] Task 10: `user` — репозитории, миграции, компонентный gRPC-стек
-- [ ] Task 11: `product` — репозиторий, миграции, компонентный gRPC-стек
+- [x] Task 11: `product` — репозиторий, миграции, компонентный gRPC-стек
 
 ### Checkpoint 3: все репозитории и компонентные стеки
 - [ ] `task test-integration` зелёный во всех модулях, `task test` работает без Docker
