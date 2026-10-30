@@ -70,13 +70,13 @@
 записи партиции не обрабатываются раньше неё. Отмена ctx завершает `Run`, `Close` без утечек.
 
 **Acceptance criteria:**
-- [ ] Коммит: повторный consumer группы не получает обработанные записи
-- [ ] Откат и ретрай: упавшая запись обрабатывается повторно и строго до следующей
-- [ ] Отмена ctx завершает `Run`; `goleak` в `TestMain` зелёный
+- [x] Коммит: повторный consumer группы не получает обработанные записи
+- [x] Откат и ретрай: упавшая запись обрабатывается повторно и строго до следующей
+- [x] Отмена ctx завершает `Run`; `goleak` в `TestMain` зелёный
 
 **Verification:**
-- [ ] `cd platform && go test -race -shuffle=on -count=5 -tags=integration ./kafka/kafkaconsumer/...` (стабильность)
-- [ ] `task -d platform lint`
+- [x] `cd platform && go test -race -shuffle=on -count=5 -tags=integration ./kafka/kafkaconsumer/...` (стабильность)
+- [x] `task -d platform lint`
 
 **Dependencies:** Task 2
 
