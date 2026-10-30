@@ -21,7 +21,6 @@ func (c Config) Validate() error {
 		validation.Field(&c.Log, validation.Required),
 		validation.Field(&c.PG, validation.Required),
 		validation.Field(&c.Kafka, validation.Required),
-		// Без Required: нулевая Telemetry{false, ""} — валидный выключенный режим.
 		validation.Field(&c.Telemetry),
 	)
 }
@@ -56,7 +55,7 @@ type PG struct {
 func (p PG) Validate() error {
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.DSN, validation.Required),
-		validation.Field(&p.MaxConns, validation.Required),
+		validation.Field(&p.MaxConns, validation.Min(int32(1))),
 	)
 }
 
@@ -81,7 +80,6 @@ type Telemetry struct {
 
 func (t Telemetry) Validate() error {
 	return validation.ValidateStruct(&t,
-		// Required на Enabled запрещён: false считается пустым значением.
 		validation.Field(&t.Endpoint, validation.When(t.Enabled, validation.Required)),
 	)
 }

@@ -124,3 +124,30 @@ func TestNew_GRPCServerReflectionUnset(t *testing.T) {
 	_, err := config.New()
 	require.Error(t, err)
 }
+
+func TestNew_Invalid(t *testing.T) {
+	tests := []struct {
+		name  string
+		key   string
+		value string
+	}{
+		{name: "APP_NAME empty", key: "APP_NAME", value: ""},
+		{name: "LOG_LEVEL unknown", key: "LOG_LEVEL", value: "trace"},
+		{name: "LOG_FORMAT unknown", key: "LOG_FORMAT", value: "xml"},
+		{name: "PG_DSN empty", key: "PG_DSN", value: ""},
+		{name: "PG_MAX_CONNS zero", key: "PG_MAX_CONNS", value: "0"},
+		{name: "PG_MAX_CONNS negative", key: "PG_MAX_CONNS", value: "-1"},
+		{name: "GRPC_SERVER_ADDR empty", key: "GRPC_SERVER_ADDR", value: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setBaseEnv(t)
+			t.Setenv("OTEL_ENABLED", "false")
+			t.Setenv(tt.key, tt.value)
+
+			_, err := config.New()
+			require.Error(t, err)
+		})
+	}
+}
