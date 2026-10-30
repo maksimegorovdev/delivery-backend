@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/maksimegorovdev/delivery-backend/platform/closer"
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcserver"
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/interceptors"
+	"github.com/maksimegorovdev/delivery-backend/platform/listener"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
 	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
 	"github.com/maksimegorovdev/delivery-backend/platform/telemetry"
@@ -109,7 +109,7 @@ func New(ctx context.Context) (_ *App, err error) {
 		AddressService: addressService,
 	})
 
-	lis, err := listen(ctx, cl, cfg.GRPCServer.Addr)
+	lis, err := listener.Listen(ctx, cl, cfg.GRPCServer.Addr)
 	if err != nil {
 		return nil, err
 	}
@@ -122,26 +122,6 @@ func New(ctx context.Context) (_ *App, err error) {
 	}
 
 	return app, nil
-}
-
-// listen открывает листенер в New, чтобы занятый порт был ошибкой старта, а Addr() знал фактический адрес.
-func listen(ctx context.Context, cl *closer.Closer, addr string) (net.Listener, error) {
-	var lc net.ListenConfig
-	lis, err := lc.Listen(ctx, "tcp", addr)
-	if err != nil {
-		return nil, fmt.Errorf("app: listen %s: %w", addr, err)
-	}
-
-	// Serve уже закрывает листенер при остановке; повторное закрытие — не ошибка.
-	cl.Add(closer.WrapErr(func() error {
-		if cerr := lis.Close(); cerr != nil && !errors.Is(cerr, net.ErrClosed) {
-			return cerr
-		}
-
-		return nil
-	}))
-
-	return lis, nil
 }
 
 func newTelemetry(ctx context.Context, cfg *config.Config) (*telemetry.Telemetry, error) {
