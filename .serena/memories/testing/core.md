@@ -17,5 +17,5 @@
 - Группа = функция от уникального имени топика, чтобы тесты шли параллельно.
 - Остановка: отмена ctx -> ожидание выхода `Run` -> `Close`; повторный вызов безопасен через `sync.Once`.
 
-## Планы по модулю integration
-Список задач и критерии: `spec/changes/testing/integration/todo.md`. Эталон события `order.created` — `contracts/events/order.created.json`, golden-тест в `order`, парный в `notification`; смоук-тесты `app` через шов `App.Addr()`.
+## Модуль integration (done)
+Спека: `spec/specs/testing/integration/spec.md`, архив change: `spec/changes/archive/testing/2026-10-31-integration/`. Эталон события `order.created` — `contracts/events/order.created.json`, golden-тест в `order`, парный в `notification`; смоук-тесты `app` через шов `App.Addr()`.

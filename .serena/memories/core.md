@@ -14,8 +14,8 @@
 ## Инварианты
 - `git commit` только по явной команде пользователя (правило действует и для скиллов вроде `build`).
 - Спеки, планы, задачи — только по скиллу `spec-workflow`: `spec/specs` (текущее), `spec/changes` (в работе), `spec/changes/archive`. `SPEC.md` и `tasks/` в корне не создавать.
-- Активный change: `spec/changes/testing/integration` (`spec.md`, `plan.md`, `todo.md`); общий DoD задач лежит вверху `todo.md`. Карта эпика: `spec/specs/testing/map.md`.
-- Контракты событий Kafka — `contracts/events/*.json` в корне (создаётся задачей Task 6 модуля integration).
+- Активных change нет: `spec/changes` содержит только `archive/`. Следующий модуль эпика testing — `e2e`. Карта эпика: `spec/specs/testing/map.md`.
+- Контракты событий Kafka — `contracts/events/*.json` в корне.
 
 ## Дальше
 - Версии и инструменты: `mem:tech_stack`.
