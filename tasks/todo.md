@@ -508,13 +508,13 @@ proto → domain (все поля, время), маппинг кодов gRPC �
 Taskfile `notification`, модуль в `FUZZ_MODULES`.
 
 **Acceptance criteria:**
-- [ ] Поля `InboxEvent` и `Payload` во входе сервиса совпадают с сообщением
-- [ ] Любой `msg.Value` не паникует; ошибка — `InvalidArgument`, сервис не вызывается
-- [ ] `task fuzz` запускает все три цели
+- [x] Поля `InboxEvent` и `Payload` во входе сервиса совпадают с сообщением
+- [x] Любой `msg.Value` не паникует; ошибка — `InvalidArgument`, сервис не вызывается
+- [x] `task fuzz` запускает все три цели
 
 **Verification:**
-- [ ] `cd services/notification && go test -race -shuffle=on -count=1 -cover ./internal/transport/...`
-- [ ] `task fuzz FUZZTIME=5s`
+- [x] `cd services/notification && go test -race -shuffle=on -count=1 -cover ./internal/transport/...`
+- [x] `task fuzz FUZZTIME=5s`
 
 **Dependencies:** Tasks 5, 20
 
