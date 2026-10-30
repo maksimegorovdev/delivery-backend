@@ -20,7 +20,7 @@ Build order: `test-foundation` → `unit`, `integration` (параллельно
 |---|---|---|
 | `test-foundation` | [spec](test-foundation/spec.md) | done |
 | `unit` | [spec](unit/spec.md) | done |
-| `integration` | — | todo |
+| `integration` | [spec](../../changes/testing/integration/spec.md) | approved |
 | `e2e` | — | todo |
 | `load` | — | todo |
 
@@ -34,7 +34,8 @@ Build order: `test-foundation` → `unit`, `integration` (параллельно
 - Имена тестовых кейсов (`name`) на английском, комментарии на русском.
 - e2e на docker compose, а не на testcontainers: стек с Debezium тяжёлый и уже описан в `docker-compose.yml`.
 - Контракты gRPC проверяет уже настроенный `buf breaking` (`task -d proto breaking`, правило `FILE`); отдельного модуля под контракты нет.
-- Контракт событий Kafka — golden-тесты в модуле `integration`: один эталон в `testdata/` используется и продюсером (`order`), и консьюмером (`notification`).
+- Контракт событий Kafka — golden-тесты в модуле `integration`: один эталон в `contracts/events/` в корне репозитория используется и продюсером (`order`), и консьюмером (`notification`).
+- Smoke-тест `app` получает фактический адрес через шов `App.Addr()`, а не поиском свободного порта.
 - Нагрузка: целевых SLO нет, задача — найти предел и узкое место, зафиксировать baseline.
 
 ## Итоги модуля `unit`
