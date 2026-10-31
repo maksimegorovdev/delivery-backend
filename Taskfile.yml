@@ -29,6 +29,41 @@ tasks:
     cmds:
       - docker compose down
 
+  e2e-images-check:
+    desc: Infrastructure image versions in e2e/compose.yaml match compose.yaml
+    silent: true
+    cmds:
+      - |
+        set -eu
+        root=$(docker compose config --images | sort -u)
+        # Образы сервисов (delivery-e2e-*) и одноразовых контейнеров (migrate, curl) в корневом файле не нужны.
+        e2e=$(docker compose -f e2e/compose.yaml config --images | sort -u \
+          | grep -v -e '^delivery-e2e-' -e '^migrate/migrate:' -e '^curlimages/curl:')
+        status=0
+        for img in $e2e; do
+          if ! printf '%s\n' "$root" | grep -qxF "$img"; then
+            echo "e2e/compose.yaml: образ $img не совпадает с compose.yaml" >&2
+            status=1
+          fi
+        done
+        exit $status
+
+  e2e-up:
+    desc: Start the isolated e2e stack (project delivery-e2e) and wait until it is ready
+    cmds:
+      - task: e2e-images-check
+      - docker compose -f e2e/compose.yaml -p delivery-e2e up -d --build --wait
+
+  e2e-down:
+    desc: Remove the e2e stack with its volumes
+    cmds:
+      - docker compose -f e2e/compose.yaml -p delivery-e2e down -v
+
+  e2e-logs:
+    desc: Show logs of the e2e stack (for failure analysis)
+    cmds:
+      - docker compose -f e2e/compose.yaml -p delivery-e2e logs --no-color {{.CLI_ARGS}}
+
   sync:
     desc: Sync the Go workspace
     cmds:

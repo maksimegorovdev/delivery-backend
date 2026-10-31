@@ -28,7 +28,7 @@ notification → `inbox_events`/`notifications`. Модуль `integration` пр
 
 ### Отличия от карты эпика
 
-- В карте сказано «стек из docker compose». Сервисов в `docker-compose.yml` сейчас нет, они запускаются
+- В карте сказано «стек из docker compose». Сервисов в `compose.yaml` сейчас нет, они запускаются
   на хосте через `air`. Модуль добавляет Dockerfile сервисов и отдельный compose-файл для e2e.
 - «Чёрный ящик» соблюдается на входе: тест ходит только в публичный HTTP API `gateway`. На выходе
   у `notification` нет API, поэтому результат читается SQL-запросами только на чтение из его БД.
@@ -42,7 +42,7 @@ notification → `inbox_events`/`notifications`. Модуль `integration` пр
 | Стек | Docker Compose, отдельный файл `e2e/compose.yaml` и проект `delivery-e2e` |
 | Образы сервисов | Один multi-stage Dockerfile: `golang:1.27` → `gcr.io/distroless/static-debian12:nonroot`, `ARG SERVICE` |
 | Миграции в стеке | Одноразовые контейнеры `migrate/migrate` (версия как у `golang-migrate` в Taskfile сервисов) |
-| Регистрация Debezium | Одноразовый контейнер `curlimages/curl`, тот же `deploy/debezium/order-outbox.json` |
+| Регистрация Debezium | Одноразовый контейнер `curlimages/curl:8.15.0`, тот же `deploy/debezium/order-outbox.json` |
 | Тесты | Go-модуль `e2e/`, тег `e2e`, `testify` (`require`, `assert`, `EventuallyWithT`) |
 | Чтение БД | `pgx/v5` (уже в workspace), только `SELECT` |
 | Готовность сервисов | gRPC health (`google.golang.org/grpc/health/grpc_health_v1`, уже в workspace). Сервер health регистрирует `platform/grpc/grpcserver` (см. «Изменения конфигурации») |
@@ -58,7 +58,7 @@ notification → `inbox_events`/`notifications`. Модуль `integration` пр
 ```
 task e2e                # e2e-up → e2e-test → e2e-down (down выполняется и при падении тестов)
 task e2e-up             # e2e-images-check, затем docker compose -f e2e/compose.yaml -p delivery-e2e up -d --build --wait
-task e2e-images-check   # версии образов инфраструктуры в e2e/compose.yaml совпадают с корневым docker-compose.yml
+task e2e-images-check   # версии образов инфраструктуры в e2e/compose.yaml совпадают с корневым compose.yaml
 task e2e-test           # go test -race -shuffle=on -count=1 -tags=e2e ./... в e2e/ (стек уже поднят)
 task e2e-down           # docker compose -f e2e/compose.yaml -p delivery-e2e down -v
 task e2e-logs           # логи сервисов стека, для разбора падений
@@ -100,7 +100,7 @@ e2e/
   без томов с данными (после `down -v` ничего не остаётся). Конфиги монтируются из общих файлов
   репозитория (`../deploy/clickhouse/users.d/otel-users.xml`, `../deploy/otel-collector/config.yaml`),
   чтобы не копировать их. Порты — диапазон e2e.
-- **Версии образов** инфраструктуры совпадают с корневым `docker-compose.yml`. Это проверяет
+- **Версии образов** инфраструктуры совпадают с корневым `compose.yaml`. Это проверяет
   `task e2e-images-check`: каждый образ из `docker compose -f e2e/compose.yaml config --images`, кроме
   образов сервисов и одноразовых контейнеров, должен быть в `docker compose config --images` корневого
   файла. `task e2e-up` вызывает проверку первой, поэтому расхождение версий роняет запуск.
@@ -237,8 +237,9 @@ func TestCreateOrder_HappyPath(t *testing.T) {
 - Новые файлы: `deploy/docker/service.Dockerfile`, `.dockerignore`, модуль `e2e/` (в `go.work`).
 - `Taskfile.yml`: задачи `e2e`, `e2e-up`, `e2e-test`, `e2e-down`, `e2e-logs`, `e2e-images-check`;
   `e2e` добавляется в `MODULES` (lint, tidy, tools), но не в `COVER_MODULES` и не в `FUZZ_MODULES`.
-- Корневой `docker-compose.yml` не меняется. При обновлении версии образа в нём ту же версию нужно
-  поставить в `e2e/compose.yaml`, иначе `task e2e-up` упадёт на `e2e-images-check`.
+- Корневой `docker-compose.yml` переименован в `compose.yaml` (единое имя с `e2e/compose.yaml`,
+  каноническое для Compose Specification); содержимое не меняется. При обновлении версии образа в нём
+  ту же версию нужно поставить в `e2e/compose.yaml`, иначе `task e2e-up` упадёт на `e2e-images-check`.
 - `platform/grpc/grpcserver`: `New` регистрирует стандартный сервер health (`health.NewServer()`, статус `SERVING`), graceful stop сначала переводит его в `NOT_SERVING`. С unit-тестом. Фильтр телеметрии для health в `grpcserver` уже есть. Других изменений боевого кода нет.
 
 ## Boundaries
@@ -253,12 +254,12 @@ func TestCreateOrder_HappyPath(t *testing.T) {
   - `task test`, `task lint`, `task e2e` зелёные перед сдачей задачи.
 - **Ask first:**
   - любое изменение боевого кода сервисов, включая исправление найденного бага;
-  - изменение корневого `docker-compose.yml`, конфигурации Debezium, миграций;
+  - изменение корневого `compose.yaml`, конфигурации Debezium, миграций;
   - новые Go-зависимости или Docker-образы сверх перечисленных в «Tech Stack»;
   - новые сценарии сверх таблицы «Сценарии».
 - **Never:**
   - запись в БД, Kafka или ClickHouse из теста (кроме сдвига оффсета в `TestResilience_Redelivery`);
-  - подключение к dev-стеку (`docker-compose.yml` с портами 5432–5435, 19092, 8080);
+  - подключение к dev-стеку (`compose.yaml` с портами 5432–5435, 19092, 8080);
   - `time.Sleep` для синхронизации (кроме `stableWindow` для доказательства отсутствия события);
   - `t.Skip`, ослабление или удаление кейсов;
   - `git commit` без команды пользователя.

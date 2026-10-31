@@ -44,7 +44,7 @@ T1–T3 независимы. T6, T7, T8 независимы друг от др
 - **Версии образов:** `golang:1.27`, `gcr.io/distroless/static-debian12:nonroot`,
   `migrate/migrate:v4.19.1` (= `MIGRATE_VERSION` в Taskfile сервисов), `curlimages/curl` —
   фиксированный тег, выбирается в T4 и записывается в спек. Инфраструктура — те же теги, что в
-  корневом `docker-compose.yml`, сверка `task e2e-images-check`.
+  корневом `compose.yaml`, сверка `task e2e-images-check`.
 - **Готовность:** `up --wait` — инфраструктура (healthchecks) и одноразовые контейнеры;
   сервисы — `TestMain` (health / `400` от `gateway`), у distroless нет утилит для healthcheck.
 - **Трейс через Link** (Open Question 5): корневой спан `gateway` ищется по
@@ -66,7 +66,7 @@ T1–T3 независимы. T6, T7, T8 независимы друг от др
 - [ ] `task test`, `task lint` зелёные; пять образов собираются
 
 ### Phase 2: Стек
-- [ ] Task 4: `e2e/compose.yaml` и задачи `e2e-up`/`e2e-down`/`e2e-logs`/`e2e-images-check`
+- [x] Task 4: `e2e/compose.yaml` и задачи `e2e-up`/`e2e-down`/`e2e-logs`/`e2e-images-check`
 
 ### Checkpoint: Стек
 - [ ] Стек поднимается рядом с dev-стеком и убирается без остатка

@@ -115,17 +115,17 @@ grpc — версии как в сервисах), `Taskfile.yml` (`tools`, `lin
 `e2e-down` (`down -v`), `e2e-logs`. Тег `curlimages/curl` вписать в «Tech Stack» спека.
 
 **Acceptance criteria:**
-- [ ] `task e2e-up` завершается успешно: миграции и регистрация коннектора `exited (0)`, инфраструктура `healthy`, сервисы `running`
-- [ ] При запущенном `task compose-up` стек e2e поднимается без конфликтов портов и имён
-- [ ] `task e2e-down` не оставляет контейнеров, сетей и томов проекта `delivery-e2e`
-- [ ] Изменение тега образа в `e2e/compose.yaml` относительно корня роняет `task e2e-up` на `e2e-images-check`
+- [x] `task e2e-up` завершается успешно: миграции и регистрация коннектора `exited (0)`, инфраструктура `healthy`, сервисы `running`
+- [x] При запущенном `task compose-up` стек e2e поднимается без конфликтов портов и имён
+- [x] `task e2e-down` не оставляет контейнеров, сетей и томов проекта `delivery-e2e`
+- [x] Изменение тега образа в `e2e/compose.yaml` относительно корня роняет `task e2e-up` на `e2e-images-check`
 
 **Verification:**
-- [ ] `task e2e-up && docker compose -p delivery-e2e ps -a`
-- [ ] `curl -s localhost:28083/connectors/order-outbox/status` → `RUNNING`
-- [ ] Ручной заказ: `curl -X POST localhost:28080/api/v1/orders ...` → `201`, строка в `notifications` (`psql` на 25435)
-- [ ] `task e2e-down && docker ps -a --filter label=com.docker.compose.project=delivery-e2e` пусто; `docker volume ls` без томов проекта
-- [ ] Порча тега → `task e2e-up` красный, возврат → зелёный
+- [x] `task e2e-up && docker compose -p delivery-e2e ps -a`
+- [x] `curl -s localhost:28083/connectors/order-outbox/status` → `RUNNING`
+- [x] Ручной заказ: `curl -X POST localhost:28080/api/v1/orders ...` → `201`, строка в `notifications` (`psql` на 25435)
+- [x] `task e2e-down && docker ps -a --filter label=com.docker.compose.project=delivery-e2e` пусто; `docker volume ls` без томов проекта
+- [x] Порча тега → `task e2e-up` красный, возврат → зелёный
 
 **Dependencies:** T1, T2, T3
 
