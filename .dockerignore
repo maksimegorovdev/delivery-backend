@@ -1,6 +1,6 @@
-bin/
-tmp/
-coverage/
+**/bin/
+**/tmp/
+**/coverage/
 .git/
 spec/
 **/.env
