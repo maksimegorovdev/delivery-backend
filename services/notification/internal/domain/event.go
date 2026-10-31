@@ -1,3 +1,3 @@
 package domain
 
-const EventTypeOrderCreated = "OrderCreated"
+const EventTypeOrderCreated = "order.created"

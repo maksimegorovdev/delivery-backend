@@ -50,6 +50,7 @@ func TestOrderEventBuilder_OrderCreated(t *testing.T) {
 	assert.Equal(t, domain.AggregateTypeOrder, got.AggregateType)
 	assert.Equal(t, order.ID, got.AggregateID)
 	assert.Equal(t, domain.EventTypeOrderCreated, got.Type)
+	assert.Equal(t, "order.created", got.Type, "тип события — часть контракта, константу не подменяем")
 	assert.Equal(t, order.CreatedAt, got.CreatedAt)
 	assert.NotEmpty(t, got.Payload)
 }
@@ -106,6 +107,28 @@ func TestOrderEventBuilder_OrderCreated_SnakeCaseFields(t *testing.T) {
 	require.NotEmpty(t, items)
 	for _, field := range []string{"id", "product_id", "product_name", "quantity", "unit_price"} {
 		assert.Contains(t, items[0], field)
+	}
+}
+
+func TestOrderEventBuilder_OrderCreated_AmountsAreNumbers(t *testing.T) {
+	t.Parallel()
+
+	got, err := event.NewOrderEventBuilder().OrderCreated(fixtureOrder())
+	require.NoError(t, err)
+
+	var raw map[string]any
+	require.NoError(t, json.Unmarshal(got.Payload, &raw))
+
+	assert.InDelta(t, 430, raw["total_amount"], 0, "total_amount — JSON-число, не строка")
+
+	items, ok := raw["items"].([]any)
+	require.True(t, ok, "items должен быть массивом")
+	require.NotEmpty(t, items)
+	for i, rawItem := range items {
+		item, isObject := rawItem.(map[string]any)
+		require.True(t, isObject, "item %d должен быть объектом", i)
+		assert.IsType(t, float64(0), item["unit_price"], "item %d unit_price — JSON-число", i)
+		assert.IsType(t, float64(0), item["quantity"], "item %d quantity — JSON-число", i)
 	}
 }
 
