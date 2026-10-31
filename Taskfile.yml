@@ -54,6 +54,25 @@ tasks:
       - task: e2e-images-check
       - docker compose -f e2e/compose.yaml -p delivery-e2e up -d --build --wait
 
+  e2e-test:
+    desc: Run e2e tests against a running stack (task e2e-up); extra go test flags go after --
+    dir: e2e
+    cmds:
+      - go test -race -shuffle=on -count=1 -tags=e2e {{.CLI_ARGS}} ./...
+
+  e2e:
+    desc: Bring up the e2e stack, run the tests, remove the stack (E2E_KEEP=1 keeps it)
+    cmds:
+      # defer объявлен до e2e-up: частично поднятый стек убирается и при падении подъёма.
+      - defer: |
+          if [ "${E2E_KEEP:-}" = "1" ]; then
+            echo "E2E_KEEP=1: стек delivery-e2e оставлен (task e2e-logs, task e2e-down)"
+          else
+            task e2e-down
+          fi
+      - task: e2e-up
+      - task: e2e-test
+
   e2e-down:
     desc: Remove the e2e stack with its volumes
     cmds:

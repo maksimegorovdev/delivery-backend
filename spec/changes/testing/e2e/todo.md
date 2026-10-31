@@ -147,7 +147,7 @@ grpc — версии как в сервисах), `Taskfile.yml` (`tools`, `lin
 
 ## Task 5: `TestMain`, хелперы и `TestCreateOrder_HappyPath`
 
-**Description:** `stack_e2e_test.go`: `TestMain` с общим таймаутом 2 мин — коннектор `RUNNING`,
+**Description:** Тест выявил расхождение боевого кода с контрактом: тип события `OrderCreated` вместо `order.created` и суммы строками в payload. Исправлено в `order` и `notification` (см. «Изменения конфигурации» спека). `stack_e2e_test.go`: `TestMain` с общим таймаутом 2 мин — коннектор `RUNNING`,
 health `SERVING` у `order`/`user`/`product`, `400` от `gateway` на пустое тело, seed-id `SELECT`-ом
 (адрес по email `demo@example.com`, товары по имени); при провале печатает шаг и `os.Exit(1)`.
 `helpers_e2e_test.go`: HTTP-клиент `gateway` с разбором конверта, read-only пулы БД, константы
@@ -155,14 +155,14 @@ health `SERVING` у `order`/`user`/`product`, `400` от `gateway` на пуст
 (up → test → down через `defer`, `E2E_KEEP=1` пропускает down).
 
 **Acceptance criteria:**
-- [ ] Happy path: `201`, ответ согласован с seed (пользователь, адрес, имена, цены, `total_amount`); ровно одна строка `inbox_events` (`order.created`) и одна `notifications` (`channel='log'`); `payload` совпадает с ответом API по `order_id`, `user_id`, `items`, `total_amount`, `delivery_address`
-- [ ] Остановленный `order` → `TestMain` падает с сообщением о шаге health, тесты не запускаются
-- [ ] `task e2e` убирает стек и при красном тесте; `E2E_KEEP=1 task e2e` оставляет его
+- [x] Happy path: `201`, ответ согласован с seed (пользователь, адрес, имена, цены, `total_amount`); ровно одна строка `inbox_events` (`order.created`) и одна `notifications` (`channel='log'`); `payload` совпадает с ответом API по `order_id`, `user_id`, `items`, `total_amount`, `delivery_address`
+- [x] Остановленный `order` → `TestMain` падает с сообщением о шаге health, тесты не запускаются
+- [x] `task e2e` убирает стек и при красном тесте; `E2E_KEEP=1 task e2e` оставляет его
 
 **Verification:**
-- [ ] `task e2e` зелёный от чистого состояния
-- [ ] `task e2e-up && docker compose -p delivery-e2e stop order && task e2e-test` → понятная ошибка `TestMain`
-- [ ] `task -d e2e lint`
+- [x] `task e2e` зелёный от чистого состояния
+- [x] `task e2e-up && docker compose -p delivery-e2e stop order && task e2e-test` → понятная ошибка `TestMain`
+- [x] `task -d e2e lint`
 
 **Dependencies:** T4
 

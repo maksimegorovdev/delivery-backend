@@ -240,7 +240,10 @@ func TestCreateOrder_HappyPath(t *testing.T) {
 - Корневой `docker-compose.yml` переименован в `compose.yaml` (единое имя с `e2e/compose.yaml`,
   каноническое для Compose Specification); содержимое не меняется. При обновлении версии образа в нём
   ту же версию нужно поставить в `e2e/compose.yaml`, иначе `task e2e-up` упадёт на `e2e-images-check`.
-- `platform/grpc/grpcserver`: `New` регистрирует стандартный сервер health (`health.NewServer()`, статус `SERVING`), graceful stop сначала переводит его в `NOT_SERVING`. С unit-тестом. Фильтр телеметрии для health в `grpcserver` уже есть. Других изменений боевого кода нет.
+- `platform/grpc/grpcserver`: `New` регистрирует стандартный сервер health (`health.NewServer()`, статус `SERVING`), graceful stop сначала переводит его в `NOT_SERVING`. С unit-тестом. Фильтр телеметрии для health в `grpcserver` уже есть. - `order` и `notification`: тип события `order.created` вместо `OrderCreated` (константы `EventTypeOrderCreated`, заголовок `event-type`, эталон `contracts/events/order.created.json`). Найдено e2e-тестом happy path: код расходился с контрактом, зафиксированным в спеке `integration`. Изменение согласовано с пользователем.
+- `order/internal/event`: payload события пишется через `encoding/json` со структурой в snake_case, суммы и количества — JSON-числа (раньше `protojson` писал `int64` строками). Проверка валидного UTF-8 сохранена явно. `notification` разбирает payload как раньше (`protojson` принимает `int64` и числом, и строкой). Схема остаётся в `proto/proto/order/v1/events.proto`.
+
+Других изменений боевого кода нет.
 
 ## Boundaries
 
