@@ -49,14 +49,14 @@
 `coverage/`, `.git/`, `spec/`, `**/.env`.
 
 **Acceptance criteria:**
-- [ ] Образ собирается для каждого из пяти сервисов
-- [ ] Контейнер стартует и завершается понятной ошибкой конфигурации без env (бинарь рабочий, пользователь nonroot)
-- [ ] Повторная сборка после правки `.go` не перекачивает модули (слой `go mod download` из кеша)
+- [x] Образ собирается для каждого из пяти сервисов
+- [x] Контейнер стартует и завершается понятной ошибкой конфигурации без env (бинарь рабочий, пользователь nonroot)
+- [x] Повторная сборка после правки `.go` не перекачивает модули (слой `go mod download` из кеша)
 
 **Verification:**
-- [ ] `for s in gateway order user product notification; do docker build -f deploy/docker/service.Dockerfile --build-arg SERVICE=$s -t delivery-$s:e2e . || break; done`
-- [ ] `docker run --rm delivery-order:e2e` — выход с ошибкой `APP_NAME` required
-- [ ] `docker inspect -f '{{.Config.User}}' delivery-order:e2e` → `nonroot` (или `65532`)
+- [x] `for s in gateway order user product notification; do docker build -f deploy/docker/service.Dockerfile --build-arg SERVICE=$s -t delivery-$s:e2e . || break; done`
+- [x] `docker run --rm delivery-order:e2e` — выход с ошибкой `APP_NAME` required
+- [x] `docker inspect -f '{{.Config.User}}' delivery-order:e2e` → `nonroot` (или `65532`)
 
 **Dependencies:** None (T3 потом добавит `e2e/go.mod` в список `COPY`)
 
