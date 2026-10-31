@@ -263,13 +263,13 @@ ClickHouse (`grafana_reader`) в `otel.otel_traces` найти корневой 
 проверить: для заказа одна строка в `inbox_events` и одна в `notifications` после `stableWindow`.
 
 **Acceptance criteria:**
-- [ ] Сдвиг оффсета реально выполнен (lag после seek > 0, затем 0)
-- [ ] Дублей по заказу нет ни в `inbox_events`, ни в `notifications`
-- [ ] `notification` запущен после теста при любом исходе
+- [x] Сдвиг оффсета реально выполнен (lag после seek > 0, затем 0)
+- [x] Дублей по заказу нет ни в `inbox_events`, ни в `notifications`
+- [x] `notification` запущен после теста при любом исходе
 
 **Verification:**
-- [ ] `task e2e-test` на поднятом стеке
-- [ ] `task -d e2e lint`
+- [x] `task e2e-test` на поднятом стеке
+- [x] `task -d e2e lint`
 
 **Dependencies:** T8
 

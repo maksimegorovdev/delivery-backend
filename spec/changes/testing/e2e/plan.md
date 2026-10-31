@@ -72,16 +72,16 @@ T1–T3 независимы. T6, T7, T8 независимы друг от др
 - [ ] Стек поднимается рядом с dev-стеком и убирается без остатка
 
 ### Phase 3: Сквозной путь
-- [ ] Task 5: `TestMain`, хелперы и `TestCreateOrder_HappyPath`; `task e2e`, `task e2e-test`
-- [ ] Task 6: `TestCreateOrder_ClientErrors` и `TestCreateOrder_NotFound`
+- [x] Task 5: `TestMain`, хелперы и `TestCreateOrder_HappyPath`; `task e2e`, `task e2e-test`
+- [x] Task 6: `TestCreateOrder_ClientErrors` и `TestCreateOrder_NotFound`
 
 ### Checkpoint: Сквозной путь
 - [ ] `task e2e` зелёный от чистого состояния
 
 ### Phase 4: Трейс и устойчивость
-- [ ] Task 7: `TestTrace_EndToEnd`
-- [ ] Task 8: `TestResilience_NotificationDown` и `TestResilience_DebeziumDown`
-- [ ] Task 9: `TestResilience_Redelivery`
+- [x] Task 7: `TestTrace_EndToEnd`
+- [x] Task 8: `TestResilience_NotificationDown` и `TestResilience_DebeziumDown`
+- [x] Task 9: `TestResilience_Redelivery`
 
 ### Checkpoint: Готово
 - [ ] Task 10: флейк-проверка и итоги модуля в карте

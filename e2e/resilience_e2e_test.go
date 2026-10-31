@@ -62,3 +62,19 @@ func TestResilience_DebeziumDown(t *testing.T) { //nolint:paralleltest // ост
 
 	requireOrderEventExactlyOnce(t, order.ID)
 }
+
+func TestResilience_Redelivery(t *testing.T) { //nolint:paralleltest // останавливает общий контейнер
+	order := newSeedOrder(t)
+	awaitOrderEvent(t, order.ID)
+
+	stopService(t, serviceNotification)
+	awaitGroupEmpty(t)
+
+	seekGroupToStart(t)
+	require.Positive(t, describeGroupLag(t), "после seek группа должна иметь непрочитанные события")
+
+	startService(t, serviceNotification)
+	awaitGroupCaughtUp(t)
+
+	requireOrderEventExactlyOnce(t, order.ID)
+}

@@ -3,6 +3,7 @@
 package e2e_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -42,6 +44,12 @@ const (
 
 	serviceNotification = "notification"
 	serviceDebezium     = "debezium"
+	serviceRedpanda     = "redpanda"
+
+	// consumerGroup — группа, в которой notification читает топик событий заказов.
+	consumerGroup = "notification"
+	// groupStateEmpty — состояние группы без участников: только тогда rpk разрешает сдвиг оффсетов.
+	groupStateEmpty = "Empty"
 
 	seedUserEmail   = "demo@example.com"
 	seedBorjomiName = "Минеральная вода Borjomi"
@@ -379,12 +387,119 @@ func ensureRunning(ctx context.Context, service string) error {
 
 // composeRun выполняет `docker compose` для стека delivery-e2e и включает вывод в ошибку.
 func composeRun(ctx context.Context, args ...string) error {
+	_, err := composeOutput(ctx, args...)
+
+	return err
+}
+
+// composeOutput выполняет `docker compose` для стека delivery-e2e и возвращает stdout.
+// При ошибке в неё попадает и stderr команды.
+func composeOutput(ctx context.Context, args ...string) ([]byte, error) {
 	full := append([]string{"compose", "-f", composeFile, "-p", composeProject}, args...)
 
-	out, err := exec.CommandContext(ctx, "docker", full...).CombinedOutput()
+	cmd := exec.CommandContext(ctx, "docker", full...)
+
+	var stderr bytes.Buffer
+
+	cmd.Stderr = &stderr
+
+	out, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("docker %v: %w: %s", args, err, out)
+		return nil, fmt.Errorf("docker %v: %w: %s", args, err, stderr.String())
 	}
 
-	return nil
+	return out, nil
+}
+
+// groupDescription — нужные поля `rpk group describe --format json`.
+type groupDescription struct {
+	State    string `json:"state"`
+	Members  int    `json:"members"`
+	TotalLag int64  `json:"total_lag"`
+}
+
+// rpkGroup выполняет `rpk group <args>` в контейнере redpanda и возвращает stdout.
+func rpkGroup(ctx context.Context, args ...string) ([]byte, error) {
+	full := append([]string{"exec", "-T", serviceRedpanda, "rpk", "group"}, args...)
+
+	return composeOutput(ctx, full...)
+}
+
+// describeGroup читает состояние группы notification.
+func describeGroup(ctx context.Context) (groupDescription, error) {
+	out, err := rpkGroup(ctx, "describe", consumerGroup, "--format", "json")
+	if err != nil {
+		return groupDescription{}, err
+	}
+
+	var groups []groupDescription
+	if decodeErr := json.Unmarshal(out, &groups); decodeErr != nil {
+		return groupDescription{}, fmt.Errorf("decode group description: %w", decodeErr)
+	}
+
+	if len(groups) != 1 {
+		return groupDescription{}, fmt.Errorf("group description: got %d groups, want 1", len(groups))
+	}
+
+	return groups[0], nil
+}
+
+// describeGroupLag возвращает суммарное отставание группы notification.
+func describeGroupLag(t *testing.T) int64 {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(t.Context(), composeTimeout)
+	defer cancel()
+
+	group, err := describeGroup(ctx)
+	require.NoError(t, err)
+
+	return group.TotalLag
+}
+
+// awaitGroupEmpty ждёт, пока в группе notification не останется участников.
+func awaitGroupEmpty(t *testing.T) {
+	t.Helper()
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		ctx, cancel := context.WithTimeout(t.Context(), composeTimeout)
+		defer cancel()
+
+		group, err := describeGroup(ctx)
+		if !assert.NoError(c, err) {
+			return
+		}
+
+		assert.Equal(c, groupStateEmpty, group.State, "состояние группы %s", consumerGroup)
+	}, eventuallyTimeout, eventuallyTick)
+}
+
+// awaitGroupCaughtUp ждёт, пока группа notification снова получит участника и дочитает топик до конца.
+func awaitGroupCaughtUp(t *testing.T) {
+	t.Helper()
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		ctx, cancel := context.WithTimeout(t.Context(), composeTimeout)
+		defer cancel()
+
+		group, err := describeGroup(ctx)
+		if !assert.NoError(c, err) {
+			return
+		}
+
+		assert.Positive(c, group.Members, "участники группы %s", consumerGroup)
+		assert.Zero(c, group.TotalLag, "отставание группы %s", consumerGroup)
+	}, eventuallyTimeout, eventuallyTick)
+}
+
+// seekGroupToStart сдвигает оффсеты группы notification в начало топика: все события будут прочитаны заново.
+// Это единственная запись в Kafka из тестов, она допустима только для проверки повторной доставки.
+func seekGroupToStart(t *testing.T) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(t.Context(), composeTimeout)
+	defer cancel()
+
+	_, err := rpkGroup(ctx, "seek", consumerGroup, "--to", "start")
+	require.NoError(t, err)
 }
