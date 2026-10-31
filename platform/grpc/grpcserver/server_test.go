@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcclient"
@@ -62,7 +61,7 @@ func receive[T any](t *testing.T, ch <-chan T, what string) T {
 	return zero
 }
 
-// runServer регистрирует health-сервис, запускает Serve на lis и возвращает клиента и канал результата Serve.
+// runServer запускает Serve на lis и возвращает клиента и канал результата Serve.
 func runServer(
 	ctx context.Context,
 	t *testing.T,
@@ -72,7 +71,6 @@ func runServer(
 	t.Helper()
 
 	srv := grpcserver.New(opts...)
-	grpc_health_v1.RegisterHealthServer(srv.Server(), health.NewServer())
 
 	result := make(chan error, 1)
 	go func() { result <- srv.Serve(ctx, lis) }()
@@ -182,4 +180,48 @@ func TestServe_GracefulStopTimeout(t *testing.T) {
 	cancel()
 
 	require.ErrorContains(t, receive(t, result, "Serve result"), "grpcserver: graceful stop timed out")
+}
+
+func TestServe_ReportsServing(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	client, result := runServer(ctx, t, listen(t))
+
+	resp, err := client.Check(ctx, &grpc_health_v1.HealthCheckRequest{}, grpc.WaitForReady(true))
+	require.NoError(t, err)
+	assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING, resp.GetStatus())
+
+	cancel()
+	require.NoError(t, receive(t, result, "Serve result"))
+}
+
+func TestServe_ReportsNotServingOnShutdown(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	client, result := runServer(ctx, t, listen(t), grpcserver.WithShutdownTimeout(50*time.Millisecond))
+	require.NoError(t, check(ctx, client))
+
+	// Watch держит соединение открытым во время graceful stop и получает смену статуса.
+	watchCtx, stopWatch := context.WithCancel(t.Context())
+	defer stopWatch()
+	stream, err := client.Watch(watchCtx, &grpc_health_v1.HealthCheckRequest{})
+	require.NoError(t, err)
+	first, err := stream.Recv()
+	require.NoError(t, err)
+	require.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING, first.GetStatus())
+
+	cancel()
+
+	next, err := stream.Recv()
+	require.NoError(t, err)
+	assert.Equal(t, grpc_health_v1.HealthCheckResponse_NOT_SERVING, next.GetStatus())
+
+	// Стрим не даёт GracefulStop завершиться, поэтому срабатывает таймаут.
+	require.Error(t, receive(t, result, "Serve result"))
 }

@@ -23,14 +23,14 @@
 Единственное изменение боевого кода модуля. Телеметрия health уже отфильтрована (`filters.HealthCheck()`).
 
 **Acceptance criteria:**
-- [ ] После `Serve` `Check` с пустым `service` возвращает `SERVING`
-- [ ] Во время graceful stop статус `NOT_SERVING` (тест через внутренний доступ к health-серверу или через `Check` до закрытия соединения)
-- [ ] Покрытие `grpcserver` не ниже текущих 91.7%, `goleak` в пакете зелёный
+- [x] После `Serve` `Check` с пустым `service` возвращает `SERVING`
+- [x] Во время graceful stop статус `NOT_SERVING` (тест через внутренний доступ к health-серверу или через `Check` до закрытия соединения)
+- [x] Покрытие `grpcserver` не ниже текущих 91.7%, `goleak` в пакете зелёный
 
 **Verification:**
-- [ ] `task -d platform test`
-- [ ] `task -d platform lint`
-- [ ] `task test-integration` (smoke-тесты `app` сервисов не сломаны)
+- [x] `task -d platform test`
+- [x] `task -d platform lint`
+- [x] `task test-integration` (smoke-тесты `app` сервисов не сломаны)
 
 **Dependencies:** None
 
