@@ -14,10 +14,10 @@ const (
 	defaultDebeziumURL     = "http://localhost:28083"
 )
 
-// Адреса с учётными данными. Они совпадают с dev-стеком (docker-compose.yml): стек e2e локальный
+// Адреса с учётными данными. Они совпадают с dev-стеком (compose.yaml): стек e2e локальный
 // и живёт без томов. БД тест только читает: сессия read-only, запись отклоняется самим Postgres.
 //
-//nolint:gosec // это публичные dev-пароли локального стека из docker-compose.yml, а не секреты
+//nolint:gosec // это публичные dev-пароли локального стека из compose.yaml, а не секреты
 const (
 	defaultClickHouseURL   = "http://grafana_reader:grafana_reader@localhost:28123"
 	defaultUserDSN         = "postgres://postgres:postgres@localhost:25433/userdb?default_transaction_read_only=on"

@@ -6,7 +6,7 @@
 - `platform` — общие библиотеки: apperr, appctx, closer, grpc, http, kafka/kafkaconsumer, logger, postgres, telemetry, `testkit/*`.
 - `proto` — gRPC-контракты (`buf`), сгенерированный код в `proto/gen`.
 - `services/{gateway,order,user,product,notification}` — gateway публичный HTTP; остальные gRPC; notification — потребитель Kafka.
-- Инфраструктура: `docker-compose.yml`, `deploy/{debezium,otel-collector,clickhouse,grafana}`. Outbox -> Debezium (`deploy/debezium/order-outbox.json`) -> Redpanda -> notification (inbox).
+- Инфраструктура: `compose.yaml`, `deploy/{debezium,otel-collector,clickhouse,grafana}`. Outbox -> Debezium (`deploy/debezium/order-outbox.json`) -> Redpanda -> notification (inbox).
 
 ## Слои сервиса
 `cmd/main.go`, `internal/{app,config,domain,service,repository/pg,transport/{grpc|kafka|http},client,event}`, `migrations/pg`. Моки mockery лежат в `*/mocks/mocks.go`.

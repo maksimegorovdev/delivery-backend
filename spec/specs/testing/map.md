@@ -32,7 +32,7 @@ Build order: `test-foundation` → `unit`, `integration` (параллельно
 - Моки: `mockery` v3 с шаблоном `testify` (типизированный `EXPECT()`). Ручной `testify/mock` не пишем: строковые имена методов не ловятся компилятором. `gomock` не берём: проект уже на testify. Для тривиальных зависимостей (`TxManager`) — ручные фейки.
 - Существующие тесты переводятся на testify (модуль `unit`), имена кейсов — на английский.
 - Имена тестовых кейсов (`name`) на английском, комментарии на русском.
-- e2e на docker compose, а не на testcontainers: стек с Debezium тяжёлый и уже описан в `docker-compose.yml`.
+- e2e на docker compose, а не на testcontainers: стек с Debezium тяжёлый и уже описан в `compose.yaml`.
 - Контракты gRPC проверяет уже настроенный `buf breaking` (`task -d proto breaking`, правило `FILE`); отдельного модуля под контракты нет.
 - Контракт событий Kafka — golden-тесты в модуле `integration`: один эталон в `contracts/events/` в корне репозитория используется и продюсером (`order`), и консьюмером (`notification`).
 - Smoke-тест `app` получает фактический адрес через шов `App.Addr()`, а не поиском свободного порта.

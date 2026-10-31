@@ -240,7 +240,7 @@ func TestConsumer_OrderCreated(t *testing.T) {
 - **Ask first:**
   - исправление, меняющее контракт (формат события, коды ошибок, gRPC/HTTP-ответы), даже если это баг;
   - изменения боевого кода сверх шва `App.Addr()` и шва для тестируемости;
-  - изменение миграций, `docker-compose.yml`, конфигурации Debezium;
+  - изменение миграций, `compose.yaml`, конфигурации Debezium;
   - новые зависимости, изменение порогов или исключений покрытия;
   - новые хелперы в `platform/testkit` сверх `CheckMigrations` и `Produce`.
 - **Never:**
