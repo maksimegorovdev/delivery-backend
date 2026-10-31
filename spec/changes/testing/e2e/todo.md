@@ -287,14 +287,14 @@ ClickHouse (`grafana_reader`) в `otel.otel_traces` найти корневой 
 по команде пользователя.
 
 **Acceptance criteria:**
-- [ ] `task e2e-test` с `-count=3` на поднятом стеке без падений, дважды подряд без `e2e-down`
-- [ ] `task e2e` дважды подряд зелёный; `task test`, `task test-integration`, `task lint`, `task cover` зелёные
-- [ ] Итоги записаны в `spec/specs/testing/map.md`
+- [x] `task e2e-test` с `-count=3` на поднятом стеке без падений, дважды подряд без `e2e-down`
+- [x] `task e2e` дважды подряд зелёный; `task test`, `task test-integration`, `task lint`, `task cover` зелёные
+- [x] Итоги записаны в `spec/specs/testing/map.md`
 
 **Verification:**
-- [ ] `task e2e-up && (cd e2e && go test -race -shuffle=on -count=3 -tags=e2e ./...)` ×2
-- [ ] `time task e2e` ×2
-- [ ] `task test && task test-integration && task lint && task cover`
+- [x] `task e2e-up && (cd e2e && go test -race -shuffle=on -count=3 -tags=e2e ./...)` ×2
+- [x] `time task e2e` ×2
+- [x] `task test && task test-integration && task lint && task cover`
 
 **Dependencies:** T6, T7, T9
 

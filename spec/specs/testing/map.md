@@ -89,3 +89,15 @@ user 34.5%, product 32.0%, notification 44.8%. Остаток — `app` и `repo
 Баги: интеграционные тесты новых багов не выявили. Зафиксировано текущее поведение: невалидное сообщение в `notification` ретраится и блокирует партицию (`kafkaconsumer` откатывает оффсет при любой ошибке; skip/DLQ — отдельная задача).
 
 Изменения боевого кода: шов `App.Addr()` в `gateway`/`order`/`user`/`product` (листенер открывается в `New`, `Run` вызывает `Serve(ctx, lis)`, повторное закрытие листенера не ошибка); в `notification` — правка замечаний линтера в `orderCreatedIDs` (именованные результаты убраны, ссылка `[uuid.Parse]`), поведение не менялось.
+
+## Итоги модуля `e2e`
+
+Время: `task e2e` от чистого состояния (образы в кеше, `up --build` → тесты → `down`) — 51 с и 62 с; сами тесты — 37–39 с.
+`go test -race -shuffle=on -count=3 -tags=e2e ./...` на долгоживущем стеке — 108 с и 104 с, два прогона подряд без `e2e-down`, падений нет.
+`task test`, `task test-integration`, `task lint`, `task cover` зелёные.
+
+Что сделано: стек `delivery-e2e` (`e2e/compose.yaml`, отдельный проект, порты и имена не пересекаются с dev-стеком); `TestMain` с проверкой готовности стека; `TestCreateOrder_HappyPath`, `TestCreateOrder_ClientErrors`, `TestCreateOrder_NotFound`, `TestCreateOrder_Trace` (спаны пяти сервисов под одним `TraceId`, клиентский `traceparent` попадает только в `Links`); `TestResilience_NotificationDown`, `TestResilience_DebeziumDown`, `TestResilience_Redelivery` (сдвиг оффсета, дублей нет).
+
+Баги: happy path выявил расхождение боевого кода с контрактом событий — тип события `OrderCreated` вместо `order.created` и суммы строками в payload. Исправлено в `order` и `notification` (коммит `8791c0c`).
+
+Изменения боевого кода: gRPC health в `platform/grpcserver` (`SERVING`, при graceful stop `NOT_SERVING`); исправление типа события и формата сумм (см. выше); общий `deploy/docker/service.Dockerfile`, `.dockerignore`, переименование `docker-compose.yml` → `compose.yaml`.
