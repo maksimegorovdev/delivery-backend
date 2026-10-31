@@ -214,13 +214,13 @@ ClickHouse (`grafana_reader`) в `otel.otel_traces` найти корневой 
 запроса сверить схему (`DESCRIBE otel.otel_traces`).
 
 **Acceptance criteria:**
-- [ ] Найдены спаны всех пяти `ServiceName` под одним `TraceId`
-- [ ] Спан `notification` имеет непустой `ParentSpanId`
-- [ ] Спанов с клиентским `TraceId` нет (граница `WithPublicEndpoint` работает)
+- [x] Найдены спаны всех пяти `ServiceName` под одним `TraceId`
+- [x] Спан `notification` имеет непустой `ParentSpanId`
+- [x] Спанов с клиентским `TraceId` нет (граница `WithPublicEndpoint` работает)
 
 **Verification:**
-- [ ] `task e2e-test` на поднятом стеке
-- [ ] `task -d e2e lint`
+- [x] `task e2e-test` на поднятом стеке
+- [x] `task -d e2e lint`
 
 **Dependencies:** T5
 

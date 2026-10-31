@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,6 +29,9 @@ const (
 
 	// requestTimeout — предел одного HTTP-запроса или запроса к БД.
 	requestTimeout = 10 * time.Second
+
+	// traceTimeout — ожидание спанов в ClickHouse: коллектор отправляет их батчами.
+	traceTimeout = 60 * time.Second
 
 	// eventTypeOrderCreated — тип события в inbox_events и notifications; значение из заголовка
 	// event-type в contracts/events/order.created.json.
@@ -80,6 +85,11 @@ type orderItemResponse struct {
 
 // postOrder отправляет сырое тело в POST /api/v1/orders и возвращает статус и разобранный конверт.
 func postOrder(ctx context.Context, body []byte) (int, envelope, error) {
+	return postOrderWithHeader(ctx, body, nil)
+}
+
+// postOrderWithHeader делает то же, что [postOrder], и добавляет к запросу заголовки header.
+func postOrderWithHeader(ctx context.Context, body []byte, header http.Header) (int, envelope, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 
@@ -91,6 +101,11 @@ func postOrder(ctx context.Context, body []byte) (int, envelope, error) {
 	)
 	if err != nil {
 		return 0, envelope{}, fmt.Errorf("build request: %w", err)
+	}
+	for key, values := range header {
+		for _, v := range values {
+			req.Header.Add(key, v)
+		}
 	}
 	req.Header.Set("Content-Type", "application/json")
 
@@ -119,10 +134,17 @@ func postOrder(ctx context.Context, body []byte) (int, envelope, error) {
 func createOrder(t *testing.T, req createOrderRequest) orderResponse {
 	t.Helper()
 
+	return createOrderWithHeader(t, req, nil)
+}
+
+// createOrderWithHeader создаёт заказ с дополнительными заголовками запроса и требует ответ 201.
+func createOrderWithHeader(t *testing.T, req createOrderRequest, header http.Header) orderResponse {
+	t.Helper()
+
 	body, err := json.Marshal(req)
 	require.NoError(t, err)
 
-	status, env, err := postOrder(t.Context(), body)
+	status, env, err := postOrderWithHeader(t.Context(), body, header)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusCreated, status, "error: %+v", env.Error)
 	require.Nil(t, env.Error)
@@ -212,4 +234,68 @@ func awaitOrderEvent(t *testing.T, orderID string) ([]inboxRow, []notificationRo
 	}, eventuallyTimeout, eventuallyTick)
 
 	return inbox, notifications
+}
+
+// span — строка otel.otel_traces, нужная трейс-тесту. Имена полей JSON совпадают с колонками.
+type span struct {
+	TraceID      string `json:"TraceId"`
+	ParentSpanID string `json:"ParentSpanId"`
+	ServiceName  string `json:"ServiceName"`
+}
+
+// querySpans выполняет SELECT к ClickHouse по HTTP и разбирает ответ JSONEachRow.
+// Значения передаются параметрами запроса (param_<имя>), а не подстановкой в текст запроса.
+func querySpans(ctx context.Context, query string, params map[string]string) ([]span, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+
+	u, err := url.Parse(stack.ClickHouseURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse clickhouse url: %w", err)
+	}
+
+	q := u.Query()
+	for name, value := range params {
+		q.Set("param_"+name, value)
+	}
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		u.String(),
+		strings.NewReader(query+" FORMAT JSONEachRow"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("query clickhouse: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("clickhouse status %d: %s", resp.StatusCode, raw)
+	}
+
+	var spans []span
+
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	for dec.More() {
+		var sp span
+		if decodeErr := dec.Decode(&sp); decodeErr != nil {
+			return nil, fmt.Errorf("decode span: %w", decodeErr)
+		}
+
+		spans = append(spans, sp)
+	}
+
+	return spans, nil
 }
