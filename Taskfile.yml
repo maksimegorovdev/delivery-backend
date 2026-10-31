@@ -3,7 +3,7 @@
 version: '3'
 
 vars:
-  MODULES: platform,proto,services/gateway,services/order,services/user,services/product,services/notification
+  MODULES: e2e,platform,proto,services/gateway,services/order,services/user,services/product,services/notification
   DB_SERVICES: order,user,product,notification
   # Модуль попадает в список вместе со своей первой fuzz-целью.
   FUZZ_MODULES: platform,services/order,services/notification

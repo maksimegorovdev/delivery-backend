@@ -11,6 +11,7 @@ WORKDIR /src
 
 # Слой зависимостей: меняется только вместе с go.mod/go.sum, правки .go его не сбрасывают.
 COPY go.work go.work.sum ./
+COPY e2e/go.mod e2e/go.sum e2e/
 COPY platform/go.mod platform/go.sum platform/
 COPY proto/go.mod proto/go.sum proto/
 COPY services/gateway/go.mod services/gateway/go.sum services/gateway/

@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  LOCAL_BIN: '{{.TASKFILE_DIR}}/bin'
+  GOLANGCI_LINT_VERSION: v2.15.0
+
+tasks:
+  tools:
+    desc: Install local dev tools into ./bin
+    env:
+      GOBIN: '{{.LOCAL_BIN}}'
+    cmds:
+      - curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b {{.LOCAL_BIN}} {{.GOLANGCI_LINT_VERSION}}
+
+  test:
+    desc: Compile the module without the e2e tag (no stack required, e2e tests are not run)
+    cmds:
+      - go test -race -shuffle=on -count=1 ./...
+
+  test-integration:
+    desc: No integration tests here; exists so the root task can loop over every module
+    cmds:
+      - go test -race -shuffle=on -count=1 -tags=integration ./...
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - '{{.LOCAL_BIN}}/golangci-lint run'
+
+  tidy:
+    desc: Tidy go.mod/go.sum
+    cmds:
+      - go mod tidy

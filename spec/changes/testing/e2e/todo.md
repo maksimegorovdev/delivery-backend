@@ -75,14 +75,14 @@ grpc — версии как в сервисах), `Taskfile.yml` (`tools`, `lin
 (не `COVER_MODULES`, не `FUZZ_MODULES`). Dockerfile из T2 копирует `e2e/go.mod`.
 
 **Acceptance criteria:**
-- [ ] `task test`, `task lint`, `task tidy`, `task tools` по корню проходят и включают `e2e`
-- [ ] `go vet -tags=e2e ./...` в `e2e/` компилирует пустой пакет тестов
-- [ ] `task cover` не трогает `e2e`; сборка образов из T2 по-прежнему проходит
+- [x] `task test`, `task lint`, `task tidy`, `task tools` по корню проходят и включают `e2e`
+- [x] `go vet -tags=e2e ./...` в `e2e/` компилирует пустой пакет тестов
+- [x] `task cover` не трогает `e2e`; сборка образов из T2 по-прежнему проходит
 
 **Verification:**
-- [ ] `task test && task lint`
-- [ ] `cd e2e && go vet -tags=e2e ./...`
-- [ ] `docker build -f deploy/docker/service.Dockerfile --build-arg SERVICE=gateway .`
+- [x] `task test && task lint`
+- [x] `cd e2e && go vet -tags=e2e ./...`
+- [x] `docker build -f deploy/docker/service.Dockerfile --build-arg SERVICE=gateway .`
 
 **Dependencies:** None
 

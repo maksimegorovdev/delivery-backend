@@ -60,7 +60,7 @@ T1–T3 независимы. T6, T7, T8 независимы друг от др
 ### Phase 1: Фундамент
 - [x] Task 1: gRPC health в `platform/grpcserver`
 - [x] Task 2: Общий Dockerfile сервисов и `.dockerignore`
-- [ ] Task 3: Каркас модуля `e2e/` в workspace и Taskfile
+- [x] Task 3: Каркас модуля `e2e/` в workspace и Taskfile
 
 ### Checkpoint: Фундамент
 - [ ] `task test`, `task lint` зелёные; пять образов собираются
