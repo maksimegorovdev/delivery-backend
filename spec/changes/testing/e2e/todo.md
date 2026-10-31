@@ -239,13 +239,13 @@ ClickHouse (`grafana_reader`) в `otel.otel_traces` найти корневой 
 и проверяет «ровно один раз»: строка появилась, счётчик по id заказа не вырос за `stableWindow`.
 
 **Acceptance criteria:**
-- [ ] Остановка `notification`: событие обработано после старта ровно один раз
-- [ ] Остановка Debezium: событие доставлено после старта ровно один раз
-- [ ] После любого исхода теста компонент запущен и готов (`t.Cleanup`)
+- [x] Остановка `notification`: событие обработано после старта ровно один раз
+- [x] Остановка Debezium: событие доставлено после старта ровно один раз
+- [x] После любого исхода теста компонент запущен и готов (`t.Cleanup`)
 
 **Verification:**
-- [ ] `task e2e-test` на поднятом стеке; затем `docker compose -p delivery-e2e ps` — всё запущено
-- [ ] `task -d e2e lint`
+- [x] `task e2e-test` на поднятом стеке; затем `docker compose -p delivery-e2e ps` — всё запущено
+- [x] `task -d e2e lint`
 
 **Dependencies:** T5
 

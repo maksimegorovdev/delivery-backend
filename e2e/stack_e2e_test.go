@@ -9,10 +9,12 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
@@ -30,6 +32,16 @@ const (
 
 	connectorName = "order-outbox"
 	stateRunning  = "RUNNING"
+
+	// composeProject и composeFile задают стек, которым тесты устойчивости управляют через docker compose.
+	// go test запускается в каталоге e2e, поэтому файл указан относительно него.
+	composeProject = "delivery-e2e"
+	composeFile    = "compose.yaml"
+	// composeTimeout — предел одной команды docker compose (stop ждёт graceful shutdown).
+	composeTimeout = time.Minute
+
+	serviceNotification = "notification"
+	serviceDebezium     = "debezium"
 
 	seedUserEmail   = "demo@example.com"
 	seedBorjomiName = "Минеральная вода Borjomi"
@@ -315,4 +327,64 @@ func connectDB(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	}
 
 	return pool, nil
+}
+
+// stopService останавливает сервис стека и регистрирует в t.Cleanup его запуск и ожидание
+// готовности, чтобы сервис остался работающим при любом исходе теста.
+func stopService(t *testing.T, service string) {
+	t.Helper()
+
+	t.Cleanup(func() {
+		// t.Context() к этому моменту уже отменён, поэтому контекст свой.
+		ctx, cancel := context.WithTimeout(context.Background(), startupTimeout)
+		defer cancel()
+
+		if err := ensureRunning(ctx, service); err != nil {
+			t.Errorf("вернуть %s в рабочее состояние: %v", service, err)
+		}
+	})
+
+	ctx, cancel := context.WithTimeout(t.Context(), composeTimeout)
+	defer cancel()
+
+	require.NoError(t, composeRun(ctx, "stop", service))
+}
+
+// startService запускает остановленный сервис и ждёт его готовности.
+func startService(t *testing.T, service string) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(t.Context(), startupTimeout)
+	defer cancel()
+
+	require.NoError(t, ensureRunning(ctx, service))
+}
+
+// ensureRunning запускает сервис (для уже работающего это no-op) и ждёт готовности: Debezium —
+// коннектор в состоянии RUNNING. У notification порта нет, его готовность доказывает
+// обработка события в самом тесте.
+func ensureRunning(ctx context.Context, service string) error {
+	if err := composeRun(ctx, "start", service); err != nil {
+		return err
+	}
+
+	if service == serviceDebezium {
+		if err := waitFor(ctx, checkConnector); err != nil {
+			return fmt.Errorf("wait connector %s: %w", connectorName, err)
+		}
+	}
+
+	return nil
+}
+
+// composeRun выполняет `docker compose` для стека delivery-e2e и включает вывод в ошибку.
+func composeRun(ctx context.Context, args ...string) error {
+	full := append([]string{"compose", "-f", composeFile, "-p", composeProject}, args...)
+
+	out, err := exec.CommandContext(ctx, "docker", full...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("docker %v: %w: %s", args, err, out)
+	}
+
+	return nil
 }
