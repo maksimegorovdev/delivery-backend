@@ -4,6 +4,8 @@ package e2e_test
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -89,6 +91,111 @@ func TestCreateOrder_HappyPath(t *testing.T) {
 	assert.Equal(t, order.TotalAmount, payload.TotalAmount)
 	assert.Equal(t, order.DeliveryAddress, payload.DeliveryAddress)
 	assert.ElementsMatch(t, eventItems(order.Items), payload.Items)
+}
+
+// Коды и причины ошибок в конверте gateway. Значения заданы контрактом platform/apperr
+// (code.go, reason.go); модуль e2e не импортирует platform, поэтому они повторены здесь.
+const (
+	codeInvalidArgument = "INVALID_ARGUMENT"
+	codeNotFound        = "NOT_FOUND"
+
+	reasonInvalidRequestBody = "INVALID_REQUEST_BODY"
+	reasonValidationFailed   = "VALIDATION_FAILED"
+
+	// missingID — корректный UUID, которого нет ни в product, ни в user.
+	missingID = "00000000-0000-4000-8000-000000000001"
+)
+
+func TestCreateOrder_ClientErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		body       string
+		wantReason string
+	}{
+		{
+			name:       "invalid json",
+			body:       `{"address_id":`,
+			wantReason: reasonInvalidRequestBody,
+		},
+		{
+			name:       "missing items",
+			body:       fmt.Sprintf(`{"address_id":%q}`, seed.AddressID),
+			wantReason: reasonValidationFailed,
+		},
+		{
+			name: "address id is not a uuid",
+			body: fmt.Sprintf(
+				`{"address_id":"not-a-uuid","items":[{"product_id":%q,"quantity":1}]}`,
+				seed.Borjomi.ID,
+			),
+			wantReason: reasonValidationFailed,
+		},
+		{
+			name: "zero quantity",
+			body: fmt.Sprintf(
+				`{"address_id":%q,"items":[{"product_id":%q,"quantity":0}]}`,
+				seed.AddressID, seed.Borjomi.ID,
+			),
+			wantReason: reasonValidationFailed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			status, env, err := postOrder(t.Context(), []byte(tt.body))
+			require.NoError(t, err)
+
+			assert.Equal(t, http.StatusBadRequest, status)
+			require.NotNil(t, env.Error, "response has no error")
+			assert.Equal(t, codeInvalidArgument, env.Error.Code)
+			assert.Equal(t, tt.wantReason, env.Error.Reason)
+		})
+	}
+}
+
+func TestCreateOrder_NotFound(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		req  createOrderRequest
+	}{
+		{
+			name: "unknown product",
+			req: createOrderRequest{
+				AddressID: seed.AddressID,
+				Items:     []orderItem{{ProductID: missingID, Quantity: 1}},
+			},
+		},
+		{
+			name: "unknown address",
+			req: createOrderRequest{
+				AddressID: missingID,
+				Items:     []orderItem{{ProductID: seed.Borjomi.ID, Quantity: 1}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			body, err := json.Marshal(tt.req)
+			require.NoError(t, err)
+
+			status, env, err := postOrder(t.Context(), body)
+			require.NoError(t, err)
+
+			assert.Equal(t, http.StatusNotFound, status)
+			require.NotNil(t, env.Error, "response has no error")
+			assert.Equal(t, codeNotFound, env.Error.Code)
+			assert.Contains(t, []string{"", "null"}, string(env.Data), "order must not be created")
+		})
+	}
 }
 
 // eventItems переводит позиции ответа API в вид payload: набор полей у них совпадает.
