@@ -2,7 +2,6 @@ package grpcserver
 
 import (
 	"context"
-	"sync"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health"
@@ -18,18 +17,18 @@ import (
 type healthServer struct {
 	*health.Server
 
-	stopping     chan struct{}
-	stopWatching func()
+	stopping     context.Context //nolint:containedctx // отменяется при остановке сервера, завершает Watch
+	stopWatching context.CancelFunc
 }
 
 func newHealthServer() *healthServer {
-	h := &healthServer{
-		Server:   health.NewServer(),
-		stopping: make(chan struct{}),
-	}
-	h.stopWatching = sync.OnceFunc(func() { close(h.stopping) })
+	stopping, stopWatching := context.WithCancel(context.Background())
 
-	return h
+	return &healthServer{
+		Server:       health.NewServer(),
+		stopping:     stopping,
+		stopWatching: stopWatching,
+	}
 }
 
 // shutdown переводит все сервисы в NOT_SERVING и завершает открытые Watch-стримы.
@@ -45,19 +44,14 @@ func (h *healthServer) Watch(req *healthpb.HealthCheckRequest, stream healthpb.H
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
-	go func() {
-		select {
-		case <-h.stopping:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
+	stopAfter := context.AfterFunc(h.stopping, cancel)
+	defer stopAfter()
 
 	ws := &watchStream{Health_WatchServer: stream, ctx: ctx, last: -1}
 	err := h.Server.Watch(req, ws)
 
 	// Стрим закрыл клиент, либо Watch завершился сам — отдаём его результат как есть.
-	if stream.Context().Err() != nil || !h.isStopping() {
+	if stream.Context().Err() != nil || h.stopping.Err() == nil {
 		return err
 	}
 
@@ -70,15 +64,6 @@ func (h *healthServer) Watch(req *healthpb.HealthCheckRequest, stream healthpb.H
 	}
 
 	return status.Error(codes.Unavailable, "grpcserver: server is shutting down")
-}
-
-func (h *healthServer) isStopping() bool {
-	select {
-	case <-h.stopping:
-		return true
-	default:
-		return false
-	}
 }
 
 // watchStream подменяет контекст стрима и запоминает последний отправленный статус.
