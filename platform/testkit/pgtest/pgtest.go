@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	// Образ совпадает с docker-compose.yml.
+	// Образ совпадает с compose.yaml.
 	image = "postgres:18"
 
 	templateDB = "template_app"

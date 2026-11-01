@@ -4,7 +4,7 @@ import "time"
 
 const AggregateTypeOrder = "order"
 
-const EventTypeOrderCreated = "OrderCreated"
+const EventTypeOrderCreated = "order.created"
 
 type OutboxEvent struct {
 	ID            string

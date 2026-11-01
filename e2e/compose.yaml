@@ -1,0 +1,318 @@
+x-clickhouse-passwords:
+  otel-writer: &clickhouse-otel-writer-password otel_writer
+  grafana-reader: &clickhouse-grafana-reader-password grafana_reader
+
+services:
+
+  order-postgres:
+    image: postgres:18
+    command: ["postgres", "-c", "wal_level=logical"]
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=orderdb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d orderdb"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  user-postgres:
+    image: postgres:18
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=userdb
+    ports:
+      - "127.0.0.1:25433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d userdb"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  product-postgres:
+    image: postgres:18
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=productdb
+    ports:
+      - "127.0.0.1:25434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d productdb"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  notification-postgres:
+    image: postgres:18
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=notificationdb
+    ports:
+      - "127.0.0.1:25435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d notificationdb"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redpanda:
+    image: redpandadata/redpanda:v26.2.3
+    command:
+      - redpanda
+      - start
+      - --kafka-addr internal://0.0.0.0:9092
+      - --advertise-kafka-addr internal://redpanda:9092
+      - --rpc-addr redpanda:33145
+      - --advertise-rpc-addr redpanda:33145
+      - --mode dev-container
+      - --smp 1
+      - --default-log-level=info
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  debezium:
+    image: quay.io/debezium/connect:3.6.3.Final
+    environment:
+      BOOTSTRAP_SERVERS: redpanda:9092
+      GROUP_ID: debezium-cdc-cluster
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+    ports:
+      - "127.0.0.1:28083:8083"
+    depends_on:
+      order-postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8083/connectors"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  debezium-register:
+    image: curlimages/curl:8.15.0
+    restart: "no"
+    command:
+      - -sS
+      - --fail-with-body
+      - -X
+      - PUT
+      - -H
+      - "Content-Type: application/json"
+      - --data
+      - "@/config/order-outbox.json"
+      - http://debezium:8083/connectors/order-outbox/config
+    volumes:
+      - ../deploy/debezium/order-outbox.json:/config/order-outbox.json:ro
+    depends_on:
+      debezium:
+        condition: service_healthy
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.8.35
+    environment:
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_OTEL_WRITER_PASSWORD: *clickhouse-otel-writer-password
+      CLICKHOUSE_GRAFANA_READER_PASSWORD: *clickhouse-grafana-reader-password
+    ports:
+      - "127.0.0.1:28123:8123"
+    volumes:
+      - ../deploy/clickhouse/users.d/otel-users.xml:/etc/clickhouse-server/users.d/otel-users.xml:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "-q", "SELECT 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.163.2
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      CLICKHOUSE_USER: otel_writer
+      CLICKHOUSE_PASSWORD: *clickhouse-otel-writer-password
+    volumes:
+      - ../deploy/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
+  migrate-order:
+    image: migrate/migrate:v4.19.1
+    restart: "no"
+    command: ["-path=/migrations", "-database=postgres://postgres:postgres@order-postgres:5432/orderdb?sslmode=disable", "up"]
+    volumes:
+      - ../services/order/migrations/pg:/migrations:ro
+    depends_on:
+      order-postgres:
+        condition: service_healthy
+
+  migrate-user:
+    image: migrate/migrate:v4.19.1
+    restart: "no"
+    command: ["-path=/migrations", "-database=postgres://postgres:postgres@user-postgres:5432/userdb?sslmode=disable", "up"]
+    volumes:
+      - ../services/user/migrations/pg:/migrations:ro
+    depends_on:
+      user-postgres:
+        condition: service_healthy
+
+  migrate-product:
+    image: migrate/migrate:v4.19.1
+    restart: "no"
+    command: ["-path=/migrations", "-database=postgres://postgres:postgres@product-postgres:5432/productdb?sslmode=disable", "up"]
+    volumes:
+      - ../services/product/migrations/pg:/migrations:ro
+    depends_on:
+      product-postgres:
+        condition: service_healthy
+
+  migrate-notification:
+    image: migrate/migrate:v4.19.1
+    restart: "no"
+    command: ["-path=/migrations", "-database=postgres://postgres:postgres@notification-postgres:5432/notificationdb?sslmode=disable", "up"]
+    volumes:
+      - ../services/notification/migrations/pg:/migrations:ro
+    depends_on:
+      notification-postgres:
+        condition: service_healthy
+
+  user:
+    image: delivery-e2e-user:e2e
+    build:
+      context: ..
+      dockerfile: services/user/Dockerfile
+    restart: "no"
+    environment:
+      APP_NAME: user
+      LOG_LEVEL: debug
+      LOG_FORMAT: json
+      PG_DSN: postgresql://postgres:postgres@user-postgres:5432/userdb?sslmode=disable
+      PG_MAX_CONNS: "10"
+      GRPC_SERVER_ADDR: ":8091"
+      GRPC_SERVER_REFLECTION: "false"
+      OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "127.0.0.1:28091:8091"
+    depends_on:
+      migrate-user:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+
+  product:
+    image: delivery-e2e-product:e2e
+    build:
+      context: ..
+      dockerfile: services/product/Dockerfile
+    restart: "no"
+    environment:
+      APP_NAME: product
+      LOG_LEVEL: debug
+      LOG_FORMAT: json
+      PG_DSN: postgresql://postgres:postgres@product-postgres:5432/productdb?sslmode=disable
+      PG_MAX_CONNS: "10"
+      GRPC_SERVER_ADDR: ":8092"
+      GRPC_SERVER_REFLECTION: "false"
+      OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "127.0.0.1:28092:8092"
+    depends_on:
+      migrate-product:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+
+  order:
+    image: delivery-e2e-order:e2e
+    build:
+      context: ..
+      dockerfile: services/order/Dockerfile
+    restart: "no"
+    environment:
+      APP_NAME: order
+      LOG_LEVEL: debug
+      LOG_FORMAT: json
+      PG_DSN: postgresql://postgres:postgres@order-postgres:5432/orderdb?sslmode=disable
+      PG_MAX_CONNS: "10"
+      GRPC_SERVER_ADDR: ":8090"
+      GRPC_SERVER_REFLECTION: "false"
+      USER_SERVICE_GRPC_ADDR: user:8091
+      PRODUCT_SERVICE_GRPC_ADDR: product:8092
+      OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "127.0.0.1:28090:8090"
+    depends_on:
+      migrate-order:
+        condition: service_completed_successfully
+      user:
+        condition: service_started
+      product:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+
+  gateway:
+    image: delivery-e2e-gateway:e2e
+    build:
+      context: ..
+      dockerfile: services/gateway/Dockerfile
+    restart: "no"
+    environment:
+      APP_NAME: gateway
+      LOG_LEVEL: debug
+      LOG_FORMAT: json
+      HTTP_ADDR: ":8080"
+      ORDER_SERVICE_GRPC_ADDR: order:8090
+      FAKE_AUTH_USER_ID: 01a0d1fa-a4e8-75a1-802d-d6e3c642b0f3
+      OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "127.0.0.1:28080:8080"
+    depends_on:
+      order:
+        condition: service_started
+      debezium-register:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+
+  notification:
+    image: delivery-e2e-notification:e2e
+    build:
+      context: ..
+      dockerfile: services/notification/Dockerfile
+    restart: "no"
+    environment:
+      APP_NAME: notification
+      LOG_LEVEL: debug
+      LOG_FORMAT: json
+      PG_DSN: postgresql://postgres:postgres@notification-postgres:5432/notificationdb?sslmode=disable
+      PG_MAX_CONNS: "10"
+      KAFKA_BROKERS: redpanda:9092
+      KAFKA_CONSUMER_GROUP: notification
+      KAFKA_TOPICS: order.events.v1
+      OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    depends_on:
+      migrate-notification:
+        condition: service_completed_successfully
+      redpanda:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started

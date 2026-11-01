@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc/filters"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -20,6 +21,7 @@ const (
 type Server struct {
 	server          *grpc.Server
 	serverOpts      []grpc.ServerOption
+	health          *healthServer
 	shutdownTimeout time.Duration
 	reflection      bool
 }
@@ -34,6 +36,9 @@ func New(opts ...Option) *Server {
 	}
 
 	srv.server = grpc.NewServer(append([]grpc.ServerOption{otelStatsHandler()}, srv.serverOpts...)...)
+
+	srv.health = newHealthServer()
+	grpc_health_v1.RegisterHealthServer(srv.server, srv.health)
 
 	if srv.reflection {
 		reflection.Register(srv.server)
@@ -58,6 +63,8 @@ func (s *Server) Server() *grpc.Server {
 }
 
 // Serve обслуживает соединения lis до отмены ctx, затем выполняет graceful stop.
+// Сервер сам регистрирует gRPC health (общий статус SERVING). При остановке health переходит в
+// NOT_SERVING, а открытые Watch-стримы получают этот статус и закрываются, не задерживая graceful stop.
 // Листенер создаёт вызывающий (обычно через listener.Listen); Serve закрывает lis.
 func (s *Server) Serve(ctx context.Context, lis net.Listener) error {
 	serveErr := make(chan error, 1)
@@ -76,6 +83,10 @@ func (s *Server) Serve(ctx context.Context, lis net.Listener) error {
 }
 
 func (s *Server) graceful() error {
+	// Health переводится в NOT_SERVING до остановки, чтобы клиенты и проверки узнали о выключении;
+	// Watch-стримы при этом закрываются, иначе GracefulStop ждал бы их до таймаута.
+	s.health.shutdown()
+
 	done := make(chan struct{})
 	go func() {
 		s.server.GracefulStop()

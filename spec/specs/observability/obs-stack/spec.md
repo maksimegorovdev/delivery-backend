@@ -17,7 +17,7 @@ Go-сервисы (Air, host) ──OTLP gRPC :4317──▶ OTel Collector ─�
                                      (contrib, clickhouseexporter)          (db otel)     (clickhouse-datasource)
 ```
 
-Модуль **не трогает Go-код** — только `docker-compose.yml`, `deploy/`, `Taskfile.yml`, документацию.
+Модуль **не трогает Go-код** — только `compose.yaml`, `deploy/`, `Taskfile.yml`, документацию.
 
 ### Acceptance criteria
 
@@ -58,7 +58,7 @@ docker compose logs -f otel-collector                 # отладка пайп�
 ## Project Structure
 
 ```
-docker-compose.yml                         → + сервисы clickhouse, otel-collector, grafana; + volumes
+compose.yaml                         → + сервисы clickhouse, otel-collector, grafana; + volumes
 deploy/
   clickhouse/
     users.d/otel-users.xml                 → пользователи otel_writer (запись в otel) и grafana_reader (readonly)
@@ -84,7 +84,7 @@ README.md                                  → + раздел Observability (а�
 
 ## Code Style
 
-Конфиги в стиле существующего `docker-compose.yml`: `container_name` = имя сервиса, явные тэги образов,
+Конфиги в стиле существующего `compose.yaml`: `container_name` = имя сервиса, явные тэги образов,
 named volumes, без лишних комментариев. Конфиг Collector — минимальный и читаемый:
 
 ```yaml

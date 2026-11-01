@@ -86,7 +86,7 @@ ignore_all_files_in_gitignore: true
 ls_specific_settings:
   go:
     gopls_settings:
-      buildFlags: ["-tags=integration"]
+      buildFlags: ["-tags=integration,e2e"]
 
 # list of workspace folder paths (LSP backend only).
 # These folders will be used to build up Serena's symbol index.

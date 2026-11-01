@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	// Образ совпадает с docker-compose.yml.
+	// Образ совпадает с compose.yaml.
 	image = "redpandadata/redpanda:v26.2.3"
 
 	startTimeout = 2 * time.Minute

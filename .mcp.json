@@ -14,6 +14,13 @@
         "x-api-key": "${EXA_API_KEY}"
       }
     },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      }
+    },
     "serena": {
       "type": "stdio",
       "command": "serena",

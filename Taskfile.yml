@@ -3,7 +3,7 @@
 version: '3'
 
 vars:
-  MODULES: platform,proto,services/gateway,services/order,services/user,services/product,services/notification
+  MODULES: e2e,platform,proto,services/gateway,services/order,services/user,services/product,services/notification
   DB_SERVICES: order,user,product,notification
   # Модуль попадает в список вместе со своей первой fuzz-целью.
   FUZZ_MODULES: platform,services/order,services/notification
@@ -28,6 +28,60 @@ tasks:
     desc: Stop local infrastructure
     cmds:
       - docker compose down
+
+  e2e-images-check:
+    desc: Infrastructure image versions in e2e/compose.yaml match compose.yaml
+    silent: true
+    cmds:
+      - |
+        set -eu
+        root=$(docker compose config --images | sort -u)
+        # Образы сервисов (delivery-e2e-*) и одноразовых контейнеров (migrate, curl) в корневом файле не нужны.
+        e2e=$(docker compose -f e2e/compose.yaml config --images | sort -u \
+          | grep -v -e '^delivery-e2e-' -e '^migrate/migrate:' -e '^curlimages/curl:')
+        status=0
+        for img in $e2e; do
+          if ! printf '%s\n' "$root" | grep -qxF "$img"; then
+            echo "e2e/compose.yaml: образ $img не совпадает с compose.yaml" >&2
+            status=1
+          fi
+        done
+        exit $status
+
+  e2e-up:
+    desc: Start the isolated e2e stack (project delivery-e2e) and wait until it is ready
+    cmds:
+      - task: e2e-images-check
+      - docker compose -f e2e/compose.yaml -p delivery-e2e up -d --build --wait
+
+  e2e-test:
+    desc: Run e2e tests against a running stack (task e2e-up); extra go test flags go after --
+    dir: e2e
+    cmds:
+      - go test -race -shuffle=on -count=1 -tags=e2e {{.CLI_ARGS}} ./...
+
+  e2e:
+    desc: Bring up the e2e stack, run the tests, remove the stack (E2E_KEEP=1 keeps it)
+    cmds:
+      # defer объявлен до e2e-up: частично поднятый стек убирается и при падении подъёма.
+      - defer: |
+          if [ "${E2E_KEEP:-}" = "1" ]; then
+            echo "E2E_KEEP=1: стек delivery-e2e оставлен (task e2e-logs, task e2e-down)"
+          else
+            task e2e-down
+          fi
+      - task: e2e-up
+      - task: e2e-test
+
+  e2e-down:
+    desc: Remove the e2e stack with its volumes
+    cmds:
+      - docker compose -f e2e/compose.yaml -p delivery-e2e down -v
+
+  e2e-logs:
+    desc: Show logs of the e2e stack (for failure analysis)
+    cmds:
+      - docker compose -f e2e/compose.yaml -p delivery-e2e logs --no-color {{.CLI_ARGS}}
 
   sync:
     desc: Sync the Go workspace
