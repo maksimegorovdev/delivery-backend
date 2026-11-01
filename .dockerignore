@@ -1,6 +1,50 @@
+# Контекст сборки services/*/Dockerfile — корень репозитория. Сюда попадает всё, что не нужно для
+# `go build`: секреты, локальные конфиги, артефакты. Dockerfile копирует каталоги platform, proto и
+# сервиса целиком в слой build-стадии и в кэш BuildKit, поэтому секреты внутри них (services/*/.env)
+# исключаются, даже если в итоговый образ они не идут. Остальное исключено, чтобы не гонять лишний
+# контекст в builder.
+
+# Артефакты сборки и тестов
 **/bin/
 **/tmp/
 **/coverage/
-.git/
-spec/
+**/coverage.*
+**/*.out
+**/*.coverprofile
+**/*.test
+**/testdata/fuzz/
+
+# Секреты и локальное окружение
 **/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.crt
+
+# VCS, IDE, ОС
+.git/
+.gitignore
+.idea/
+.vscode/
+**/.DS_Store
+
+# Агенты и MCP
+.agents/
+.claude/
+.serena/
+.mcp.json
+skills-lock.json
+
+# Документация, спеки и конфиги стеков: в сборке не участвуют
+spec/
+**/*.md
+compose.yaml
+**/Taskfile.yml
+**/.golangci.yml
+deploy/
+contracts/
+
+e2e/
+go.work
+**/Dockerfile

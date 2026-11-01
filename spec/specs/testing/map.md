@@ -100,4 +100,4 @@ user 34.5%, product 32.0%, notification 44.8%. Остаток — `app` и `repo
 
 Баги: happy path выявил расхождение боевого кода с контрактом событий — тип события `OrderCreated` вместо `order.created` и суммы строками в payload. Исправлено в `order` и `notification` (коммит `8791c0c`).
 
-Изменения боевого кода: gRPC health в `platform/grpcserver` (`SERVING`, при graceful stop `NOT_SERVING`); исправление типа события и формата сумм (см. выше); общий `deploy/docker/service.Dockerfile`, `.dockerignore`, переименование `docker-compose.yml` → `compose.yaml`.
+Изменения боевого кода: gRPC health в `platform/grpcserver` (`SERVING`, при graceful stop `NOT_SERVING`); исправление типа события и формата сумм (см. выше); `services/<svc>/Dockerfile` для каждого сервиса, `.dockerignore`, переименование `docker-compose.yml` → `compose.yaml`.

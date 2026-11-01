@@ -73,8 +73,8 @@ Grafana не входит в стек, трейсы читаются прямо 
 ## Project Structure
 
 ```
-deploy/docker/service.Dockerfile   → общий Dockerfile сервисов (ARG SERVICE), контекст — корень репозитория
-.dockerignore                      → bin/, tmp/, coverage/, .git/, spec/
+services/<svc>/Dockerfile          → Dockerfile сервиса, контекст — корень репозитория; workspace только из platform, proto и сервиса
+.dockerignore                      → артефакты, секреты (.env*, ключи), конфиги IDE и агентов, документация, e2e/
 e2e/
   go.mod                           → модуль github.com/maksimegorovdev/delivery-backend/e2e, в go.work
   Taskfile.yml                     → tools, lint, test (компиляция без тега), tidy
@@ -110,8 +110,8 @@ e2e/
   после `service_completed_successfully` своей миграции.
 - **Debezium:** `debezium-register` после `debezium: service_healthy` делает тот же `PUT`, что и
   `task connect-register`, и завершается с ошибкой, если ответ не 2xx.
-- **Сервисы:** `gateway`, `order`, `user`, `product`, `notification` собираются из
-  `deploy/docker/service.Dockerfile` с `SERVICE=<svc>`. Конфигурация — env в compose (адреса по
+- **Сервисы:** `gateway`, `order`, `user`, `product`, `notification` собираются каждый из своего
+  `services/<svc>/Dockerfile`. Конфигурация — env в compose (адреса по
   именам сервисов в сети compose), `OTEL_ENABLED=true`, `LOG_FORMAT=json`.
 - **Порты на хосте** (только то, что нужно тесту):
 
@@ -234,13 +234,20 @@ func TestCreateOrder_HappyPath(t *testing.T) {
 
 ## Изменения конфигурации
 
-- Новые файлы: `deploy/docker/service.Dockerfile`, `.dockerignore`, модуль `e2e/` (в `go.work`).
+- Новые файлы: `services/<svc>/Dockerfile` для пяти сервисов, `.dockerignore`, модуль `e2e/` (в `go.work`).
+  Dockerfile у каждого сервиса свой, чтобы при выносе сервиса в отдельный репозиторий он уходил вместе с
+  ним. Сборка идёт в workspace, который Dockerfile собирает из `platform`, `proto` и самого сервиса
+  (`go work init`), поэтому правки других сервисов не сбрасывают кэш сборки.
 - `Taskfile.yml`: задачи `e2e`, `e2e-up`, `e2e-test`, `e2e-down`, `e2e-logs`, `e2e-images-check`;
   `e2e` добавляется в `MODULES` (lint, tidy, tools), но не в `COVER_MODULES` и не в `FUZZ_MODULES`.
 - Корневой `docker-compose.yml` переименован в `compose.yaml` (единое имя с `e2e/compose.yaml`,
   каноническое для Compose Specification); содержимое не меняется. При обновлении версии образа в нём
   ту же версию нужно поставить в `e2e/compose.yaml`, иначе `task e2e-up` упадёт на `e2e-images-check`.
 - `platform/grpc/grpcserver`: `New` регистрирует стандартный сервер health (`health.NewServer()`, статус `SERVING`), graceful stop сначала переводит его в `NOT_SERVING`, а открытые `Watch`-стримы получают этот статус и закрываются с `Unavailable`, чтобы не держать `GracefulStop` до таймаута. С unit-тестом. Фильтр телеметрии для health в `grpcserver` уже есть. - `order` и `notification`: тип события `order.created` вместо `OrderCreated` (константы `EventTypeOrderCreated`, заголовок `event-type`, эталон `contracts/events/order.created.json`). Найдено e2e-тестом happy path: код расходился с контрактом, зафиксированным в спеке `integration`. Изменение согласовано с пользователем.
+- `notification`: старый тип `OrderCreated` не поддерживается, переходного периода нет — живых
+  окружений с такими событиями нет, dev-стек поднимается с чистого старта. Сообщения с неизвестным
+  типом (в том числе `OrderCreated`) подтверждаются с `Warn` в логе (topic, partition, offset,
+  event_type) вместо молчаливого пропуска.
 - `order/internal/event`: payload события пишется через `encoding/json` со структурой в snake_case, суммы и количества — JSON-числа (раньше `protojson` писал `int64` строками). Проверка валидного UTF-8 сохранена явно. `notification` разбирает payload как раньше (`protojson` принимает `int64` и числом, и строкой). Схема остаётся в `proto/proto/order/v1/events.proto`.
 
 Других изменений боевого кода нет.

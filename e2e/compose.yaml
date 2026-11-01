@@ -193,9 +193,7 @@ services:
     image: delivery-e2e-user:e2e
     build:
       context: ..
-      dockerfile: deploy/docker/service.Dockerfile
-      args:
-        SERVICE: user
+      dockerfile: services/user/Dockerfile
     restart: "no"
     environment:
       APP_NAME: user
@@ -219,9 +217,7 @@ services:
     image: delivery-e2e-product:e2e
     build:
       context: ..
-      dockerfile: deploy/docker/service.Dockerfile
-      args:
-        SERVICE: product
+      dockerfile: services/product/Dockerfile
     restart: "no"
     environment:
       APP_NAME: product
@@ -245,9 +241,7 @@ services:
     image: delivery-e2e-order:e2e
     build:
       context: ..
-      dockerfile: deploy/docker/service.Dockerfile
-      args:
-        SERVICE: order
+      dockerfile: services/order/Dockerfile
     restart: "no"
     environment:
       APP_NAME: order
@@ -277,9 +271,7 @@ services:
     image: delivery-e2e-gateway:e2e
     build:
       context: ..
-      dockerfile: deploy/docker/service.Dockerfile
-      args:
-        SERVICE: gateway
+      dockerfile: services/gateway/Dockerfile
     restart: "no"
     environment:
       APP_NAME: gateway
@@ -304,9 +296,7 @@ services:
     image: delivery-e2e-notification:e2e
     build:
       context: ..
-      dockerfile: deploy/docker/service.Dockerfile
-      args:
-        SERVICE: notification
+      dockerfile: services/notification/Dockerfile
     restart: "no"
     environment:
       APP_NAME: notification
