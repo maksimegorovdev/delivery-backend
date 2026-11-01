@@ -1,6 +1,6 @@
 # Implementation Plan: e2e
 
-> Spec: [spec.md](spec.md) · Tasks: [todo.md](todo.md) · Карта: [map.md](../../../specs/testing/map.md)
+> Spec: [spec.md](spec.md) · Tasks: [todo.md](todo.md) · Карта: [map.md](../../../../specs/testing/map.md)
 
 ## Overview
 

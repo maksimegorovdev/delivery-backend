@@ -94,9 +94,9 @@ grpc — версии как в сервисах), `Taskfile.yml` (`tools`, `lin
 **Estimated scope:** M
 
 ## Checkpoint: Фундамент
-- [ ] `task test`, `task lint`, `task test-integration` зелёные
-- [ ] Пять образов собираются, `e2e/` в workspace
-- [ ] Ревью с человеком
+- [x] `task test`, `task lint`, `task test-integration` зелёные
+- [x] Пять образов собираются, `e2e/` в workspace
+- [x] Ревью с человеком
 
 ---
 
@@ -137,9 +137,9 @@ grpc — версии как в сервисах), `Taskfile.yml` (`tools`, `lin
 **Estimated scope:** M
 
 ## Checkpoint: Стек
-- [ ] Стек поднимается от чистого состояния, ручной заказ доходит до `notification`
-- [ ] Dev-стек и e2e-стек работают одновременно
-- [ ] Ревью с человеком
+- [x] Стек поднимается от чистого состояния, ручной заказ доходит до `notification`
+- [x] Dev-стек и e2e-стек работают одновременно
+- [x] Ревью с человеком
 
 ---
 
@@ -197,8 +197,8 @@ JSON, нет `items`, `address_id` не UUID, `quantity = 0`. `404`: несущ�
 **Estimated scope:** S
 
 ## Checkpoint: Сквозной путь
-- [ ] `task e2e` зелёный, повторный запуск тоже
-- [ ] Ревью с человеком
+- [x] `task e2e` зелёный, повторный запуск тоже
+- [x] Ревью с человеком
 
 ---
 
@@ -304,5 +304,5 @@ ClickHouse (`grafana_reader`) в `otel.otel_traces` найти корневой 
 **Estimated scope:** S
 
 ## Checkpoint: Готово
-- [ ] Все Success Criteria спека выполнены
-- [ ] Ревью с человеком перед архивированием
+- [x] Все Success Criteria спека выполнены
+- [x] Ревью с человеком перед архивированием
