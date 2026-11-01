@@ -58,6 +58,16 @@ func (h *Handler) route(ctx context.Context, msg kafkaconsumer.Message, eventTyp
 	case domain.EventTypeOrderCreated:
 		return h.handleOrderCreated(ctx, msg)
 	default:
+		// Tolerant reader: неизвестный тип не блокирует партицию, но пропуск должен быть виден
+		// в логах, иначе расхождение контракта с продюсером теряет события незаметно.
+		h.log.WarnContext(
+			ctx,
+			"skip message with unknown event type",
+			slog.String("topic", msg.Topic),
+			slog.Int("partition", int(msg.Partition)),
+			slog.Int64("offset", msg.Offset),
+			slog.String("event_type", eventType),
+		)
 		return nil
 	}
 }

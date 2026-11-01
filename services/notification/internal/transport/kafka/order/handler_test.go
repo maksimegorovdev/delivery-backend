@@ -1,7 +1,9 @@
 package order_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"testing"
@@ -192,10 +194,21 @@ func TestHandler_Handle_UnknownEventType(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		headers map[string]string
+		name      string
+		headers   map[string]string
+		eventType string
 	}{
-		{name: "unknown event type", headers: map[string]string{kafka.HeaderEventType: "order.cancelled"}},
+		{
+			name:      "unknown event type",
+			headers:   map[string]string{kafka.HeaderEventType: "order.cancelled"},
+			eventType: "order.cancelled",
+		},
+		{
+			// Тип до перехода на "order.created" (коммит 8791c0c) не поддерживается.
+			name:      "legacy order created type",
+			headers:   map[string]string{kafka.HeaderEventType: "OrderCreated"},
+			eventType: "OrderCreated",
+		},
 		{name: "empty event type", headers: map[string]string{kafka.HeaderEventType: ""}},
 		{name: "no event type header", headers: map[string]string{"other": "value"}},
 		{name: "nil headers", headers: nil},
@@ -205,13 +218,33 @@ func TestHandler_Handle_UnknownEventType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			h, _ := newHandler(t) // сервис без ожиданий: tolerant reader не должен его вызывать
+			var logs bytes.Buffer
+			// Сервис без ожиданий: tolerant reader не должен его вызывать.
+			h := order.NewHandler(order.HandlerDeps{
+				NotificationService: mocks.NewMockNotificationService(t),
+				Log:                 slog.New(slog.NewJSONHandler(&logs, nil)),
+			})
 			msg := orderCreatedMessage(`not a json, but must not even be parsed`)
 			msg.Headers = tt.headers
 
 			err := h.Handle(t.Context(), msg)
 
 			require.NoError(t, err)
+
+			// Пропуск должен быть виден в логах с координатами сообщения.
+			var record map[string]any
+			require.NoError(
+				t,
+				json.Unmarshal(logs.Bytes(), &record),
+				"want exactly one log record, got %q",
+				logs.String(),
+			)
+			assert.Equal(t, slog.LevelWarn.String(), record[slog.LevelKey])
+			assert.Equal(t, "skip message with unknown event type", record[slog.MessageKey])
+			assert.Equal(t, order.Topic, record["topic"])
+			assert.InDelta(t, 2, record["partition"], 0)
+			assert.InDelta(t, 42, record["offset"], 0)
+			assert.Equal(t, tt.eventType, record["event_type"])
 		})
 	}
 }
