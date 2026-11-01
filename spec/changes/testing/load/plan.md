@@ -126,6 +126,4 @@ load/compose.yaml + load/Taskfile.yml (load-up/down)          ── T1
 
 ## Open Questions
 
-- Спека в примере проверяет `data.order_id`, а gateway отдаёт `data.id` (`ResponseDTO.ID`).
-  План проверяет `data.id`. Поправить пример в спеке (минорная правка без смены поведения) —
-  нужно ли переводить спеку в `draft` и переутверждать, или достаточно правки с вашего «ок»?
+Нет.

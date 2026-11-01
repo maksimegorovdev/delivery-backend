@@ -53,8 +53,8 @@
 Postgres) передаёт `SEED_ADDRESS_ID`, `SEED_PRODUCT_IDS`, `GATEWAY_URL`, `PROFILE` в
 `docker compose run --rm k6`. Сценарий `k6/create_order.js`, `k6/lib/config.js` (профиль `smoke`:
 `constant-arrival-rate` 5 RPS × 1 мин, `checks` rate == 1, `abortOnFail`), `k6/lib/seed.js`
-(`loadSeed()`, `randomOrder()`: 1–3 товара, количество 1–5). Проверки: `201` и `data.id` (см. Open
-Questions плана). `task load-smoke`, `task load` (`defer` с `load-down`, `LOAD_KEEP=1` оставляет стек).
+(`loadSeed()`, `randomOrder()`: 1–3 товара, количество 1–5). Проверки: `201` и `data.id`.
+`task load-smoke`, `task load` (`defer` с `load-down`, `LOAD_KEEP=1` оставляет стек).
 
 **Acceptance criteria:**
 - [ ] `task load-smoke` на поднятом стеке проходит, `checks` = 100%, код выхода 0
