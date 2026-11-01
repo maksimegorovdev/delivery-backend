@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -77,7 +78,10 @@ func TestTrace_EndToEnd(t *testing.T) {
 		}
 	}, traceTimeout, eventuallyTick)
 
-	// Граница не приняла чужой trace-id: ни одного спана с клиентским TraceId.
+	// Граница не приняла чужой trace-id: ни одного спана с клиентским TraceId. Коллектор пишет
+	// батчами, поэтому отсутствие проверяется после окна стабилизации, а не сразу.
+	time.Sleep(stableWindow)
+
 	foreign, err := querySpans(t.Context(), `
 		SELECT TraceId, ParentSpanId, ServiceName
 		FROM otel.otel_traces
