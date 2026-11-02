@@ -131,6 +131,21 @@ tasks:
     cmds:
       - task -d load grpc METHOD={{.METHOD}}
 
+  bench:
+    desc: Go benchmarks of the hot paths into load/bench/new.txt
+    cmds:
+      - task -d load bench
+
+  bench-compare:
+    desc: benchstat of load/bench/baseline.txt against load/bench/new.txt
+    cmds:
+      - task -d load bench-compare
+
+  bench-baseline:
+    desc: Overwrite load/bench/baseline.txt with the current load/bench/new.txt (by hand, after an intentional change)
+    cmds:
+      - task -d load bench-baseline
+
   load:
     desc: Bring up the load stack, run smoke, remove the stack (LOAD_KEEP=1 keeps it)
     cmds:

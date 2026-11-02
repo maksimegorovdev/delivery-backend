@@ -39,3 +39,7 @@ tmp/
 
 # Load test raw results: not committed; files referenced by load/results/baseline.md are copied to load/results/baseline/
 load/results/raw/*
+
+# Go benchmark output: only the baseline.txt reference is committed
+load/bench/*
+!load/bench/baseline.txt

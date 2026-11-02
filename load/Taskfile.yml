@@ -6,6 +6,10 @@ vars:
   COMPOSE: docker compose -f {{.TASKFILE_DIR}}/compose.yaml -p delivery-load
   # Совпадает с FAKE_AUTH_USER_ID gateway в compose.yaml и сидом миграций user: адрес берётся у этого пользователя.
   SEED_USER_ID: 01a0d1fa-a4e8-75a1-802d-d6e3c642b0f3
+  # Модули с Go-бенчмарками (относительно корня репозитория); новые модули добавляются сюда.
+  BENCH_MODULES: services/gateway
+  # benchstat — tool в e2e/go.mod: тестовый модуль никем не импортируется, зависимость не попадает в граф сервисов.
+  BENCHSTAT: cd {{.TASKFILE_DIR}}/../e2e && go tool benchstat
 
 tasks:
   up:
@@ -178,3 +182,40 @@ tasks:
         fi
         USER_ID=$user_id ADDRESS_ID=$address_id PRODUCT_IDS=$product_ids \
           sh scripts/grpc.sh delivery-load results/raw/{{.RUN_ID}} "{{.METHOD}}"
+
+  bench:
+    desc: Go benchmarks of the hot paths (-benchmem, -count=10) from every module in BENCH_MODULES into bench/new.txt
+    silent: true
+    cmds:
+      - |
+        set -eu
+        mkdir -p bench
+        : > bench/new.txt
+        for module in {{.BENCH_MODULES}}; do
+          # Вывод модулей склеивается: benchstat различает пакеты по строкам pkg:.
+          (cd {{.TASKFILE_DIR}}/../$module && go test -run='^$' -bench=. -benchmem -count=10 ./...) | tee -a bench/new.txt
+        done
+        if ! grep -q '^Benchmark' bench/new.txt; then echo "bench: бенчмарков не найдено" >&2; exit 1; fi
+        echo "bench: результаты в load/bench/new.txt"
+
+  bench-compare:
+    desc: benchstat of bench/baseline.txt against bench/new.txt (a first run without a baseline compares new.txt with itself)
+    silent: true
+    cmds:
+      - |
+        set -eu
+        if [ ! -f bench/new.txt ]; then echo "bench-compare: нет bench/new.txt (task bench)" >&2; exit 1; fi
+        base=$(pwd)
+        old=bench/baseline.txt
+        if [ ! -f "$old" ]; then echo "bench-compare: baseline.txt нет, new.txt сравнивается сам с собой"; old=bench/new.txt; fi
+        {{.BENCHSTAT}} "$base/$old" "$base/bench/new.txt"
+
+  bench-baseline:
+    desc: Overwrite bench/baseline.txt with the current bench/new.txt (run by hand after an intentional change)
+    silent: true
+    cmds:
+      - |
+        set -eu
+        if [ ! -f bench/new.txt ]; then echo "bench-baseline: нет bench/new.txt (task bench)" >&2; exit 1; fi
+        cp bench/new.txt bench/baseline.txt
+        echo "bench-baseline: bench/baseline.txt обновлён"

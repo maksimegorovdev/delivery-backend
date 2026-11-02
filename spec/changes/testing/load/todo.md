@@ -402,7 +402,9 @@ WAL) — снимок в начале и в конце. `task load-soak` с сэ
 **Результат проверки:** Прогон `20261102-150614` на свежем стеке, 30 мин без abort, 468 000 итераций, 0 ошибок. Код `task load-soak` = 201:
 вердикт `failed` из-за порога `dropped_iterations == 0` (109 пропусков в провале ~10 с на 24-й минуте). Дрейф p99 ×3.78 (порог 1.5×),
 в пуле pgx `order` доля ожиданий растёт 0.01% → 1.08%; утечек памяти и горутин нет, лаг цепочки не растёт. Подробно — раздел 7 `baseline.md`.
-Пороги не менялись. Нужно решение пользователя: считать ли пропуски итераций дефектом прогона (как сейчас) или находкой soak. Код
+Пороги не менялись. Решение: пропуски итераций — находка soak, а не дефект прогона; пороги не менять, вердикт `failed` остаётся. Проверено: в окне провала
+k6 ≈ 14% CPU, `order` ≈ 31% (генератор не насыщен); на 10:29:47 в `order-postgres` начался чекпойнт по времени (за 13 с до провала), связь не
+доказана. Записано в раздел 7 `baseline.md`. Код
 сервисов не менялся. Добавлены профиль `soak` (`config.js`, окна first/last, тег `window`), `summary.js` (summary.json с окнами и
 `stages` для `load-lag`), `sql/soak-snapshot.sql`, `task load-soak`.
 
@@ -435,13 +437,22 @@ baseline.txt new.txt`), `bench-baseline` (копия new → baseline). `new.txt
 (подбенчмарки `items=1`, `items=10`), `b.Loop()`, имена `Benchmark<Тип>_<Метод>`.
 
 **Acceptance criteria:**
-- [ ] `task bench` пишет `load/bench/new.txt` с бенчмарками gateway (`ns/op`, `B/op`, `allocs/op`)
-- [ ] `task bench-compare` работает (на первом шаге — `new.txt` против самого себя)
-- [ ] `task test` бенчмарки не запускает, `go vet` и линтер их проверяют
+- [x] `task bench` пишет `load/bench/new.txt` с бенчмарками gateway (`ns/op`, `B/op`, `allocs/op`)
+- [x] `task bench-compare` работает (на первом шаге — `new.txt` против самого себя)
+- [x] `task test` бенчмарки не запускает, `go vet` и линтер их проверяют
 
 **Verification:**
-- [ ] `task bench && task bench-compare`
-- [ ] `task -d services/gateway lint test` зелёные; время `task test` до/после записано
+- [x] `task bench && task bench-compare`
+- [x] `task -d services/gateway lint test` зелёные; время `task test` до/после записано
+
+**Результат проверки:** RED — `task bench` падал: «бенчмарков не найдено». Теперь `task bench` пишет `load/bench/new.txt`
+(`BenchmarkCreateOrderRequestDTO_Validate` и `BenchmarkHandler_CreateOrder`, `items=1/10`: ~1.6/6.1 мкс и 5.7/17.2 мкс, 25/124 и 60/165 allocs/op;
+~50 с на прогон). `task bench-compare` без `baseline.txt` сравнивает `new.txt` сам с собой (все `~`). `task test` бенчмарки не запускает
+(0 строк Benchmark в `-v`), время `task -d services/gateway test` ≈ 2.7 с; `task lint` (0 issues), `task test` зелёные, `go mod tidy` в e2e чистый.
+Как устроено: `benchstat` — `tool` в `e2e/go.mod`, запускается через `cd e2e && go tool benchstat` (в workspace-режиме `-modfile` запрещён);
+список модулей — переменная `BENCH_MODULES` в `load/Taskfile.yml` (T11/T12 добавляют модули). Бенчмарк handler'а покрывает разбор JSON, Validate,
+маппинг DTO↔сервис и запись конверта; маппинг в protobuf живёт в `gateway/internal/client` (не в пакете из спеки) — не включён.
+Побочно `go get -tool` поднял в e2e `x/net`, `x/sys`, `x/text`, `x/sync` до свежих версий (`go.work.sum` тоже изменён).
 
 **Dependencies:** None
 

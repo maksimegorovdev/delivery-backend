@@ -102,7 +102,7 @@ load/compose.yaml + load/Taskfile.yml (load-up/down)          ── T1
 - [ ] Ревью с пользователем (ask first: перезапись baseline, найденные проблемы)
 
 ### Phase 4: Go-бенчмарки (параллельно с фазами 1–3)
-- [ ] Task 10: Инструменты `bench`/`bench-compare`/`bench-baseline` и бенчмарки gateway
+- [x] Task 10: Инструменты `bench`/`bench-compare`/`bench-baseline` и бенчмарки gateway
 - [ ] Task 11: Бенчмарки `platform`
 - [ ] Task 12: Бенчмарки `order`, `notification` и `baseline.txt`
 
