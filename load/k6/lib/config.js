@@ -10,9 +10,10 @@ export const degradation = {
 
 // Разметка ступеней: ступень = разгон + плато. Метрики плато считаются отдельно (тег phase).
 const stress = {
-  // Выбраны по разведке (см. todo, Task 4): чистые ступени до 400 RPS, деградация на 800 RPS.
-  start: 100,
-  step: 50,
+  // Мелкая лестница с остановкой по критерию предела: абсолютный предел зависит от машины и лимитов
+  // контейнеров, поэтому числа не подгоняются под один результат, а прогон сам останавливается на пределе.
+  start: 25,
+  step: 25,
   max: 1000,
   rampSec: 30,
   plateauSec: 90,
@@ -98,11 +99,64 @@ function stressProfile() {
       },
     },
     thresholds,
+    // setup() прогревает стек и калибрует эталон p95 (см. create_order.js): дольше дефолтных 60 с.
+    setupTimeout: '180s',
     summaryTrendStats: ['min', 'avg', 'p(50)', 'p(95)', 'p(99)', 'max'],
   };
 }
 
+// Пороги регрессионного гейта, выведенные из baseline (load/results/baseline.md, разделы 3 и 6).
+// Числа привязаны к машине и лимитам контейнеров baseline; пересматриваются только вместе с новым baseline.
+const regression = {
+  limitRPS: 375, // предел HTTP: последняя ступень stress без деградации
+  loadShare: 0.7, // доля предела, которую держит гейт
+  baselineP95Ms: 4.0, // p95 baseline на ступени 275 RPS (ближайшей сверху к 70% предела), мс
+  p95Factor: 1.5, // допустимое ухудшение p95
+  maxErrorRate: 0.01,
+  duration: '5m',
+  preAllocatedVUs: 50,
+  maxVUs: 200,
+};
+
+// regressionRPS: 70% предела, округлено вниз до 5 RPS.
+export const regressionRPS = Math.floor((regression.limitRPS * regression.loadShare) / 5) * 5;
+
+// regressionP95Ms возвращает порог p95 в мс: env REGRESSION_P95_MS (проверка, что гейт падает) или 1.5× baseline.
+export function regressionP95Ms() {
+  const raw = (__ENV.REGRESSION_P95_MS || '').trim();
+  if (raw === '') {
+    return regression.baselineP95Ms * regression.p95Factor;
+  }
+  const v = Number(raw);
+  if (!(v > 0)) {
+    throw new Error(`env REGRESSION_P95_MS must be a positive number, got "${raw}"`);
+  }
+  return v;
+}
+
 const profiles = {
+  // Гейт регрессий: постоянный RPS = 70% предела, нарушение любого порога даёт ненулевой код выхода k6.
+  regression: () => ({
+    scenarios: {
+      create_order: {
+        executor: 'constant-arrival-rate',
+        rate: regressionRPS,
+        timeUnit: '1s',
+        duration: regression.duration,
+        preAllocatedVUs: regression.preAllocatedVUs,
+        maxVUs: regression.maxVUs,
+      },
+    },
+    thresholds: {
+      'http_req_duration{name:create_order}': [`p(95)<=${regressionP95Ms()}`],
+      http_req_failed: [`rate<${regression.maxErrorRate}`],
+      checks: ['rate==1'],
+      checked_iterations: ['count>0'],
+      // Пропущенные итерации — система не держит заданный RPS.
+      dropped_iterations: ['count==0'],
+    },
+    summaryTrendStats: ['min', 'avg', 'p(50)', 'p(95)', 'p(99)', 'max'],
+  }),
   // Сценарий и стек работают: 5 RPS × 1 мин. Любая проваленная проверка останавливает прогон.
   smoke: () => ({
     scenarios: {

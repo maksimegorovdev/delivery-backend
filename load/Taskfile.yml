@@ -42,6 +42,7 @@ tasks:
           -e PROFILE={{.PROFILE}} \
           -e RUN_ID="{{.RUN_ID}}" \
           -e STRESS_RATES="${STRESS_RATES:-}" \
+          -e REGRESSION_P95_MS="${REGRESSION_P95_MS:-}" \
           -e GATEWAY_URL="${GATEWAY_URL:-http://gateway:8080}" \
           -e SEED_ADDRESS_ID="$address_id" \
           -e SEED_PRODUCT_IDS="$product_ids" \
@@ -82,6 +83,15 @@ tasks:
           if [ ! -f "$summary" ]; then echo "stress: summary.json не создан, прогон не состоялся" >&2; exit 1; fi
           if grep -q '"verdict": "failed"' "$summary"; then echo "stress: вердикт failed, см. $summary" >&2; exit 1; fi
           echo "stress: результаты в load/results/raw/{{.RUN_ID}}"
+
+  regression:
+    desc: k6 regression gate - constant 70% of the baseline limit for 5 min, non-zero exit when a threshold is crossed (REGRESSION_P95_MS overrides the p95 limit)
+    vars:
+      RUN_ID:
+        sh: date +%Y%m%d-%H%M%S
+    cmds:
+      - task: k6
+        vars: { PROFILE: regression, RUN_ID: '{{.RUN_ID}}' }
 
   lag:
     desc: Order -> notification lag by stage for the last run (RUN=<dir name> picks another), table goes to results/raw/<run>/lag.txt

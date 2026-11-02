@@ -25,17 +25,19 @@ const gatewayURL = __ENV.GATEWAY_URL || 'http://gateway:8080';
 const orderURL = `${gatewayURL}/api/v1/orders`;
 const orderParams = { headers: { 'Content-Type': 'application/json' } };
 
-const warmupRequests = 20;
-const calibrationRequests = 200;
+// Прогрев по времени: за пару секунд соединения, пулы и кэши сервисов не успевают выйти на рабочий режим,
+// и эталон получается заниженным (ложная деградация на первой ступени).
+const warmupSec = 30;
+const calibrationRequests = 1000;
 
-// calibrate шлёт последовательные запросы в темпе первой ступени и возвращает p95 их длительности (мс).
+// calibrate прогревает стек warmupSec секунд, затем шлёт calibrationRequests последовательных запросов
+// в темпе первой ступени и возвращает p95 их длительности (мс).
 // Это эталон для критерия «p95 > 3× p95 первой ступени»: темп первой ступени, а не серия без пауз, потому что
 // на редких запросах задержка заметно выше (холодные соединения и кэши). Запросы помечены name=calibration
 // и не попадают в ступени.
 function calibrate(seed) {
   const pauseSec = 1 / stressPlan().stages[0].rate;
-  const durations = [];
-  for (let i = 0; i < warmupRequests + calibrationRequests; i++) {
+  const send = () => {
     const res = http.post(orderURL, JSON.stringify(randomOrder(seed)), {
       ...orderParams,
       tags: { name: 'calibration' },
@@ -43,10 +45,16 @@ function calibrate(seed) {
     if (res.status !== 201) {
       throw new Error(`calibration request failed: status ${res.status}, body ${res.body}`);
     }
-    if (i >= warmupRequests) {
-      durations.push(res.timings.duration);
-    }
     sleep(pauseSec);
+    return res.timings.duration;
+  };
+  const warmupEnd = Date.now() + warmupSec * 1000;
+  while (Date.now() < warmupEnd) {
+    send();
+  }
+  const durations = [];
+  for (let i = 0; i < calibrationRequests; i++) {
+    durations.push(send());
   }
   durations.sort((a, b) => a - b);
   return durations[Math.ceil(durations.length * 0.95) - 1];

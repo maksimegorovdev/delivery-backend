@@ -93,7 +93,7 @@ load/compose.yaml + load/Taskfile.yml (load-up/down)          ── T1
 
 ### Phase 3: Baseline, regression, soak
 - [ ] Task 7: Полный прогон, узкое место, `baseline.md`
-- [ ] Task 8: Профиль `regression` и `load-regression`
+- [x] Task 8: Профиль `regression` и `load-regression`
 - [ ] Task 9: Профиль `soak` и `load-soak`
 
 ### Checkpoint 3

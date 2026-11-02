@@ -37,5 +37,5 @@ coverage/
 bin/
 tmp/
 
-# Load test raw results: committed only when referenced by load/results/baseline.md
+# Load test raw results: not committed; files referenced by load/results/baseline.md are copied to load/results/baseline/
 load/results/raw/*

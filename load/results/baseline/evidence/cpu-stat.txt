@@ -1,0 +1,22 @@
+# cpu.stat контейнеров (накопительно за стресс + gRPC, снято после load-grpc)
+# лимиты CPU: gateway 1, order 1, product 0.5, user 0.5, notification 0.5
+== gateway
+nr_periods 19649
+nr_throttled 0
+throttled_usec 0
+== order
+nr_periods 21989
+nr_throttled 563
+throttled_usec 26271882
+== product
+nr_periods 26584
+nr_throttled 4333
+throttled_usec 609188910
+== user
+nr_periods 26644
+nr_throttled 6564
+throttled_usec 791777323
+== notification
+nr_periods 13560
+nr_throttled 669
+throttled_usec 9163869

@@ -111,6 +111,11 @@ tasks:
     cmds:
       - task -d load stress
 
+  load-regression:
+    desc: k6 regression gate against a running load stack (task load-up) - 70% of the baseline limit for 5 min, fails when p95 or errors exceed baseline thresholds (REGRESSION_P95_MS overrides the p95 limit)
+    cmds:
+      - task -d load regression
+
   load-lag:
     desc: Order -> notification lag by stage for the last load run (RUN=<dir in load/results/raw> picks another)
     cmds:
