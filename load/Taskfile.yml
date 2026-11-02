@@ -104,3 +104,26 @@ tasks:
           -v summary="$summary" -v grouplag="$grouplag" \
           -f - <sql/lag.sql | tee "$dir/lag.txt"
         echo "lag: таблица в load/$dir/lag.txt"
+
+  grpc:
+    desc: ghz against gRPC services in the stack network, concurrency steps, JSON and summary go to results/raw/<run>/ghz (METHOD=<ghz config name> picks one; GHZ_STAGES, GHZ_DURATION override)
+    silent: true
+    vars:
+      RUN_ID:
+        sh: date +%Y%m%d-%H%M%S
+    cmds:
+      - |
+        set -eu
+        user_id={{.SEED_USER_ID}}
+        address_id=$({{.COMPOSE}} exec -T user-postgres \
+          psql -U postgres -d userdb -At \
+          -c "SELECT id FROM addresses WHERE user_id = '$user_id' ORDER BY created_at LIMIT 1")
+        product_ids=$({{.COMPOSE}} exec -T product-postgres \
+          psql -U postgres -d productdb -At \
+          -c "SELECT string_agg(id::text, ',' ORDER BY name) FROM products")
+        if [ -z "$address_id" ] || [ -z "$product_ids" ]; then
+          echo "seed-id не найдены: стек поднят (task load-up)?" >&2
+          exit 1
+        fi
+        USER_ID=$user_id ADDRESS_ID=$address_id PRODUCT_IDS=$product_ids \
+          sh scripts/grpc.sh delivery-load results/raw/{{.RUN_ID}} "{{.METHOD}}"

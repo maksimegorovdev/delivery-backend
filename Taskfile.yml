@@ -116,6 +116,11 @@ tasks:
     cmds:
       - task -d load lag RUN={{.RUN}}
 
+  load-grpc:
+    desc: ghz against every gRPC method of a running load stack, concurrency steps (METHOD=<name in load/ghz> picks one, GHZ_STAGES and GHZ_DURATION override)
+    cmds:
+      - task -d load grpc METHOD={{.METHOD}}
+
   load:
     desc: Bring up the load stack, run smoke, remove the stack (LOAD_KEEP=1 keeps it)
     cmds:

@@ -453,4 +453,5 @@ services:
     volumes:
       - ./ghz:/ghz:ro
       - ../proto/proto:/proto:ro
+      - ../proto/third_party/protovalidate:/third_party:ro
       - ./results:/results
