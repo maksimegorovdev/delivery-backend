@@ -23,17 +23,26 @@
 корневой Taskfile делегирует `load-*`. `e2e-images-check` обобщается во внутреннюю задачу для обоих стеков.
 
 **Acceptance criteria:**
-- [ ] `task load-up` поднимает стек с нуля, все healthcheck зелёные, Debezium-коннектор зарегистрирован
-- [ ] `task load-down` удаляет контейнеры и тома, повторный `load-up` стартует с пустыми БД
-- [ ] Проверка образов ловит расхождение версии с корневым `compose.yaml` и для e2e, и для load; `task e2e` по-прежнему работает
-- [ ] Порты не пересекаются с dev и e2e (оба стека можно поднять одновременно)
+- [x] `task load-up` поднимает стек с нуля, все healthcheck зелёные, Debezium-коннектор зарегистрирован
+- [x] `task load-down` удаляет контейнеры и тома, повторный `load-up` стартует с пустыми БД
+- [x] Проверка образов ловит расхождение версии с корневым `compose.yaml` и для e2e, и для load; `task e2e` по-прежнему работает
+- [x] Порты не пересекаются с dev и e2e (оба стека можно поднять одновременно)
 
 **Verification:**
-- [ ] `task load-up && docker compose -f load/compose.yaml -p delivery-load ps` — все сервисы `healthy`/`running`, одноразовые — `exited (0)`
-- [ ] `docker compose ... run --rm --entrypoint sh k6 -c 'wget -qO- http://gateway:8080/...'` (или curl-контейнер) — gateway отвечает из сети стека
-- [ ] `docker compose -f load/compose.yaml config | grep -c 'cpus'` = числу долгоживущих контейнеров; сумма CPU ≤ 8
-- [ ] Подменить тег одного образа в `load/compose.yaml` → `task load-up` падает с понятным сообщением; вернуть
-- [ ] `task e2e` зелёный
+- [x] `task load-up && docker compose -f load/compose.yaml -p delivery-load ps` — все сервисы `healthy`/`running`, одноразовые — `exited (0)`
+- [x] `docker compose ... run --rm --entrypoint sh k6 -c 'wget -qO- http://gateway:8080/...'` (или curl-контейнер) — gateway отвечает из сети стека
+- [x] `docker compose -f load/compose.yaml config | grep -c 'cpus'` = числу долгоживущих контейнеров; сумма CPU ≤ 8
+- [x] Подменить тег одного образа в `load/compose.yaml` → `task load-up` падает с понятным сообщением; вернуть
+- [x] `task e2e` зелёный
+
+**Результат проверки:** `load-up` с нуля — 14 долгоживущих контейнеров healthy/running, 5 одноразовых
+`Exited (0)`, коннектор `order-outbox` RUNNING (~1.5 мин с загрузкой образов). Из сети стека
+`gateway:8080` отвечает (404 на `/nope`). 14 блоков `cpus` = 14 контейнеров, сумма 7.75 CPU; память
+по лимитам ≈ 6.3 ГБ (Docker Desktop даёт 7.65 ГБ, а не 16 ГБ из спеки — учесть в отчёте и при k6).
+Подмена тега redpanda в `load/` и в `e2e/` → понятное сообщение, код 201; `load-down` убирает
+контейнеры и тома; повторный `load-up` — `orders` = 0. `task e2e` зелёный при поднятом load-стеке
+(порты 38xxx не пересекаются). `task lint`, `task test` зелёные. `ghz` (`obvionaoe/ghz:v0.117.0`) —
+только linux/amd64, на Apple Silicon идёт через эмуляцию (`platform: linux/amd64`), отметить в отчёте.
 
 **Dependencies:** None
 

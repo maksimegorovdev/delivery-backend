@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  COMPOSE: docker compose -f {{.TASKFILE_DIR}}/compose.yaml -p delivery-load
+
+tasks:
+  up:
+    desc: Start the load stack without the image check (prefer the root task load-up)
+    cmds:
+      - '{{.COMPOSE}} up -d --build --wait'
+
+  down:
+    desc: Remove the load stack with its volumes
+    cmds:
+      - '{{.COMPOSE}} down -v'

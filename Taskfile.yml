@@ -29,24 +29,35 @@ tasks:
     cmds:
       - docker compose down
 
-  e2e-images-check:
-    desc: Infrastructure image versions in e2e/compose.yaml match compose.yaml
+  images-check:
+    desc: Infrastructure image versions in a stack compose file match compose.yaml (FILE=..., PREFIX=<service image prefix>)
+    internal: true
     silent: true
+    requires:
+      vars: [FILE, PREFIX]
     cmds:
       - |
         set -eu
         root=$(docker compose config --images | sort -u)
-        # Образы сервисов (delivery-e2e-*) и одноразовых контейнеров (migrate, curl) в корневом файле не нужны.
-        e2e=$(docker compose -f e2e/compose.yaml config --images | sort -u \
-          | grep -v -e '^delivery-e2e-' -e '^migrate/migrate:' -e '^curlimages/curl:')
+        # Образы сервисов ({{.PREFIX}}*), одноразовых контейнеров (migrate, curl) и генераторов нагрузки
+        # (k6, ghz) в корневом файле не нужны.
+        stack=$(docker compose -f {{.FILE}} --profile '*' config --images | sort -u \
+          | grep -v -e '^{{.PREFIX}}' -e '^migrate/migrate:' -e '^curlimages/curl:' -e '^grafana/k6:' -e '^obvionaoe/ghz:')
         status=0
-        for img in $e2e; do
+        for img in $stack; do
           if ! printf '%s\n' "$root" | grep -qxF "$img"; then
-            echo "e2e/compose.yaml: образ $img не совпадает с compose.yaml" >&2
+            echo "{{.FILE}}: образ $img не совпадает с compose.yaml" >&2
             status=1
           fi
         done
         exit $status
+
+  e2e-images-check:
+    desc: Infrastructure image versions in e2e/compose.yaml match compose.yaml
+    silent: true
+    cmds:
+      - task: images-check
+        vars: { FILE: e2e/compose.yaml, PREFIX: delivery-e2e- }
 
   e2e-up:
     desc: Start the isolated e2e stack (project delivery-e2e) and wait until it is ready
@@ -77,6 +88,18 @@ tasks:
     desc: Remove the e2e stack with its volumes
     cmds:
       - docker compose -f e2e/compose.yaml -p delivery-e2e down -v
+
+  load-up:
+    desc: Start the isolated load stack (project delivery-load) and wait until it is ready
+    cmds:
+      - task: images-check
+        vars: { FILE: load/compose.yaml, PREFIX: delivery-load- }
+      - task -d load up
+
+  load-down:
+    desc: Remove the load stack with its volumes
+    cmds:
+      - task -d load down
 
   e2e-logs:
     desc: Show logs of the e2e stack (for failure analysis)
