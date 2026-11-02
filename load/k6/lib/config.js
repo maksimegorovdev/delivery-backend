@@ -24,6 +24,26 @@ const stress = {
 // Через сколько секунд плато начинать оценивать пороги: первые секунды выборка слишком мала.
 const evalAfterPlateauSec = 30;
 
+// Калибровка эталона p95 в setup() профиля stress (см. calibrate в create_order.js): прогрев по времени,
+// затем requests последовательных запросов в темпе первой ступени.
+export const calibration = {
+  // Прогрев по времени: за пару секунд соединения, пулы и кэши сервисов не успевают выйти на рабочий режим,
+  // и эталон получается заниженным (ложная деградация на первой ступени).
+  warmupSec: 30,
+  requests: 1000,
+  // Запас на длительность одного запроса сверх паузы темпа: только для расчёта setupTimeout.
+  requestBudgetSec: 0.1,
+  // Запас на loadSeed и прочее в setup().
+  slackSec: 30,
+};
+
+// calibrationTimeoutSec — верхняя граница длительности setup(): калибровка идёт в темпе первой ступени,
+// поэтому её длительность обратно пропорциональна этому темпу (STRESS_RATES=5,… — минуты, а не секунды).
+function calibrationTimeoutSec(firstRate) {
+  const perRequestSec = 1 / firstRate + calibration.requestBudgetSec;
+  return Math.ceil(calibration.warmupSec + calibration.requests * perRequestSec + calibration.slackSec);
+}
+
 let stressPlanCache;
 
 // stressRates возвращает целевые RPS ступеней: env STRESS_RATES (список через запятую, для разведки)
@@ -99,8 +119,9 @@ function stressProfile() {
       },
     },
     thresholds,
-    // setup() прогревает стек и калибрует эталон p95 (см. create_order.js): дольше дефолтных 60 с.
-    setupTimeout: '180s',
+    // setup() прогревает стек и калибрует эталон p95 (см. create_order.js): дольше дефолтных 60 с
+    // и зависит от темпа первой ступени.
+    setupTimeout: `${calibrationTimeoutSec(plan.stages[0].rate)}s`,
     summaryTrendStats: ['min', 'avg', 'p(50)', 'p(95)', 'p(99)', 'max'],
   };
 }

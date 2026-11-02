@@ -2,7 +2,7 @@ import http from 'k6/http';
 import exec from 'k6/execution';
 import { check, sleep } from 'k6';
 import { Counter, Gauge, Rate } from 'k6/metrics';
-import { degradation, profile, stageAt, stressPlan } from './lib/config.js';
+import { calibration, degradation, profile, stageAt, stressPlan } from './lib/config.js';
 import { loadSeed, randomOrder } from './lib/seed.js';
 import { buildSummary } from './lib/summary.js';
 
@@ -25,13 +25,9 @@ const gatewayURL = __ENV.GATEWAY_URL || 'http://gateway:8080';
 const orderURL = `${gatewayURL}/api/v1/orders`;
 const orderParams = { headers: { 'Content-Type': 'application/json' } };
 
-// Прогрев по времени: за пару секунд соединения, пулы и кэши сервисов не успевают выйти на рабочий режим,
-// и эталон получается заниженным (ложная деградация на первой ступени).
-const warmupSec = 30;
-const calibrationRequests = 1000;
-
-// calibrate прогревает стек warmupSec секунд, затем шлёт calibrationRequests последовательных запросов
-// в темпе первой ступени и возвращает p95 их длительности (мс).
+// calibrate прогревает стек calibration.warmupSec секунд, затем шлёт calibration.requests последовательных
+// запросов в темпе первой ступени и возвращает p95 их длительности (мс). Параметры и расчёт setupTimeout
+// под них — в lib/config.js.
 // Это эталон для критерия «p95 > 3× p95 первой ступени»: темп первой ступени, а не серия без пауз, потому что
 // на редких запросах задержка заметно выше (холодные соединения и кэши). Запросы помечены name=calibration
 // и не попадают в ступени.
@@ -48,12 +44,12 @@ function calibrate(seed) {
     sleep(pauseSec);
     return res.timings.duration;
   };
-  const warmupEnd = Date.now() + warmupSec * 1000;
+  const warmupEnd = Date.now() + calibration.warmupSec * 1000;
   while (Date.now() < warmupEnd) {
     send();
   }
   const durations = [];
-  for (let i = 0; i < calibrationRequests; i++) {
+  for (let i = 0; i < calibration.requests; i++) {
     durations.push(send());
   }
   durations.sort((a, b) => a - b);
