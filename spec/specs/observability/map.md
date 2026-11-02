@@ -29,7 +29,7 @@ Build order: `obs-stack` → `telemetry-sdk` → `logs`, `tracing`, `metrics` (�
 | `metrics` | [spec](metrics/spec.md) | done |
 | `async-propagation` | [spec](async-propagation/spec.md) | done |
 | `dashboards` | [spec](dashboards/spec.md) | done |
-| `profiling` | — | todo |
+| `profiling` | [spec](../../changes/observability/profiling/spec.md) | approved |
 
 ## Принятые решения
 
