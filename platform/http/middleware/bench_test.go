@@ -30,15 +30,16 @@ func (nopWriter) Write(p []byte) (int, error) { return len(p), nil }
 
 func benchLogger() *slog.Logger { return slog.New(slog.NewJSONHandler(nopWriter{}, nil)) }
 
-// benchRouter собирает ту же цепочку, что и сервисы: Route → RequestID → FakeAuth → Logger → Recover.
+// benchRouter собирает ту же цепочку, что и gateway: Route (httpserver.New) → RequestID → Logger → Recover → FakeAuth
+// (services/gateway/internal/app/app.go).
 func benchRouter(handler http.HandlerFunc) http.Handler {
 	r := chi.NewRouter()
 	r.Use(
 		middleware.Route,
 		middleware.RequestID,
-		middleware.FakeAuth("01a0d1fa-a4e8-75a1-802d-d6e3c642b0f3"),
 		middleware.Logger(benchLogger()),
 		middleware.Recover,
+		middleware.FakeAuth("01a0d1fa-a4e8-75a1-802d-d6e3c642b0f3"),
 	)
 	r.Post("/orders", handler)
 	return r
@@ -46,15 +47,16 @@ func benchRouter(handler http.HandlerFunc) http.Handler {
 
 func BenchmarkMiddleware_Chain(b *testing.B) {
 	cases := []struct {
-		name    string
-		handler http.HandlerFunc
+		name       string
+		handler    http.HandlerFunc
+		wantStatus int
 	}{
 		{"success", func(w http.ResponseWriter, r *http.Request) {
 			response.Created(w, r, map[string]string{"id": "1"})
-		}},
+		}, http.StatusCreated},
 		{"failure", func(w http.ResponseWriter, r *http.Request) {
 			response.Fail(w, r, apperr.NotFound())
-		}},
+		}, http.StatusNotFound},
 	}
 
 	for _, tc := range cases {
@@ -62,6 +64,12 @@ func BenchmarkMiddleware_Chain(b *testing.B) {
 			handler := benchRouter(tc.handler)
 			req := httptest.NewRequestWithContext(b.Context(), http.MethodPost, "/orders", nil)
 			req.Header.Set(middleware.RequestIDHeader, "bench-request-id")
+			// Цепочка, оборвавшая запрос раньше handler, измерялась бы молча: путь проверяется до замера.
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != tc.wantStatus {
+				b.Fatalf("chain responded %d, want %d", rec.Code, tc.wantStatus)
+			}
 			w := newDiscardWriter()
 
 			b.ReportAllocs()

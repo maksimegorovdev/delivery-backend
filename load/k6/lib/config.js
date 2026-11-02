@@ -21,9 +21,8 @@ const stress = {
   maxVUs: 500,
 };
 
-// Через сколько секунд плато начинать оценивать пороги abort: сразу после разгона идёт переходный всплеск.
-// Окно оценки размечается тегом eval (см. stageAt), а не delayAbortEval: тот отсчитывается от старта прогона
-// вместе с setup(), а калибровка в setup() длится минуту и больше, и оценка начиналась бы раньше задуманного.
+// Через сколько секунд плато начинать оценивать пороги abort: первые секунды выборка слишком мала, и короткий
+// всплеск задержки даёт ложную деградацию. Оценка идёт по всем запросам плато, накопленным к этому моменту.
 const evalAfterPlateauSec = 30;
 
 // Статистики трендов в summary профилей stress, regression и soak.
@@ -36,25 +35,23 @@ function constantRateScenario({ rate, duration, preAllocatedVUs, maxVUs }) {
   };
 }
 
-// Калибровка эталона p95 в setup() профиля stress (см. calibrate в create_order.js): прогрев по времени,
-// затем requests последовательных запросов в темпе первой ступени.
+// Калибровка эталона p95 в setup() профиля stress (см. calibrate в create_order.js): прогрев, затем замер,
+// оба по времени от начала setup() и в темпе первой ступени.
+// Длительность по времени, а не по числу запросов, делает длительность setup() известной заранее: delayAbortEval
+// k6 отсчитывается от старта прогона вместе с setup(), и задержка порогов abort сдвигается ровно на setupSec.
 export const calibration = {
-  // Прогрев по времени: за пару секунд соединения, пулы и кэши сервисов не успевают выйти на рабочий режим,
+  // Прогрев: за пару секунд соединения, пулы и кэши сервисов не успевают выйти на рабочий режим,
   // и эталон получается заниженным (ложная деградация на первой ступени).
   warmupSec: 30,
-  requests: 1000,
-  // Запас на длительность одного запроса сверх паузы темпа: только для расчёта setupTimeout.
-  requestBudgetSec: 0.1,
-  // Запас на loadSeed и прочее в setup().
+  // Замер: при 25 RPS первой ступени ≈ 1000 запросов.
+  measureSec: 40,
+  // Запас setupTimeout на loadSeed и последний запрос замера.
   slackSec: 30,
 };
 
-// calibrationTimeoutSec — верхняя граница длительности setup(): калибровка идёт в темпе первой ступени,
-// поэтому её длительность обратно пропорциональна этому темпу (STRESS_RATES=5,… — минуты, а не секунды).
-function calibrationTimeoutSec(firstRate) {
-  const perRequestSec = 1 / firstRate + calibration.requestBudgetSec;
-  return Math.ceil(calibration.warmupSec + calibration.requests * perRequestSec + calibration.slackSec);
-}
+// setupSec — длительность setup() профиля stress: калибровка заканчивается не раньше этого срока от начала setup()
+// и позже не больше чем на один запрос с паузой темпа.
+export const setupSec = calibration.warmupSec + calibration.measureSec;
 
 let stressPlanCache;
 
@@ -104,14 +101,14 @@ function stressProfile() {
     stages.push({ duration: `${plan.plateauSec}s`, target: s.rate });
 
     const plateau = `{stage:${s.n},phase:plateau}`;
-    // Пороги abort — на окне оценки ступени: до него подметрика пуста, а пустые k6 во время прогона не оценивает.
-    const evalWindow = `{stage:${s.n},eval:1}`;
-    thresholds[`http_req_failed${evalWindow}`] = [{ threshold: `rate<${degradation.maxErrorRate}`, abortOnFail: true }];
+    // Оценка через evalAfterPlateauSec после начала плато; delayAbortEval — от старта прогона, то есть с setup().
+    const delayAbortEval = `${setupSec + s.plateauStartSec + evalAfterPlateauSec}s`;
+    thresholds[`http_req_failed${plateau}`] = [
+      { threshold: `rate<${degradation.maxErrorRate}`, abortOnFail: true, delayAbortEval },
+    ];
     // p95 > K× эталона ⇔ доля запросов медленнее K× эталона больше 5% (метрика slow, см. create_order.js).
-    thresholds[`slow${evalWindow}`] = [{ threshold: 'rate<0.05', abortOnFail: true }];
-    // Пустые пороги создают подметрики всего плато, которые попадают в summary.
-    thresholds[`http_req_failed${plateau}`] = [];
-    thresholds[`slow${plateau}`] = [];
+    thresholds[`slow${plateau}`] = [{ threshold: 'rate<0.05', abortOnFail: true, delayAbortEval }];
+    // Пустые пороги создают подметрики, которые попадают в summary.
     thresholds[`http_req_duration${plateau}`] = [];
     thresholds[`http_reqs${plateau}`] = [];
     thresholds[`checks${plateau}`] = [];
@@ -131,9 +128,8 @@ function stressProfile() {
       },
     },
     thresholds,
-    // setup() прогревает стек и калибрует эталон p95 (см. create_order.js): дольше дефолтных 60 с
-    // и зависит от темпа первой ступени.
-    setupTimeout: `${calibrationTimeoutSec(plan.stages[0].rate)}s`,
+    // setup() прогревает стек и калибрует эталон p95 (см. create_order.js): дольше дефолтных 60 с.
+    setupTimeout: `${setupSec + calibration.slackSec}s`,
     summaryTrendStats,
   };
 }
@@ -253,7 +249,6 @@ export function profile(name) {
 
 // stageAt возвращает ступень, фазу (ramp|plateau) и целевой RPS профиля name через elapsedMs после старта
 // сценария. Нужен для тега stage и метрики target_rps (панель «целевой/достигнутый» дашборда Load).
-// Для stress eval сообщает, идёт ли окно оценки порогов abort (тег eval).
 // Считается по собственному плану, а не по options: k6 нормализует options и в VU они уже не в исходной форме.
 export function stageAt(name, elapsedMs) {
   if (name === 'stress') {
@@ -262,12 +257,10 @@ export function stageAt(name, elapsedMs) {
     const s = plan.stages[i];
     const intoStageMs = Math.max(0, elapsedMs - s.startSec * 1000);
     if (intoStageMs >= plan.rampSec * 1000) {
-      const evalWindow = intoStageMs >= (plan.rampSec + evalAfterPlateauSec) * 1000;
-      return { stage: s.n, phase: 'plateau', eval: evalWindow, target: s.rate };
+      return { stage: s.n, phase: 'plateau', target: s.rate };
     }
     const from = i === 0 ? s.rate : plan.stages[i - 1].rate;
-    const target = from + ((s.rate - from) * intoStageMs) / (plan.rampSec * 1000);
-    return { stage: s.n, phase: 'ramp', eval: false, target };
+    return { stage: s.n, phase: 'ramp', target: from + ((s.rate - from) * intoStageMs) / (plan.rampSec * 1000) };
   }
   const target = profile(name).scenarios.create_order.rate;
   if (name === 'soak') {

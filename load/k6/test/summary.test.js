@@ -46,13 +46,13 @@ test('остановка по dropped_iterations — предел найден, 
   assert.equal(summary.limit_rps, plan.stages[1].rate);
 });
 
-test('остановка по порогу slow окна оценки — предел найден', () => {
+test('остановка по порогу slow плато — предел найден', () => {
   const s2 = plan.stages[1];
   const data = stressData({
     startedAgoMs: (s2.plateauStartSec + 40) * 1000,
     reachedStages: [1, 2],
-    extra: { 'slow{stage:2,eval:1}': { values: { rate: 0.2 }, thresholds: { 'rate<0.05': { ok: false } } } },
   });
+  data.metrics['slow{stage:2,phase:plateau}'].thresholds = { 'rate<0.05': { ok: false } };
   const summary = stressSummary(data);
   assert.equal(summary.verdict, 'limit_reached');
   assert.equal(summary.first_degraded_stage, 2);
