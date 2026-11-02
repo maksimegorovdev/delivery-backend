@@ -1,6 +1,6 @@
 # Implementation Plan: load
 
-> Spec: [spec.md](spec.md) · Tasks: [todo.md](todo.md) · Map: [testing](../../../specs/testing/map.md)
+> Spec: [spec.md](spec.md) · Tasks: [todo.md](todo.md) · Map: [testing](../../../../specs/testing/map.md)
 
 ## Overview
 
