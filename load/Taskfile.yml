@@ -93,6 +93,47 @@ tasks:
       - task: k6
         vars: { PROFILE: regression, RUN_ID: '{{.RUN_ID}}' }
 
+  soak-snapshot:
+    desc: Table sizes, query times, Debezium slot and WAL snapshot into results/raw/<run>/soak-<label>.txt
+    internal: true
+    silent: true
+    requires:
+      vars: [RUN_ID, LABEL]
+    cmds:
+      - |
+        {{.COMPOSE}} exec -T notification-postgres psql -U postgres -d notificationdb -X -q \
+          -v ON_ERROR_STOP=1 \
+          -v order_dsn='host=order-postgres dbname=orderdb user=postgres password=postgres' \
+          -v label={{.LABEL}} \
+          -f - <sql/soak-snapshot.sql | tee results/raw/{{.RUN_ID}}/soak-{{.LABEL}}.txt
+
+  soak:
+    desc: k6 soak - the regression RPS for 30 min, SQL snapshots at start and end, docker stats and group lag samplers; results go to results/raw/<run>
+    vars:
+      RUN_ID:
+        sh: date +%Y%m%d-%H%M%S
+    cmds:
+      - mkdir -p results/raw/{{.RUN_ID}}
+      - task: soak-snapshot
+        vars: { RUN_ID: '{{.RUN_ID}}', LABEL: start }
+      - cmd: |
+          sh scripts/docker-stats.sh delivery-load results/raw/{{.RUN_ID}}/docker-stats.csv 10 >/dev/null 2>&1 &
+      - cmd: |
+          sh scripts/group-lag.sh delivery-load notification results/raw/{{.RUN_ID}}/group-lag.csv 10 >/dev/null 2>&1 &
+      - defer: pkill -f 'scripts/(docker-stats|group-lag).sh .*results/raw/{{.RUN_ID}}/' || true
+      # Код k6 99 (порог нарушен) не прерывает задачу: снимок конца нужен и после падения. Исход решает вердикт в summary.json.
+      - task: k6
+        vars: { PROFILE: soak, RUN_ID: '{{.RUN_ID}}' }
+        ignore_error: true
+      - task: soak-snapshot
+        vars: { RUN_ID: '{{.RUN_ID}}', LABEL: end }
+      - cmd: |
+          summary=results/raw/{{.RUN_ID}}/summary.json
+          if [ ! -f "$summary" ]; then echo "soak: summary.json не создан, прогон не состоялся" >&2; exit 1; fi
+          if grep -q '"verdict": "failed"' "$summary"; then echo "soak: вердикт failed, см. $summary" >&2; exit 1; fi
+          if grep -q '"verdict": "drift"' "$summary"; then echo "soak: p99 последних 5 мин больше 1.5x первых, см. $summary"; fi
+          echo "soak: результаты в load/results/raw/{{.RUN_ID}}"
+
   lag:
     desc: Order -> notification lag by stage for the last run (RUN=<dir name> picks another), table goes to results/raw/<run>/lag.txt
     silent: true

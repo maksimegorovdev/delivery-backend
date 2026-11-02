@@ -1,0 +1,20 @@
+Снимок soak: start
+Размеры таблиц (pg_total_relation_size) и число строк
+     table     |      db      | bytes | size  | rows 
+---------------+--------------+-------+-------+------
+ inbox_events  | notification | 24576 | 24 kB |    0
+ notifications | notification | 32768 | 32 kB |    0
+ outbox_events | order        | 24576 | 24 kB |    0
+
+Время count(*), мс (минимум из 3)
+     table     | count_ms 
+---------------+----------
+ inbox_events  | 0.02
+ notifications | 0.01
+ outbox_events | 3.90
+
+Слот репликации Debezium и WAL в order-postgres
+ slot_name | active | confirmed_flush_lsn | current_wal_lsn | flush_lag_bytes | retained_wal_bytes | wal_dir_bytes 
+-----------+--------+---------------------+-----------------+-----------------+--------------------+---------------
+ debezium  | t      | 0/1C62E78           | 0/1C62ED8       |              96 |                 96 |      16777216
+

@@ -134,7 +134,56 @@ export function regressionP95Ms() {
   return v;
 }
 
+// Soak: тот же RPS, что у гейта регрессий (70% предела), 30 мин. Сравниваются первые и последние windowSec секунд.
+export const soak = {
+  durationSec: 1800,
+  windowSec: 300,
+  p99Factor: 1.5, // допустимый рост p99 в последнем окне относительно первого
+  maxErrorRate: 0.01,
+  preAllocatedVUs: 50,
+  maxVUs: 200,
+};
+
+// soakWindowAt: окно soak (first | middle | last) через elapsedMs после старта сценария.
+function soakWindowAt(elapsedMs) {
+  if (elapsedMs < soak.windowSec * 1000) {
+    return 'first';
+  }
+  if (elapsedMs >= (soak.durationSec - soak.windowSec) * 1000) {
+    return 'last';
+  }
+  return 'middle';
+}
+
 const profiles = {
+  // Утечки и деградация во времени: постоянный RPS гейта 30 мин. Пороги ловят только дефекты прогона;
+  // дрейф p99 оценивает summary (метрики окон first/last), а не abort: прогон должен дойти до конца.
+  soak: () => ({
+    scenarios: {
+      create_order: {
+        executor: 'constant-arrival-rate',
+        rate: regressionRPS,
+        timeUnit: '1s',
+        duration: `${soak.durationSec / 60}m`,
+        preAllocatedVUs: soak.preAllocatedVUs,
+        maxVUs: soak.maxVUs,
+      },
+    },
+    thresholds: {
+      http_req_failed: [{ threshold: `rate<${soak.maxErrorRate}`, abortOnFail: true, delayAbortEval: '60s' }],
+      checks: [{ threshold: 'rate==1', abortOnFail: true, delayAbortEval: '60s' }],
+      checked_iterations: ['count>0'],
+      dropped_iterations: ['count==0'],
+      // Пустые пороги создают подметрики окон, которые попадают в summary.
+      'http_req_duration{window:first}': [],
+      'http_req_duration{window:last}': [],
+      'http_reqs{window:first}': [],
+      'http_reqs{window:last}': [],
+      'http_req_failed{window:first}': [],
+      'http_req_failed{window:last}': [],
+    },
+    summaryTrendStats: ['min', 'avg', 'p(50)', 'p(95)', 'p(99)', 'max'],
+  }),
   // Гейт регрессий: постоянный RPS = 70% предела, нарушение любого порога даёт ненулевой код выхода k6.
   regression: () => ({
     scenarios: {
@@ -201,5 +250,9 @@ export function stageAt(name, elapsedMs) {
     const from = i === 0 ? s.rate : plan.stages[i - 1].rate;
     return { stage: s.n, phase: 'ramp', target: from + ((s.rate - from) * intoStageMs) / (plan.rampSec * 1000) };
   }
-  return { stage: 1, phase: 'plateau', target: profile(name).scenarios.create_order.rate };
+  const target = profile(name).scenarios.create_order.rate;
+  if (name === 'soak') {
+    return { stage: 1, phase: 'plateau', target, window: soakWindowAt(elapsedMs) };
+  }
+  return { stage: 1, phase: 'plateau', target };
 }

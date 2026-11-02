@@ -1,4 +1,4 @@
-import { degradation, stressPlan } from './config.js';
+import { degradation, regressionRPS, soak, stressPlan } from './config.js';
 
 // Пороги, нарушение которых означает «предел найден»; любое другое нарушение — дефект прогона.
 const limitThresholds = [/^http_req_failed\{stage:/, /^slow\{stage:/, /^dropped_iterations$/];
@@ -110,6 +110,71 @@ function limitOf(stages) {
   };
 }
 
+// soakWindowStats: метрики окна soak (first|last). from/to — абсолютные границы окна в миллисекундах.
+function soakWindowStats(data, name, fromMs, toMs) {
+  const tags = `{window:${name}}`;
+  const requests = value(data, `http_reqs${tags}`, 'count') || 0;
+  return {
+    window: name,
+    from: iso(fromMs),
+    to: iso(toMs),
+    requests,
+    p50_ms: value(data, `http_req_duration${tags}`, 'p(50)'),
+    p95_ms: value(data, `http_req_duration${tags}`, 'p(95)'),
+    p99_ms: value(data, `http_req_duration${tags}`, 'p(99)'),
+    error_rate: value(data, `http_req_failed${tags}`, 'rate'),
+  };
+}
+
+// soakSummary сравнивает первое и последнее окно прогона. Ступени stages[] (1 = первое окно, 2 = последнее)
+// повторяют формат stress, чтобы sql/lag.sql считал лаг по окнам без изменений.
+function soakSummary(data, runID, failed) {
+  const startMs = value(data, 'scenario_start_ts', 'min');
+  const windowMs = soak.windowSec * 1000;
+  const endMs = startMs + soak.durationSec * 1000;
+  const first = soakWindowStats(data, 'first', startMs, startMs + windowMs);
+  const last = soakWindowStats(data, 'last', endMs - windowMs, endMs);
+  const ratio = first.p99_ms > 0 ? Number((last.p99_ms / first.p99_ms).toFixed(2)) : undefined;
+
+  const iterations = value(data, 'iterations', 'count') || 0;
+  const checked = value(data, 'checked_iterations', 'count') || 0;
+  let verdict = 'completed';
+  if (failed.length > 0 || checked === 0 || checked < iterations || first.requests === 0 || last.requests === 0) {
+    verdict = 'failed';
+  } else if (ratio === undefined || ratio > soak.p99Factor) {
+    verdict = 'drift';
+  }
+  const stages = [first, last].map((w, i) => ({
+    stage: i + 1,
+    window: w.window,
+    target_rps: regressionRPS,
+    reached: w.requests > 0,
+    plateau_started_at: w.from,
+    ended_at: w.to,
+    requests: w.requests,
+    p50_ms: w.p50_ms,
+    p95_ms: w.p95_ms,
+    p99_ms: w.p99_ms,
+    error_rate: w.error_rate,
+  }));
+  return {
+    run: runID,
+    profile: 'soak',
+    verdict,
+    scenario_started_at: iso(startMs),
+    finished_at: iso(Date.now()),
+    test_run_duration_ms: Math.round(data.state.testRunDurationMs),
+    target_rps: regressionRPS,
+    iterations,
+    checked_iterations: checked,
+    dropped_iterations: value(data, 'dropped_iterations', 'count') || 0,
+    failed_thresholds: failed,
+    p99_factor_limit: soak.p99Factor,
+    p99_ratio_last_to_first: ratio,
+    stages,
+  };
+}
+
 function pad(v, w) {
   return String(v === undefined ? '—' : v).padStart(w);
 }
@@ -191,6 +256,17 @@ export function buildSummary(data, profileName, runID) {
     result[`/results/raw/${runID}/summary.json`] = JSON.stringify(summary, null, 2);
     lines.push(`verdict=${verdict} limit_rps=${summary.limit_rps} first_degraded_stage=${summary.first_degraded_stage}`);
     lines.push(...stagesTable(stages));
+  }
+  if (profileName === 'soak') {
+    const summary = soakSummary(data, runID, failed);
+    result[`/results/raw/${runID}/summary.json`] = JSON.stringify(summary, null, 2);
+    lines.push(`verdict=${summary.verdict} p99_last/first=${summary.p99_ratio_last_to_first} (limit ${soak.p99Factor})`);
+    const ms = (v) => (v === undefined ? '—' : `${v.toFixed(1)}ms`);
+    for (const s of summary.stages) {
+      lines.push(
+        `${s.window}: requests=${s.requests} p50=${ms(s.p50_ms)} p95=${ms(s.p95_ms)} p99=${ms(s.p99_ms)} errors=${s.error_rate}`,
+      );
+    }
   }
   result.stdout = lines.join('\n') + '\n';
   return result;

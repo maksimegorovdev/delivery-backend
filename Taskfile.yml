@@ -116,6 +116,11 @@ tasks:
     cmds:
       - task -d load regression
 
+  load-soak:
+    desc: k6 soak against a running load stack (task load-up) - the regression RPS for 30 min, SQL snapshots at start and end (use a fresh stack)
+    cmds:
+      - task -d load soak
+
   load-lag:
     desc: Order -> notification lag by stage for the last load run (RUN=<dir in load/results/raw> picks another)
     cmds:

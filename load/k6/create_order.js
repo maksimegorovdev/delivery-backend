@@ -86,6 +86,9 @@ export default function (seed) {
   const at = stageAt(profileName, Date.now() - exec.scenario.startTime);
   exec.vu.tags.stage = String(at.stage);
   exec.vu.tags.phase = at.phase;
+  if (at.window !== undefined) {
+    exec.vu.tags.window = at.window;
+  }
   targetRPS.add(at.target);
 
   const res = http.post(orderURL, JSON.stringify(randomOrder(seed)), {
