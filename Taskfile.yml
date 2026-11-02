@@ -111,6 +111,11 @@ tasks:
     cmds:
       - task -d load stress
 
+  load-lag:
+    desc: Order -> notification lag by stage for the last load run (RUN=<dir in load/results/raw> picks another)
+    cmds:
+      - task -d load lag RUN={{.RUN}}
+
   load:
     desc: Bring up the load stack, run smoke, remove the stack (LOAD_KEEP=1 keeps it)
     cmds:

@@ -48,10 +48,18 @@ tasks:
           k6 run /scripts/create_order.js
 
   smoke:
-    desc: k6 smoke against a running stack - 5 RPS for 1 min, fails on any failed check
+    desc: k6 smoke against a running stack - 5 RPS for 1 min, fails on any failed check; group-lag.csv goes to results/raw/<run>
+    vars:
+      RUN_ID:
+        sh: date +%Y%m%d-%H%M%S
     cmds:
+      - mkdir -p results/raw/{{.RUN_ID}}
+      - cmd: |
+          sh scripts/group-lag.sh delivery-load notification results/raw/{{.RUN_ID}}/group-lag.csv 2 >/dev/null 2>&1 &
+      # $! в интерпретаторе Task не годится для kill: сэмплер гасится по пути своего прогона.
+      - defer: pkill -f 'scripts/group-lag.sh .*results/raw/{{.RUN_ID}}/' || true
       - task: k6
-        vars: { PROFILE: smoke }
+        vars: { PROFILE: smoke, RUN_ID: '{{.RUN_ID}}' }
 
   stress:
     desc: k6 stress - RPS steps until degradation, summary and docker-stats.csv go to results/raw/<run> (STRESS_RATES overrides the steps)
@@ -62,10 +70,9 @@ tasks:
       - mkdir -p results/raw/{{.RUN_ID}}
       - cmd: |
           sh scripts/docker-stats.sh delivery-load results/raw/{{.RUN_ID}}/docker-stats.csv 5 >/dev/null 2>&1 &
-          echo $! > results/raw/{{.RUN_ID}}/sampler.pid
-      - defer: |
-          pid=results/raw/{{.RUN_ID}}/sampler.pid
-          if [ -f "$pid" ]; then kill "$(cat "$pid")" 2>/dev/null || true; rm -f "$pid"; fi
+      - cmd: |
+          sh scripts/group-lag.sh delivery-load notification results/raw/{{.RUN_ID}}/group-lag.csv 5 >/dev/null 2>&1 &
+      - defer: pkill -f 'scripts/(docker-stats|group-lag).sh .*results/raw/{{.RUN_ID}}/' || true
       # Код 99 у k6 — нарушены пороги: для stress штатный исход «предел найден». Исход решает вердикт в summary.json.
       - task: k6
         vars: { PROFILE: stress, RUN_ID: '{{.RUN_ID}}' }
@@ -75,3 +82,25 @@ tasks:
           if [ ! -f "$summary" ]; then echo "stress: summary.json не создан, прогон не состоялся" >&2; exit 1; fi
           if grep -q '"verdict": "failed"' "$summary"; then echo "stress: вердикт failed, см. $summary" >&2; exit 1; fi
           echo "stress: результаты в load/results/raw/{{.RUN_ID}}"
+
+  lag:
+    desc: Order -> notification lag by stage for the last run (RUN=<dir name> picks another), table goes to results/raw/<run>/lag.txt
+    silent: true
+    vars:
+      RUN:
+        sh: '{{if .RUN}}echo {{.RUN}}{{else}}ls -1 results/raw | tail -1{{end}}'
+    cmds:
+      - |
+        set -eu
+        dir=results/raw/{{.RUN}}
+        if [ -z "{{.RUN}}" ] || [ ! -d "$dir" ]; then echo "lag: прогон не найден (task load-smoke или load-stress)" >&2; exit 1; fi
+        summary=""
+        if [ -f "$dir/summary.json" ]; then summary=$(cat "$dir/summary.json"); fi
+        grouplag=""
+        if [ -f "$dir/group-lag.csv" ]; then grouplag=$(cat "$dir/group-lag.csv"); fi
+        {{.COMPOSE}} exec -T notification-postgres psql -U postgres -d notificationdb -X -q \
+          -v ON_ERROR_STOP=1 \
+          -v order_dsn='host=order-postgres dbname=orderdb user=postgres password=postgres' \
+          -v summary="$summary" -v grouplag="$grouplag" \
+          -f - <sql/lag.sql | tee "$dir/lag.txt"
+        echo "lag: таблица в load/$dir/lag.txt"
