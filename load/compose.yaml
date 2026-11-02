@@ -112,8 +112,6 @@ services:
     environment:
       BOOTSTRAP_SERVERS: redpanda:9092
       GROUP_ID: debezium-cdc-cluster
-      # Образ по умолчанию берёт -Xmx2G: при лимите контейнера 1G куча растёт за лимит, JVM
-      # зависает на GC, а cgroup убивает процесс (OOMKilled, код 137). Куча держится ниже лимита.
       KAFKA_HEAP_OPTS: "-Xms256M -Xmx512M"
       CONFIG_STORAGE_TOPIC: connect_configs
       OFFSET_STORAGE_TOPIC: connect_offsets
@@ -222,7 +220,6 @@ services:
       product-postgres:
         condition: service_healthy
 
-  # Добавляет товары до >= 10 (в миграциях их два); product стартует после сида.
   seed-product:
     image: postgres:18
     restart: "no"
@@ -434,7 +431,6 @@ services:
     image: grafana/k6:2.3.0
     profiles: ["tools"]
     environment:
-      # Метрики генератора уходят в тот же otel-collector, что и телеметрия сервисов (service.name = k6).
       K6_OUT: opentelemetry
       K6_OTEL_SERVICE_NAME: k6
       K6_OTEL_METRIC_PREFIX: k6_
@@ -442,7 +438,6 @@ services:
       K6_OTEL_GRPC_EXPORTER_ENDPOINT: otel-collector:4317
       K6_OTEL_GRPC_EXPORTER_INSECURE: "true"
       K6_OTEL_EXPORT_INTERVAL: 5s
-      # Как у сервисов: счётчики и гистограммы шлются приращениями, SQL панелей остаётся простым.
       OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: delta
     depends_on:
       otel-collector:
