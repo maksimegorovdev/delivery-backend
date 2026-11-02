@@ -101,6 +101,24 @@ tasks:
     cmds:
       - task -d load down
 
+  load-smoke:
+    desc: k6 smoke against a running load stack (task load-up) - 5 RPS for 1 min
+    cmds:
+      - task -d load smoke
+
+  load:
+    desc: Bring up the load stack, run smoke, remove the stack (LOAD_KEEP=1 keeps it)
+    cmds:
+      # defer объявлен до load-up: частично поднятый стек убирается и при падении подъёма.
+      - defer: |
+          if [ "${LOAD_KEEP:-}" = "1" ]; then
+            echo "LOAD_KEEP=1: стек delivery-load оставлен (task load-down)"
+          else
+            task load-down
+          fi
+      - task: load-up
+      - task: load-smoke
+
   e2e-logs:
     desc: Show logs of the e2e stack (for failure analysis)
     cmds:

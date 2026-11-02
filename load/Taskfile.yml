@@ -4,6 +4,8 @@ version: '3'
 
 vars:
   COMPOSE: docker compose -f {{.TASKFILE_DIR}}/compose.yaml -p delivery-load
+  # Совпадает с FAKE_AUTH_USER_ID gateway в compose.yaml и сидом миграций user: адрес берётся у этого пользователя.
+  SEED_USER_ID: 01a0d1fa-a4e8-75a1-802d-d6e3c642b0f3
 
 tasks:
   up:
@@ -15,3 +17,36 @@ tasks:
     desc: Remove the load stack with its volumes
     cmds:
       - '{{.COMPOSE}} down -v'
+
+  k6:
+    desc: Run the k6 scenario with PROFILE against a running stack (GATEWAY_URL overrides the target)
+    internal: true
+    silent: true
+    requires:
+      vars: [PROFILE]
+    cmds:
+      - |
+        set -eu
+        # k6 не умеет в SQL: seed-id берутся из БД стека и передаются в env сценария.
+        address_id=$({{.COMPOSE}} exec -T user-postgres \
+          psql -U postgres -d userdb -At \
+          -c "SELECT id FROM addresses WHERE user_id = '{{.SEED_USER_ID}}' ORDER BY created_at LIMIT 1")
+        product_ids=$({{.COMPOSE}} exec -T product-postgres \
+          psql -U postgres -d productdb -At \
+          -c "SELECT string_agg(id::text, ',' ORDER BY name) FROM products")
+        if [ -z "$address_id" ] || [ -z "$product_ids" ]; then
+          echo "seed-id не найдены: стек поднят (task load-up)?" >&2
+          exit 1
+        fi
+        {{.COMPOSE}} run --rm \
+          -e PROFILE={{.PROFILE}} \
+          -e GATEWAY_URL="${GATEWAY_URL:-http://gateway:8080}" \
+          -e SEED_ADDRESS_ID="$address_id" \
+          -e SEED_PRODUCT_IDS="$product_ids" \
+          k6 run /scripts/create_order.js
+
+  smoke:
+    desc: k6 smoke against a running stack - 5 RPS for 1 min, fails on any failed check
+    cmds:
+      - task: k6
+        vars: { PROFILE: smoke }

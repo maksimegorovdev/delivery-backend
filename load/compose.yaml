@@ -222,6 +222,22 @@ services:
       product-postgres:
         condition: service_healthy
 
+  # Добавляет товары до >= 10 (в миграциях их два); product стартует после сида.
+  seed-product:
+    image: postgres:18
+    restart: "no"
+    entrypoint: ["psql", "-v", "ON_ERROR_STOP=1", "-f", "/seed/seed.sql"]
+    environment:
+      PGHOST: product-postgres
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: productdb
+    volumes:
+      - ./sql/seed.sql:/seed/seed.sql:ro
+    depends_on:
+      migrate-product:
+        condition: service_completed_successfully
+
   migrate-notification:
     image: migrate/migrate:v4.19.1
     restart: "no"
@@ -286,6 +302,8 @@ services:
       - "127.0.0.1:38092:8092"
     depends_on:
       migrate-product:
+        condition: service_completed_successfully
+      seed-product:
         condition: service_completed_successfully
       otel-collector:
         condition: service_started

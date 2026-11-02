@@ -66,14 +66,31 @@ Postgres) передаёт `SEED_ADDRESS_ID`, `SEED_PRODUCT_IDS`, `GATEWAY_URL`,
 `task load-smoke`, `task load` (`defer` с `load-down`, `LOAD_KEEP=1` оставляет стек).
 
 **Acceptance criteria:**
-- [ ] `task load-smoke` на поднятом стеке проходит, `checks` = 100%, код выхода 0
-- [ ] При сломанном запросе (например, пустой `SEED_ADDRESS_ID` или неверный путь) задача падает с кодом ≠ 0
-- [ ] `task load` выполняет up → smoke → down; стек убирается и при падении smoke; `LOAD_KEEP=1` оставляет его
+- [x] `task load-smoke` на поднятом стеке проходит, `checks` = 100%, код выхода 0
+- [x] При сломанном запросе (например, пустой `SEED_ADDRESS_ID` или неверный путь) задача падает с кодом ≠ 0
+- [x] `task load` выполняет up → smoke → down; стек убирается и при падении smoke; `LOAD_KEEP=1` оставляет его
 
 **Verification:**
-- [ ] `task load` от чистого состояния — зелёный, `docker ps --filter name=delivery-load` пусто после
-- [ ] `GATEWAY_URL=http://gateway:8080/nope task load-smoke` → код ≠ 0
-- [ ] `SELECT count(*) FROM orders` в order-Postgres ≈ 300 после smoke; в заказах встречаются 1, 2 и 3 позиции
+- [x] `task load` от чистого состояния — зелёный, `docker ps --filter name=delivery-load` пусто после
+- [x] `GATEWAY_URL=http://gateway:8080/nope task load-smoke` → код ≠ 0
+- [x] `SELECT count(*) FROM orders` в order-Postgres ≈ 300 после smoke; в заказах встречаются 1, 2 и 3 позиции
+
+**Результат проверки:** RED — до правок `task load-smoke` не существовал (`Task "load-smoke" does not exist`,
+код 200). Smoke на поднятом стеке: 300 запросов, `checks` 600/600 = 100%, p95 ≈ 12 мс, код 0.
+`GATEWAY_URL=.../nope` → `checks` 0%, прогон прерван `abortOnFail` через ~2 с, код 201; пустой
+`SEED_ADDRESS_ID` и неизвестный `PROFILE` → исключение в `setup()`/`profile()`, код 107.
+`task load` от нуля: штатно — код 0, контейнеров и томов `delivery-load` после 0; со сломанным smoke —
+код 201, стек и тома тоже убраны; `LOAD_KEEP=1` оставил стек с сообщением. После smoke: `orders` = 300,
+заказов с 1/2/3 позициями 99/107/94, `quantity` 1–5, товаров 12 (повторный `seed-product` — `INSERT 0 0`),
+коннектор `order-outbox` RUNNING, `notifications` = 300. `task lint` (0 issues), `task test` зелёные;
+боевой код сервисов не менялся.
+
+**Найденный дефект Task 1 (исправлен в этой задаче):** первый `load-up` упал — `debezium` стал
+unhealthy и был убит `OOMKilled` (код 137). Образ запускает JVM с `-Xmx2G`, лимит контейнера в
+load-стеке 1 ГБ: куча росла за лимит, JVM зависала на GC (один плагин сканировался ~5 мин), cgroup
+убивала процесс. На прогоне Task 1 куча до лимита не дошла — дефект плавающий. Исправление:
+`KAFKA_HEAP_OPTS: "-Xms256M -Xmx512M"` у `debezium` в `load/compose.yaml`; лимиты ресурсов не менялись.
+После него `load-up` стабильно проходит (~2.5 мин с нуля), debezium ≈ 630 МБ из 1 ГБ.
 
 **Dependencies:** Task 1
 
