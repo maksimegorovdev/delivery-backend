@@ -472,12 +472,20 @@ baseline.txt new.txt`), `bench-baseline` (копия new → baseline). `new.txt
 (цепочка интерсепторов с пустым handler). Модуль `platform` добавляется в список `task bench`.
 
 **Acceptance criteria:**
-- [ ] Бенчмарки трёх пакетов в `new.txt`
-- [ ] Бенчмарки без I/O и без сети, результат стабилен (разброс `benchstat` ≤ ~5%)
+- [x] Бенчмарки трёх пакетов в `new.txt`
+- [x] Бенчмарки без I/O и без сети, результат стабилен (разброс `benchstat` ≤ ~5%)
 
 **Verification:**
-- [ ] `task bench && task bench-compare` — разброс в выводе приемлемый
-- [ ] `task -d platform lint test` зелёные
+- [x] `task bench && task bench-compare` — разброс в выводе приемлемый
+- [x] `task -d platform lint test` зелёные
+
+**Результат проверки:** RED — `BENCH_MODULES` без `platform`, пакеты в `new.txt` отсутствовали. Теперь `task bench` пишет 4 пакета (120 строк):
+`BenchmarkMiddleware_Chain` (success/failure: ~2,3 мкс, 29/26 allocs; chi + Route → RequestID → FakeAuth → Logger(JSON в nopWriter) → Recover),
+`BenchmarkRequestID_Generate` (~0,42 мкс), `BenchmarkResponse_Created` (items=1/10: ~0,66/1,53 мкс, 6 allocs) и `_Fail` (~0,61 мкс, 4 allocs),
+`BenchmarkInterceptors_Chain` (Logger → Error → Validation, success/failure: ~0,75/1,45 мкс, 2/15 allocs). Без I/O и сети: `discardWriter`, цепочка
+интерцепторов собрана вручную без `grpc.Server`. Разброс `benchstat` ≤ 3,6% (± по выборке), кроме `Middleware_Chain/failure` — одиночный выброс,
+min–max 11%. Логгер пишет в свой `nopWriter` (не `io.Discard`/`slog.DiscardHandler`: линтер требует последний, но он пропускает форматирование и занизил бы стоимость).
+`task -d platform lint test` зелёные (0 issues). Боевой код не тронут.
 
 **Dependencies:** Task 10
 

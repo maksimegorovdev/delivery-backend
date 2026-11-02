@@ -7,7 +7,7 @@ vars:
   # Совпадает с FAKE_AUTH_USER_ID gateway в compose.yaml и сидом миграций user: адрес берётся у этого пользователя.
   SEED_USER_ID: 01a0d1fa-a4e8-75a1-802d-d6e3c642b0f3
   # Модули с Go-бенчмарками (относительно корня репозитория); новые модули добавляются сюда.
-  BENCH_MODULES: services/gateway
+  BENCH_MODULES: services/gateway platform
   # benchstat — tool в e2e/go.mod: тестовый модуль никем не импортируется, зависимость не попадает в граф сервисов.
   BENCHSTAT: cd {{.TASKFILE_DIR}}/../e2e && go tool benchstat
 
