@@ -3,6 +3,7 @@ x-clickhouse-passwords:
   grafana-reader: &clickhouse-grafana-reader-password grafana_reader
 
 services:
+
   order-postgres:
     container_name: order-postgres
     image: postgres:18
