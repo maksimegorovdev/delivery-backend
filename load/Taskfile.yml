@@ -19,7 +19,7 @@ tasks:
       - '{{.COMPOSE}} down -v'
 
   k6:
-    desc: Run the k6 scenario with PROFILE against a running stack (GATEWAY_URL overrides the target)
+    desc: Run the k6 scenario with PROFILE against a running stack (GATEWAY_URL overrides the target, RUN_ID names the results dir)
     internal: true
     silent: true
     requires:
@@ -40,6 +40,8 @@ tasks:
         fi
         {{.COMPOSE}} run --rm \
           -e PROFILE={{.PROFILE}} \
+          -e RUN_ID="{{.RUN_ID}}" \
+          -e STRESS_RATES="${STRESS_RATES:-}" \
           -e GATEWAY_URL="${GATEWAY_URL:-http://gateway:8080}" \
           -e SEED_ADDRESS_ID="$address_id" \
           -e SEED_PRODUCT_IDS="$product_ids" \
@@ -50,3 +52,26 @@ tasks:
     cmds:
       - task: k6
         vars: { PROFILE: smoke }
+
+  stress:
+    desc: k6 stress - RPS steps until degradation, summary and docker-stats.csv go to results/raw/<run> (STRESS_RATES overrides the steps)
+    vars:
+      RUN_ID:
+        sh: date +%Y%m%d-%H%M%S
+    cmds:
+      - mkdir -p results/raw/{{.RUN_ID}}
+      - cmd: |
+          sh scripts/docker-stats.sh delivery-load results/raw/{{.RUN_ID}}/docker-stats.csv 5 >/dev/null 2>&1 &
+          echo $! > results/raw/{{.RUN_ID}}/sampler.pid
+      - defer: |
+          pid=results/raw/{{.RUN_ID}}/sampler.pid
+          if [ -f "$pid" ]; then kill "$(cat "$pid")" 2>/dev/null || true; rm -f "$pid"; fi
+      # Код 99 у k6 — нарушены пороги: для stress штатный исход «предел найден». Исход решает вердикт в summary.json.
+      - task: k6
+        vars: { PROFILE: stress, RUN_ID: '{{.RUN_ID}}' }
+        ignore_error: true
+      - cmd: |
+          summary=results/raw/{{.RUN_ID}}/summary.json
+          if [ ! -f "$summary" ]; then echo "stress: summary.json не создан, прогон не состоялся" >&2; exit 1; fi
+          if grep -q '"verdict": "failed"' "$summary"; then echo "stress: вердикт failed, см. $summary" >&2; exit 1; fi
+          echo "stress: результаты в load/results/raw/{{.RUN_ID}}"

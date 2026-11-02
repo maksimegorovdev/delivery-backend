@@ -106,6 +106,11 @@ tasks:
     cmds:
       - task -d load smoke
 
+  load-stress:
+    desc: k6 stress against a running load stack (task load-up) - RPS steps until degradation (STRESS_RATES overrides the steps)
+    cmds:
+      - task -d load stress
+
   load:
     desc: Bring up the load stack, run smoke, remove the stack (LOAD_KEEP=1 keeps it)
     cmds:

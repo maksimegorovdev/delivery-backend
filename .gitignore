@@ -36,3 +36,6 @@ coverage/
 .DS_Store
 bin/
 tmp/
+
+# Load test raw results: committed only when referenced by load/results/baseline.md
+load/results/raw/*
