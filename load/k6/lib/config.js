@@ -24,6 +24,16 @@ const stress = {
 // Через сколько секунд плато начинать оценивать пороги: первые секунды выборка слишком мала.
 const evalAfterPlateauSec = 30;
 
+// Статистики трендов в summary профилей stress, regression и soak.
+const summaryTrendStats = ['min', 'avg', 'p(50)', 'p(95)', 'p(99)', 'max'];
+
+// constantRateScenario — сценарий create_order с постоянным RPS (открытая модель).
+function constantRateScenario({ rate, duration, preAllocatedVUs, maxVUs }) {
+  return {
+    create_order: { executor: 'constant-arrival-rate', rate, timeUnit: '1s', duration, preAllocatedVUs, maxVUs },
+  };
+}
+
 // Калибровка эталона p95 в setup() профиля stress (см. calibrate в create_order.js): прогрев по времени,
 // затем requests последовательных запросов в темпе первой ступени.
 export const calibration = {
@@ -122,7 +132,7 @@ function stressProfile() {
     // setup() прогревает стек и калибрует эталон p95 (см. create_order.js): дольше дефолтных 60 с
     // и зависит от темпа первой ступени.
     setupTimeout: `${calibrationTimeoutSec(plan.stages[0].rate)}s`,
-    summaryTrendStats: ['min', 'avg', 'p(50)', 'p(95)', 'p(99)', 'max'],
+    summaryTrendStats,
   };
 }
 
@@ -180,16 +190,12 @@ const profiles = {
   // Утечки и деградация во времени: постоянный RPS гейта 30 мин. Пороги ловят только дефекты прогона;
   // дрейф p99 оценивает summary (метрики окон first/last), а не abort: прогон должен дойти до конца.
   soak: () => ({
-    scenarios: {
-      create_order: {
-        executor: 'constant-arrival-rate',
-        rate: regressionRPS,
-        timeUnit: '1s',
-        duration: `${soak.durationSec / 60}m`,
-        preAllocatedVUs: soak.preAllocatedVUs,
-        maxVUs: soak.maxVUs,
-      },
-    },
+    scenarios: constantRateScenario({
+      rate: regressionRPS,
+      duration: `${soak.durationSec / 60}m`,
+      preAllocatedVUs: soak.preAllocatedVUs,
+      maxVUs: soak.maxVUs,
+    }),
     thresholds: {
       http_req_failed: [{ threshold: `rate<${soak.maxErrorRate}`, abortOnFail: true, delayAbortEval: '60s' }],
       checks: [{ threshold: 'rate==1', abortOnFail: true, delayAbortEval: '60s' }],
@@ -203,20 +209,16 @@ const profiles = {
       'http_req_failed{window:first}': [],
       'http_req_failed{window:last}': [],
     },
-    summaryTrendStats: ['min', 'avg', 'p(50)', 'p(95)', 'p(99)', 'max'],
+    summaryTrendStats,
   }),
   // Гейт регрессий: постоянный RPS = 70% предела, нарушение любого порога даёт ненулевой код выхода k6.
   regression: () => ({
-    scenarios: {
-      create_order: {
-        executor: 'constant-arrival-rate',
-        rate: regressionRPS,
-        timeUnit: '1s',
-        duration: regression.duration,
-        preAllocatedVUs: regression.preAllocatedVUs,
-        maxVUs: regression.maxVUs,
-      },
-    },
+    scenarios: constantRateScenario({
+      rate: regressionRPS,
+      duration: regression.duration,
+      preAllocatedVUs: regression.preAllocatedVUs,
+      maxVUs: regression.maxVUs,
+    }),
     thresholds: {
       'http_req_duration{name:create_order}': [`p(95)<=${regressionP95Ms()}`],
       http_req_failed: [`rate<${regression.maxErrorRate}`],
@@ -225,20 +227,11 @@ const profiles = {
       // Пропущенные итерации — система не держит заданный RPS.
       dropped_iterations: ['count==0'],
     },
-    summaryTrendStats: ['min', 'avg', 'p(50)', 'p(95)', 'p(99)', 'max'],
+    summaryTrendStats,
   }),
   // Сценарий и стек работают: 5 RPS × 1 мин. Любая проваленная проверка останавливает прогон.
   smoke: () => ({
-    scenarios: {
-      create_order: {
-        executor: 'constant-arrival-rate',
-        rate: 5,
-        timeUnit: '1s',
-        duration: '1m',
-        preAllocatedVUs: 10,
-        maxVUs: 50,
-      },
-    },
+    scenarios: constantRateScenario({ rate: 5, duration: '1m', preAllocatedVUs: 10, maxVUs: 50 }),
     thresholds: {
       checks: [{ threshold: 'rate==1', abortOnFail: true }],
       checked_iterations: ['count>0'],
