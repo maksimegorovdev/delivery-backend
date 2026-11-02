@@ -44,6 +44,11 @@
 - Taskfile для автоматизации задач
 - Air для hot reload сервисов при разработке
 
+### Тестирование
+- E2E-тесты на отдельном compose-стеке `delivery-e2e`
+- Нагрузочное тестирование k6 на изолированном стеке `delivery-load`: профили smoke, stress (поиск предела), regression (гейт регрессий), soak; gRPC-нагрузка через ghz; результаты и предел — в [`load/results/baseline.md`](load/results/baseline.md)
+- Go-бенчмарки горячих путей и сравнение с эталоном через benchstat (`task bench`, `task bench-compare`)
+
 ### Observability
 - OpenTelemetry Collector — приём OTLP и запись в ClickHouse
 - ClickHouse — хранилище логов, трейсов и метрик

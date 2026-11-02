@@ -538,8 +538,10 @@ min–max 11%. Логгер пишет в свой `nopWriter` (не `io.Discard
 
 **Description:** (1) `delayAbortEval` k6 отсчитывается от старта прогона вместе с `setup()` (`MarkStarted` до setup
 в `internal/execution/scheduler.go` k6), калибровка длится ~74 с — пороги abort оценивали плато с первых секунд
-(в baseline ступень 16 прервана через ~8 с плато). Окно оценки размечается тегом `eval` (`stageAt`), пороги abort —
-на подметриках `{stage:N,eval:1}` без `delayAbortEval`. (2) `limitThresholds` в `summary.js` не совпадал со строкой
+(в baseline ступень 16 прервана через ~8 с плато). Первая попытка (тег `eval` с 30-й секунды плато, `86608a3`)
+оценивала окно, копившееся с нуля: прогон остановился на 175 RPS из-за одного всплеска на 2–4 с данных. Итог:
+калибровка ограничена по времени (`calibration.warmupSec` + `measureSec` от начала `setup()`), `delayAbortEval`
+сдвинут на `setupSec`, тег `eval` убран. (2) `limitThresholds` в `summary.js` не совпадал со строкой
 `dropped_iterations: count==0` — остановка по пропущенным итерациям давала `failed` вместо `limit_reached`.
 
 **Acceptance criteria:**
@@ -548,11 +550,16 @@ min–max 11%. Логгер пишет в свой `nopWriter` (не `io.Discard
 - [x] Node-тесты логики k6 (`task load-js-test`) воспроизводят оба дефекта и зелёные после исправления
 - [x] `summary.js`: пропуски на разгоне помечают ступень остановки; summary пишется без `scenario_start_ts` и при
   пропусках в первые секунды; stress без подметрик плато и soak без p99 окна — `failed`, а не `completed`
-- [ ] Stress перепрогнан, `baseline.md` и пороги `regression` в `config.js` обновлены по новому пределу
+- [x] Stress перепрогнан, результат в `baseline.md` (раздел 8): предел 325 RPS против 375 в baseline — разброс
+  прогонов; пороги `regression` не меняются (275 RPS в повторе — p95 4.5 мс при пороге 6 мс)
+- [x] Бенчмарки цепочек в порядке сервисов (gRPC `Error → Logger → Validation`, HTTP `Route → RequestID → Logger →
+  Recover → FakeAuth`), путь проверяется до замера; цель k6 — `LOAD_GATEWAY_URL` с allowlist хостов
 
 **Verification:**
-- [x] `task load-js-test` зелёный; `k6 inspect -e PROFILE=stress` (k6 2.3.0) принимает пороги `{stage:N,eval:1}`
-- [ ] `task load-stress` на свежем стеке
+- [x] `task load-js-test` зелёный; `k6 inspect -e PROFILE=stress` (k6 2.3.0): `setupTimeout` 1m40s, у ступени 16
+  `delayAbortEval` 32m10s (70 с setup + 1830 с до плато + 30 с)
+- [x] `task load-stress` на свежем стеке: `limit_reached`, 325 RPS, остановка по `dropped_iterations` на ступени 14
+- [x] `task bench && task bench-compare`: цепочки −2…−11%, остальное в шуме; `baseline.txt` перезаписан этим прогоном по команде пользователя
 
 **Dependencies:** Task 12
 

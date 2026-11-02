@@ -25,13 +25,13 @@ const gatewayURL = __ENV.GATEWAY_URL || 'http://gateway:8080';
 const orderURL = `${gatewayURL}/api/v1/orders`;
 const orderParams = { headers: { 'Content-Type': 'application/json' } };
 
-// calibrate прогревает стек calibration.warmupSec секунд, затем шлёт calibration.requests последовательных
-// запросов в темпе первой ступени и возвращает p95 их длительности (мс). Параметры и расчёт setupTimeout
-// под них — в lib/config.js.
+// calibrate прогревает стек до setupStartMs + calibration.warmupSec, затем ещё calibration.measureSec шлёт
+// последовательные запросы в темпе первой ступени и возвращает p95 их длительности (мс). Сроки — от начала
+// setup(), чтобы setup() длился setupSec: на это время сдвинуты пороги abort (см. lib/config.js).
 // Это эталон для критерия «p95 > 3× p95 первой ступени»: темп первой ступени, а не серия без пауз, потому что
 // на редких запросах задержка заметно выше (холодные соединения и кэши). Запросы помечены name=calibration
 // и не попадают в ступени.
-function calibrate(seed) {
+function calibrate(seed, setupStartMs) {
   const pauseSec = 1 / stressPlan().stages[0].rate;
   const send = () => {
     const res = http.post(orderURL, JSON.stringify(randomOrder(seed)), {
@@ -44,22 +44,27 @@ function calibrate(seed) {
     sleep(pauseSec);
     return res.timings.duration;
   };
-  const warmupEnd = Date.now() + calibration.warmupSec * 1000;
+  const warmupEnd = setupStartMs + calibration.warmupSec * 1000;
   while (Date.now() < warmupEnd) {
     send();
   }
+  const measureEnd = warmupEnd + calibration.measureSec * 1000;
   const durations = [];
-  for (let i = 0; i < calibration.requests; i++) {
+  while (Date.now() < measureEnd) {
     durations.push(send());
+  }
+  if (durations.length === 0) {
+    throw new Error('calibration: no requests measured');
   }
   durations.sort((a, b) => a - b);
   return durations[Math.ceil(durations.length * 0.95) - 1];
 }
 
 export function setup() {
+  const setupStartMs = Date.now();
   const seed = loadSeed();
   if (profileName === 'stress') {
-    seed.baselineP95 = calibrate(seed);
+    seed.baselineP95 = calibrate(seed, setupStartMs);
     baselineP95.add(seed.baselineP95);
   }
   return seed;
@@ -84,13 +89,7 @@ export default function (seed) {
   exec.vu.tags.phase = at.phase;
   if (at.window !== undefined) {
     exec.vu.tags.window = at.window;
-  }
-  // Теги VU живут между итерациями: eval перезаписывается на каждой, иначе окно оценки ступени перешло бы
-  // на разгон следующей.
-  if (at.eval !== undefined) {
-    exec.vu.tags.eval = at.eval ? '1' : '0';
-  }
-  targetRPS.add(at.target);
+  }  targetRPS.add(at.target);
 
   const res = http.post(orderURL, JSON.stringify(randomOrder(seed)), {
     ...orderParams,

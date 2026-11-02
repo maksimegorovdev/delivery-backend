@@ -2,12 +2,12 @@
 ?   	github.com/maksimegorovdev/delivery-backend/services/gateway/docs	[no test files]
 ?   	github.com/maksimegorovdev/delivery-backend/services/gateway/internal/app	[no test files]
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/services/gateway/internal/client	0.446s
+ok  	github.com/maksimegorovdev/delivery-backend/services/gateway/internal/client	0.361s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/services/gateway/internal/config	0.295s
+ok  	github.com/maksimegorovdev/delivery-backend/services/gateway/internal/config	0.296s
 ?   	github.com/maksimegorovdev/delivery-backend/services/gateway/internal/domain	[no test files]
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/services/gateway/internal/service	0.260s
+ok  	github.com/maksimegorovdev/delivery-backend/services/gateway/internal/service	0.292s
 ?   	github.com/maksimegorovdev/delivery-backend/services/gateway/internal/service/mocks	[no test files]
 ?   	github.com/maksimegorovdev/delivery-backend/services/gateway/internal/transport/http	[no test files]
 ?   	github.com/maksimegorovdev/delivery-backend/services/gateway/internal/transport/http/swagger	[no test files]
@@ -15,310 +15,310 @@ goos: darwin
 goarch: arm64
 pkg: github.com/maksimegorovdev/delivery-backend/services/gateway/internal/transport/http/v1/order
 cpu: Apple M2 Pro
-BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	 1020498	      1178 ns/op	    1052 B/op	      25 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	 1000000	      1214 ns/op	    1052 B/op	      25 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	 1000000	      1306 ns/op	    1052 B/op	      25 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	  958730	      1185 ns/op	    1052 B/op	      25 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	  979368	      1161 ns/op	    1052 B/op	      25 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	  952273	      1174 ns/op	    1052 B/op	      25 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	 1000000	      1165 ns/op	    1052 B/op	      25 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	  997084	      1225 ns/op	    1052 B/op	      25 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	 1000000	      1160 ns/op	    1052 B/op	      25 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	 1000000	      1185 ns/op	    1052 B/op	      25 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  214840	      5709 ns/op	    3754 B/op	     124 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  212125	      5654 ns/op	    3754 B/op	     124 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  202388	      5746 ns/op	    3754 B/op	     124 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  221073	      5709 ns/op	    3754 B/op	     124 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  207242	      5727 ns/op	    3754 B/op	     124 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  204908	      5734 ns/op	    3754 B/op	     124 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  205587	      5620 ns/op	    3754 B/op	     124 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  209815	      5674 ns/op	    3754 B/op	     124 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  213753	      5572 ns/op	    3754 B/op	     124 allocs/op
-BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  219147	      5724 ns/op	    3754 B/op	     124 allocs/op
-BenchmarkHandler_CreateOrder/items=1-12                    	  221085	      5281 ns/op	    9236 B/op	      60 allocs/op
-BenchmarkHandler_CreateOrder/items=1-12                    	  236787	      5277 ns/op	    9236 B/op	      60 allocs/op
-BenchmarkHandler_CreateOrder/items=1-12                    	  244298	      5250 ns/op	    9236 B/op	      60 allocs/op
-BenchmarkHandler_CreateOrder/items=1-12                    	  241782	      5410 ns/op	    9237 B/op	      60 allocs/op
-BenchmarkHandler_CreateOrder/items=1-12                    	  213795	      5257 ns/op	    9236 B/op	      60 allocs/op
-BenchmarkHandler_CreateOrder/items=1-12                    	  230859	      5167 ns/op	    9235 B/op	      60 allocs/op
-BenchmarkHandler_CreateOrder/items=1-12                    	  203214	      5335 ns/op	    9237 B/op	      60 allocs/op
-BenchmarkHandler_CreateOrder/items=1-12                    	  224118	      5238 ns/op	    9236 B/op	      60 allocs/op
-BenchmarkHandler_CreateOrder/items=1-12                    	  217298	      5257 ns/op	    9236 B/op	      60 allocs/op
-BenchmarkHandler_CreateOrder/items=1-12                    	  233150	      5298 ns/op	    9235 B/op	      60 allocs/op
-BenchmarkHandler_CreateOrder/items=10-12                   	   70515	     15851 ns/op	   16695 B/op	     165 allocs/op
-BenchmarkHandler_CreateOrder/items=10-12                   	   78498	     15974 ns/op	   16697 B/op	     165 allocs/op
-BenchmarkHandler_CreateOrder/items=10-12                   	   77852	     15801 ns/op	   16694 B/op	     165 allocs/op
-BenchmarkHandler_CreateOrder/items=10-12                   	   74455	     15889 ns/op	   16694 B/op	     165 allocs/op
-BenchmarkHandler_CreateOrder/items=10-12                   	   75780	     15888 ns/op	   16695 B/op	     165 allocs/op
-BenchmarkHandler_CreateOrder/items=10-12                   	   76339	     15700 ns/op	   16691 B/op	     165 allocs/op
-BenchmarkHandler_CreateOrder/items=10-12                   	   76782	     15874 ns/op	   16693 B/op	     165 allocs/op
-BenchmarkHandler_CreateOrder/items=10-12                   	   79236	     15940 ns/op	   16695 B/op	     165 allocs/op
-BenchmarkHandler_CreateOrder/items=10-12                   	   74917	     15850 ns/op	   16694 B/op	     165 allocs/op
-BenchmarkHandler_CreateOrder/items=10-12                   	   73905	     16222 ns/op	   16700 B/op	     165 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	 1039742	      1142 ns/op	    1052 B/op	      25 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	 1000000	      1121 ns/op	    1052 B/op	      25 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	 1000000	      1206 ns/op	    1052 B/op	      25 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	 1000000	      1121 ns/op	    1052 B/op	      25 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	 1000000	      1123 ns/op	    1052 B/op	      25 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	  946776	      1149 ns/op	    1052 B/op	      25 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	 1000000	      1159 ns/op	    1052 B/op	      25 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	 1000000	      1210 ns/op	    1052 B/op	      25 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	  986683	      1129 ns/op	    1052 B/op	      25 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=1-12         	 1000000	      1191 ns/op	    1052 B/op	      25 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  185335	      5902 ns/op	    3754 B/op	     124 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  221052	      5549 ns/op	    3754 B/op	     124 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  220988	      5476 ns/op	    3754 B/op	     124 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  216116	      5523 ns/op	    3754 B/op	     124 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  219482	      5537 ns/op	    3754 B/op	     124 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  220032	      5570 ns/op	    3754 B/op	     124 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  222210	      5598 ns/op	    3754 B/op	     124 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  207571	      5834 ns/op	    3754 B/op	     124 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  210894	      5890 ns/op	    3754 B/op	     124 allocs/op
+BenchmarkCreateOrderRequestDTO_Validate/items=10-12        	  204763	      5635 ns/op	    3754 B/op	     124 allocs/op
+BenchmarkHandler_CreateOrder/items=1-12                    	  216734	      5203 ns/op	    9235 B/op	      60 allocs/op
+BenchmarkHandler_CreateOrder/items=1-12                    	  239071	      5117 ns/op	    9234 B/op	      60 allocs/op
+BenchmarkHandler_CreateOrder/items=1-12                    	  238250	      5343 ns/op	    9237 B/op	      60 allocs/op
+BenchmarkHandler_CreateOrder/items=1-12                    	  223598	      5329 ns/op	    9237 B/op	      60 allocs/op
+BenchmarkHandler_CreateOrder/items=1-12                    	  222445	      5261 ns/op	    9236 B/op	      60 allocs/op
+BenchmarkHandler_CreateOrder/items=1-12                    	  229797	      5205 ns/op	    9234 B/op	      60 allocs/op
+BenchmarkHandler_CreateOrder/items=1-12                    	  237271	      5415 ns/op	    9238 B/op	      60 allocs/op
+BenchmarkHandler_CreateOrder/items=1-12                    	  238460	      5526 ns/op	    9237 B/op	      60 allocs/op
+BenchmarkHandler_CreateOrder/items=1-12                    	  231638	      5022 ns/op	    9234 B/op	      60 allocs/op
+BenchmarkHandler_CreateOrder/items=1-12                    	  240572	      5020 ns/op	    9234 B/op	      60 allocs/op
+BenchmarkHandler_CreateOrder/items=10-12                   	   78769	     15081 ns/op	   16686 B/op	     165 allocs/op
+BenchmarkHandler_CreateOrder/items=10-12                   	   79496	     15512 ns/op	   16690 B/op	     165 allocs/op
+BenchmarkHandler_CreateOrder/items=10-12                   	   79165	     15057 ns/op	   16684 B/op	     165 allocs/op
+BenchmarkHandler_CreateOrder/items=10-12                   	   79376	     15139 ns/op	   16691 B/op	     165 allocs/op
+BenchmarkHandler_CreateOrder/items=10-12                   	   80354	     15068 ns/op	   16688 B/op	     165 allocs/op
+BenchmarkHandler_CreateOrder/items=10-12                   	   80193	     15794 ns/op	   16693 B/op	     165 allocs/op
+BenchmarkHandler_CreateOrder/items=10-12                   	   72609	     16927 ns/op	   16712 B/op	     165 allocs/op
+BenchmarkHandler_CreateOrder/items=10-12                   	   71932	     15843 ns/op	   16697 B/op	     165 allocs/op
+BenchmarkHandler_CreateOrder/items=10-12                   	   79382	     15507 ns/op	   16692 B/op	     165 allocs/op
+BenchmarkHandler_CreateOrder/items=10-12                   	   74430	     15385 ns/op	   16694 B/op	     165 allocs/op
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/services/gateway/internal/transport/http/v1/order	48.277s
+ok  	github.com/maksimegorovdev/delivery-backend/services/gateway/internal/transport/http/v1/order	48.149s
 ?   	github.com/maksimegorovdev/delivery-backend/services/gateway/internal/transport/http/v1/order/mocks	[no test files]
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/appctx	0.284s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/appctx	0.296s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/apperr	0.274s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/apperr	0.291s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/apperr/grpcerr	0.391s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/apperr/grpcerr	0.394s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/apperr/ozzoerr	0.306s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/apperr/ozzoerr	0.316s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/apperr/pgerr	0.575s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/apperr/pgerr	0.294s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/closer	0.264s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/closer	0.289s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/grpc	0.351s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/grpc	0.367s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcclient	0.329s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcclient	0.337s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcserver	0.329s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcserver	0.360s
 goos: darwin
 goarch: arm64
 pkg: github.com/maksimegorovdev/delivery-backend/platform/grpc/interceptors
 cpu: Apple M2 Pro
-BenchmarkInterceptors_Chain/success-12         	 1563619	       756.4 ns/op	     176 B/op	       2 allocs/op
-BenchmarkInterceptors_Chain/success-12         	 1628082	       732.1 ns/op	     176 B/op	       2 allocs/op
-BenchmarkInterceptors_Chain/success-12         	 1588077	       746.0 ns/op	     176 B/op	       2 allocs/op
-BenchmarkInterceptors_Chain/success-12         	 1635051	       739.3 ns/op	     176 B/op	       2 allocs/op
-BenchmarkInterceptors_Chain/success-12         	 1629849	       737.2 ns/op	     176 B/op	       2 allocs/op
-BenchmarkInterceptors_Chain/success-12         	 1635966	       735.5 ns/op	     176 B/op	       2 allocs/op
-BenchmarkInterceptors_Chain/success-12         	 1635489	       729.0 ns/op	     176 B/op	       2 allocs/op
-BenchmarkInterceptors_Chain/success-12         	 1603480	       744.9 ns/op	     176 B/op	       2 allocs/op
-BenchmarkInterceptors_Chain/success-12         	 1650133	       730.7 ns/op	     176 B/op	       2 allocs/op
-BenchmarkInterceptors_Chain/success-12         	 1611736	       740.1 ns/op	     176 B/op	       2 allocs/op
-BenchmarkInterceptors_Chain/failure-12         	  836780	      1434 ns/op	     842 B/op	      15 allocs/op
-BenchmarkInterceptors_Chain/failure-12         	  852292	      1395 ns/op	     842 B/op	      15 allocs/op
-BenchmarkInterceptors_Chain/failure-12         	  877890	      1429 ns/op	     842 B/op	      15 allocs/op
-BenchmarkInterceptors_Chain/failure-12         	  898376	      1430 ns/op	     842 B/op	      15 allocs/op
-BenchmarkInterceptors_Chain/failure-12         	  772672	      1400 ns/op	     842 B/op	      15 allocs/op
-BenchmarkInterceptors_Chain/failure-12         	  880340	      1404 ns/op	     842 B/op	      15 allocs/op
-BenchmarkInterceptors_Chain/failure-12         	  853778	      1397 ns/op	     842 B/op	      15 allocs/op
-BenchmarkInterceptors_Chain/failure-12         	  875794	      1389 ns/op	     842 B/op	      15 allocs/op
-BenchmarkInterceptors_Chain/failure-12         	  890408	      1408 ns/op	     842 B/op	      15 allocs/op
-BenchmarkInterceptors_Chain/failure-12         	  797792	      1413 ns/op	     842 B/op	      15 allocs/op
+BenchmarkInterceptors_Chain/success-12         	 1612922	       738.4 ns/op	     176 B/op	       2 allocs/op
+BenchmarkInterceptors_Chain/success-12         	 1659487	       725.7 ns/op	     176 B/op	       2 allocs/op
+BenchmarkInterceptors_Chain/success-12         	 1625347	       741.5 ns/op	     176 B/op	       2 allocs/op
+BenchmarkInterceptors_Chain/success-12         	 1679228	       715.6 ns/op	     176 B/op	       2 allocs/op
+BenchmarkInterceptors_Chain/success-12         	 1629133	       729.3 ns/op	     176 B/op	       2 allocs/op
+BenchmarkInterceptors_Chain/success-12         	 1655840	       721.9 ns/op	     176 B/op	       2 allocs/op
+BenchmarkInterceptors_Chain/success-12         	 1672729	       719.1 ns/op	     176 B/op	       2 allocs/op
+BenchmarkInterceptors_Chain/success-12         	 1666680	       716.5 ns/op	     176 B/op	       2 allocs/op
+BenchmarkInterceptors_Chain/success-12         	 1674459	       714.9 ns/op	     176 B/op	       2 allocs/op
+BenchmarkInterceptors_Chain/success-12         	 1689643	       711.8 ns/op	     176 B/op	       2 allocs/op
+BenchmarkInterceptors_Chain/failure-12         	  971593	      1244 ns/op	     761 B/op	      13 allocs/op
+BenchmarkInterceptors_Chain/failure-12         	  978399	      1243 ns/op	     761 B/op	      13 allocs/op
+BenchmarkInterceptors_Chain/failure-12         	  987325	      1243 ns/op	     761 B/op	      13 allocs/op
+BenchmarkInterceptors_Chain/failure-12         	  967503	      1247 ns/op	     761 B/op	      13 allocs/op
+BenchmarkInterceptors_Chain/failure-12         	  974018	      1244 ns/op	     761 B/op	      13 allocs/op
+BenchmarkInterceptors_Chain/failure-12         	  987416	      1347 ns/op	     761 B/op	      13 allocs/op
+BenchmarkInterceptors_Chain/failure-12         	  904984	      1332 ns/op	     761 B/op	      13 allocs/op
+BenchmarkInterceptors_Chain/failure-12         	  962347	      1268 ns/op	     761 B/op	      13 allocs/op
+BenchmarkInterceptors_Chain/failure-12         	  964885	      1279 ns/op	     761 B/op	      13 allocs/op
+BenchmarkInterceptors_Chain/failure-12         	  976820	      1273 ns/op	     761 B/op	      13 allocs/op
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/grpc/interceptors	24.384s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/grpc/interceptors	24.574s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/http/bind	0.322s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/http/bind	0.307s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/http/httpserver	0.343s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/http/httpserver	0.323s
 goos: darwin
 goarch: arm64
 pkg: github.com/maksimegorovdev/delivery-backend/platform/http/middleware
 cpu: Apple M2 Pro
-BenchmarkMiddleware_Chain/success-12         	  523467	      2287 ns/op	    2469 B/op	      29 allocs/op
-BenchmarkMiddleware_Chain/success-12         	  528580	      2251 ns/op	    2469 B/op	      29 allocs/op
-BenchmarkMiddleware_Chain/success-12         	  536221	      2191 ns/op	    2469 B/op	      29 allocs/op
-BenchmarkMiddleware_Chain/success-12         	  538472	      2245 ns/op	    2469 B/op	      29 allocs/op
-BenchmarkMiddleware_Chain/success-12         	  555505	      2324 ns/op	    2469 B/op	      29 allocs/op
-BenchmarkMiddleware_Chain/success-12         	  519541	      2279 ns/op	    2469 B/op	      29 allocs/op
-BenchmarkMiddleware_Chain/success-12         	  517320	      2340 ns/op	    2469 B/op	      29 allocs/op
-BenchmarkMiddleware_Chain/success-12         	  519022	      2220 ns/op	    2469 B/op	      29 allocs/op
-BenchmarkMiddleware_Chain/success-12         	  528714	      2362 ns/op	    2469 B/op	      29 allocs/op
-BenchmarkMiddleware_Chain/success-12         	  538296	      2240 ns/op	    2469 B/op	      29 allocs/op
-BenchmarkMiddleware_Chain/failure-12         	  482905	      2250 ns/op	    2341 B/op	      26 allocs/op
-BenchmarkMiddleware_Chain/failure-12         	  541674	      2242 ns/op	    2341 B/op	      26 allocs/op
-BenchmarkMiddleware_Chain/failure-12         	  509005	      2234 ns/op	    2341 B/op	      26 allocs/op
-BenchmarkMiddleware_Chain/failure-12         	  558346	      2260 ns/op	    2341 B/op	      26 allocs/op
-BenchmarkMiddleware_Chain/failure-12         	  544688	      2249 ns/op	    2340 B/op	      26 allocs/op
-BenchmarkMiddleware_Chain/failure-12         	  514185	      2260 ns/op	    2341 B/op	      26 allocs/op
-BenchmarkMiddleware_Chain/failure-12         	  531210	      2280 ns/op	    2341 B/op	      26 allocs/op
-BenchmarkMiddleware_Chain/failure-12         	  518209	      2242 ns/op	    2341 B/op	      26 allocs/op
-BenchmarkMiddleware_Chain/failure-12         	  533330	      2277 ns/op	    2341 B/op	      26 allocs/op
-BenchmarkMiddleware_Chain/failure-12         	  545870	      2211 ns/op	    2341 B/op	      26 allocs/op
-BenchmarkRequestID_Generate-12               	 2826763	       421.0 ns/op	     544 B/op	       8 allocs/op
-BenchmarkRequestID_Generate-12               	 2984374	       409.5 ns/op	     544 B/op	       8 allocs/op
-BenchmarkRequestID_Generate-12               	 2908176	       409.0 ns/op	     544 B/op	       8 allocs/op
-BenchmarkRequestID_Generate-12               	 2853345	       418.9 ns/op	     544 B/op	       8 allocs/op
-BenchmarkRequestID_Generate-12               	 2901898	       417.0 ns/op	     544 B/op	       8 allocs/op
-BenchmarkRequestID_Generate-12               	 2895450	       414.8 ns/op	     544 B/op	       8 allocs/op
-BenchmarkRequestID_Generate-12               	 2859252	       417.7 ns/op	     544 B/op	       8 allocs/op
-BenchmarkRequestID_Generate-12               	 2834094	       413.8 ns/op	     544 B/op	       8 allocs/op
-BenchmarkRequestID_Generate-12               	 2941632	       416.6 ns/op	     544 B/op	       8 allocs/op
-BenchmarkRequestID_Generate-12               	 2875744	       415.0 ns/op	     544 B/op	       8 allocs/op
+BenchmarkMiddleware_Chain/success-12         	  533590	      2212 ns/op	    2469 B/op	      29 allocs/op
+BenchmarkMiddleware_Chain/success-12         	  559519	      2148 ns/op	    2469 B/op	      29 allocs/op
+BenchmarkMiddleware_Chain/success-12         	  560469	      2162 ns/op	    2469 B/op	      29 allocs/op
+BenchmarkMiddleware_Chain/success-12         	  565495	      2138 ns/op	    2469 B/op	      29 allocs/op
+BenchmarkMiddleware_Chain/success-12         	  568543	      2165 ns/op	    2469 B/op	      29 allocs/op
+BenchmarkMiddleware_Chain/success-12         	  562008	      2141 ns/op	    2469 B/op	      29 allocs/op
+BenchmarkMiddleware_Chain/success-12         	  552717	      2150 ns/op	    2469 B/op	      29 allocs/op
+BenchmarkMiddleware_Chain/success-12         	  559047	      2147 ns/op	    2469 B/op	      29 allocs/op
+BenchmarkMiddleware_Chain/success-12         	  563158	      2187 ns/op	    2469 B/op	      29 allocs/op
+BenchmarkMiddleware_Chain/success-12         	  537062	      2153 ns/op	    2469 B/op	      29 allocs/op
+BenchmarkMiddleware_Chain/failure-12         	  563527	      2128 ns/op	    2340 B/op	      26 allocs/op
+BenchmarkMiddleware_Chain/failure-12         	  566784	      2136 ns/op	    2340 B/op	      26 allocs/op
+BenchmarkMiddleware_Chain/failure-12         	  575360	      2147 ns/op	    2340 B/op	      26 allocs/op
+BenchmarkMiddleware_Chain/failure-12         	  569559	      2134 ns/op	    2340 B/op	      26 allocs/op
+BenchmarkMiddleware_Chain/failure-12         	  563922	      2141 ns/op	    2340 B/op	      26 allocs/op
+BenchmarkMiddleware_Chain/failure-12         	  562412	      2125 ns/op	    2340 B/op	      26 allocs/op
+BenchmarkMiddleware_Chain/failure-12         	  565671	      2134 ns/op	    2340 B/op	      26 allocs/op
+BenchmarkMiddleware_Chain/failure-12         	  561493	      2128 ns/op	    2341 B/op	      26 allocs/op
+BenchmarkMiddleware_Chain/failure-12         	  572472	      2129 ns/op	    2340 B/op	      26 allocs/op
+BenchmarkMiddleware_Chain/failure-12         	  570463	      2131 ns/op	    2340 B/op	      26 allocs/op
+BenchmarkRequestID_Generate-12               	 3090771	       385.9 ns/op	     544 B/op	       8 allocs/op
+BenchmarkRequestID_Generate-12               	 3151257	       381.5 ns/op	     544 B/op	       8 allocs/op
+BenchmarkRequestID_Generate-12               	 3135738	       382.1 ns/op	     544 B/op	       8 allocs/op
+BenchmarkRequestID_Generate-12               	 3145672	       381.2 ns/op	     544 B/op	       8 allocs/op
+BenchmarkRequestID_Generate-12               	 3135224	       382.4 ns/op	     544 B/op	       8 allocs/op
+BenchmarkRequestID_Generate-12               	 3120792	       382.5 ns/op	     544 B/op	       8 allocs/op
+BenchmarkRequestID_Generate-12               	 3138482	       381.6 ns/op	     544 B/op	       8 allocs/op
+BenchmarkRequestID_Generate-12               	 3134442	       382.0 ns/op	     544 B/op	       8 allocs/op
+BenchmarkRequestID_Generate-12               	 3151435	       381.6 ns/op	     544 B/op	       8 allocs/op
+BenchmarkRequestID_Generate-12               	 3060417	       390.2 ns/op	     544 B/op	       8 allocs/op
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/http/middleware	36.231s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/http/middleware	36.266s
 goos: darwin
 goarch: arm64
 pkg: github.com/maksimegorovdev/delivery-backend/platform/http/response
 cpu: Apple M2 Pro
-BenchmarkResponse_Created/items=1-12         	 1766318	       662.6 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=1-12         	 1867242	       642.0 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=1-12         	 1873340	       644.2 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=1-12         	 1824510	       654.9 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=1-12         	 1870174	       642.6 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=1-12         	 1876494	       638.7 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=1-12         	 1884160	       639.6 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=1-12         	 1831459	       646.5 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=1-12         	 1907360	       638.6 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=1-12         	 1892950	       639.9 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=10-12        	  788509	      1509 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=10-12        	  809778	      1513 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=10-12        	  771476	      1518 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=10-12        	  828957	      1511 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=10-12        	  813765	      1500 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=10-12        	  766585	      1517 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=10-12        	  809329	      1490 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=10-12        	  789625	      1532 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=10-12        	  808654	      1526 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Created/items=10-12        	  777999	      1519 ns/op	     304 B/op	       6 allocs/op
-BenchmarkResponse_Fail-12                    	 2027569	       601.4 ns/op	     192 B/op	       4 allocs/op
-BenchmarkResponse_Fail-12                    	 2014648	       601.7 ns/op	     192 B/op	       4 allocs/op
-BenchmarkResponse_Fail-12                    	 1992783	       596.4 ns/op	     192 B/op	       4 allocs/op
-BenchmarkResponse_Fail-12                    	 1995058	       603.8 ns/op	     192 B/op	       4 allocs/op
-BenchmarkResponse_Fail-12                    	 2000338	       597.8 ns/op	     192 B/op	       4 allocs/op
-BenchmarkResponse_Fail-12                    	 2018186	       606.0 ns/op	     192 B/op	       4 allocs/op
-BenchmarkResponse_Fail-12                    	 1950423	       607.4 ns/op	     192 B/op	       4 allocs/op
-BenchmarkResponse_Fail-12                    	 1984360	       608.6 ns/op	     192 B/op	       4 allocs/op
-BenchmarkResponse_Fail-12                    	 1985046	       602.1 ns/op	     192 B/op	       4 allocs/op
-BenchmarkResponse_Fail-12                    	 1983706	       604.5 ns/op	     192 B/op	       4 allocs/op
+BenchmarkResponse_Created/items=1-12         	 1873365	       629.3 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=1-12         	 1941126	       617.4 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=1-12         	 1916775	       623.2 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=1-12         	 1940853	       618.1 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=1-12         	 1940767	       619.3 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=1-12         	 1945778	       619.5 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=1-12         	 1946068	       617.2 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=1-12         	 1916278	       622.3 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=1-12         	 1949458	       616.0 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=1-12         	 1943360	       619.0 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=10-12        	  835702	      1461 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=10-12        	  823986	      1464 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=10-12        	  827288	      1457 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=10-12        	  831544	      1456 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=10-12        	  819021	      1458 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=10-12        	  828795	      1464 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=10-12        	  827286	      1457 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=10-12        	  840846	      1458 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=10-12        	  840679	      1456 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Created/items=10-12        	  832567	      1461 ns/op	     304 B/op	       6 allocs/op
+BenchmarkResponse_Fail-12                    	 2082430	       577.1 ns/op	     192 B/op	       4 allocs/op
+BenchmarkResponse_Fail-12                    	 2079358	       577.0 ns/op	     192 B/op	       4 allocs/op
+BenchmarkResponse_Fail-12                    	 2073104	       577.4 ns/op	     192 B/op	       4 allocs/op
+BenchmarkResponse_Fail-12                    	 2079604	       580.2 ns/op	     192 B/op	       4 allocs/op
+BenchmarkResponse_Fail-12                    	 2078902	       578.3 ns/op	     192 B/op	       4 allocs/op
+BenchmarkResponse_Fail-12                    	 2080150	       576.5 ns/op	     192 B/op	       4 allocs/op
+BenchmarkResponse_Fail-12                    	 2080802	       575.7 ns/op	     192 B/op	       4 allocs/op
+BenchmarkResponse_Fail-12                    	 2079044	       579.0 ns/op	     192 B/op	       4 allocs/op
+BenchmarkResponse_Fail-12                    	 2079844	       576.3 ns/op	     192 B/op	       4 allocs/op
+BenchmarkResponse_Fail-12                    	 2069712	       577.9 ns/op	     192 B/op	       4 allocs/op
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/http/response	36.383s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/http/response	36.396s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/internal/otelenv	0.288s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/internal/otelenv	0.285s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/kafka/kafkaconsumer	0.343s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/kafka/kafkaconsumer	0.334s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/listener	0.268s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/listener	0.280s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/logger	0.299s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/logger	0.295s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/postgres	0.302s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/postgres	0.307s
 PASS
 ok  	github.com/maksimegorovdev/delivery-backend/platform/telemetry	0.366s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/platform/testkit/grpctest	0.337s
+ok  	github.com/maksimegorovdev/delivery-backend/platform/testkit/grpctest	0.340s
 ?   	github.com/maksimegorovdev/delivery-backend/platform/testkit/kafkatest	[no test files]
 ?   	github.com/maksimegorovdev/delivery-backend/platform/testkit/pgtest	[no test files]
 ?   	github.com/maksimegorovdev/delivery-backend/services/order/cmd	[no test files]
 ?   	github.com/maksimegorovdev/delivery-backend/services/order/internal/app	[no test files]
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/services/order/internal/client	0.350s
+ok  	github.com/maksimegorovdev/delivery-backend/services/order/internal/client	0.343s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/services/order/internal/config	0.493s
+ok  	github.com/maksimegorovdev/delivery-backend/services/order/internal/config	0.295s
 goos: darwin
 goarch: arm64
 pkg: github.com/maksimegorovdev/delivery-backend/services/order/internal/domain
 cpu: Apple M2 Pro
-BenchmarkNewOrder/items=1-12      	 2709558	       429.0 ns/op	     176 B/op	       3 allocs/op
-BenchmarkNewOrder/items=1-12      	 2894098	       415.2 ns/op	     176 B/op	       3 allocs/op
-BenchmarkNewOrder/items=1-12      	 2874015	       419.2 ns/op	     176 B/op	       3 allocs/op
-BenchmarkNewOrder/items=1-12      	 2922948	       418.9 ns/op	     176 B/op	       3 allocs/op
-BenchmarkNewOrder/items=1-12      	 2901488	       419.6 ns/op	     176 B/op	       3 allocs/op
-BenchmarkNewOrder/items=1-12      	 2812899	       421.1 ns/op	     176 B/op	       3 allocs/op
-BenchmarkNewOrder/items=1-12      	 2844680	       417.7 ns/op	     176 B/op	       3 allocs/op
-BenchmarkNewOrder/items=1-12      	 2826225	       419.2 ns/op	     176 B/op	       3 allocs/op
-BenchmarkNewOrder/items=1-12      	 2913475	       419.1 ns/op	     176 B/op	       3 allocs/op
-BenchmarkNewOrder/items=1-12      	 2782356	       420.8 ns/op	     176 B/op	       3 allocs/op
-BenchmarkNewOrder/items=10-12     	  580753	      2131 ns/op	    1424 B/op	      12 allocs/op
-BenchmarkNewOrder/items=10-12     	  560766	      2115 ns/op	    1424 B/op	      12 allocs/op
-BenchmarkNewOrder/items=10-12     	  508384	      2131 ns/op	    1424 B/op	      12 allocs/op
-BenchmarkNewOrder/items=10-12     	  563216	      2129 ns/op	    1424 B/op	      12 allocs/op
-BenchmarkNewOrder/items=10-12     	  577110	      2091 ns/op	    1424 B/op	      12 allocs/op
-BenchmarkNewOrder/items=10-12     	  545462	      2130 ns/op	    1424 B/op	      12 allocs/op
-BenchmarkNewOrder/items=10-12     	  571172	      2091 ns/op	    1424 B/op	      12 allocs/op
-BenchmarkNewOrder/items=10-12     	  590431	      2147 ns/op	    1424 B/op	      12 allocs/op
-BenchmarkNewOrder/items=10-12     	  574167	      2128 ns/op	    1424 B/op	      12 allocs/op
-BenchmarkNewOrder/items=10-12     	  558793	      2126 ns/op	    1424 B/op	      12 allocs/op
-BenchmarkOrderItem_Subtotal-12    	622620180	         1.942 ns/op	       0 B/op	       0 allocs/op
-BenchmarkOrderItem_Subtotal-12    	618282218	         1.941 ns/op	       0 B/op	       0 allocs/op
-BenchmarkOrderItem_Subtotal-12    	619848717	         1.945 ns/op	       0 B/op	       0 allocs/op
-BenchmarkOrderItem_Subtotal-12    	630705777	         1.942 ns/op	       0 B/op	       0 allocs/op
-BenchmarkOrderItem_Subtotal-12    	625935776	         1.925 ns/op	       0 B/op	       0 allocs/op
-BenchmarkOrderItem_Subtotal-12    	610951560	         1.945 ns/op	       0 B/op	       0 allocs/op
-BenchmarkOrderItem_Subtotal-12    	616458542	         1.935 ns/op	       0 B/op	       0 allocs/op
-BenchmarkOrderItem_Subtotal-12    	635231107	         1.951 ns/op	       0 B/op	       0 allocs/op
-BenchmarkOrderItem_Subtotal-12    	608292288	         1.967 ns/op	       0 B/op	       0 allocs/op
-BenchmarkOrderItem_Subtotal-12    	619195314	         1.939 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNewOrder/items=1-12      	 3056223	       380.4 ns/op	     176 B/op	       3 allocs/op
+BenchmarkNewOrder/items=1-12      	 3200540	       375.7 ns/op	     176 B/op	       3 allocs/op
+BenchmarkNewOrder/items=1-12      	 3179689	       376.5 ns/op	     176 B/op	       3 allocs/op
+BenchmarkNewOrder/items=1-12      	 3191860	       375.6 ns/op	     176 B/op	       3 allocs/op
+BenchmarkNewOrder/items=1-12      	 3210091	       375.8 ns/op	     176 B/op	       3 allocs/op
+BenchmarkNewOrder/items=1-12      	 3195060	       375.3 ns/op	     176 B/op	       3 allocs/op
+BenchmarkNewOrder/items=1-12      	 3217027	       374.0 ns/op	     176 B/op	       3 allocs/op
+BenchmarkNewOrder/items=1-12      	 3069612	       383.7 ns/op	     176 B/op	       3 allocs/op
+BenchmarkNewOrder/items=1-12      	 3219771	       373.1 ns/op	     176 B/op	       3 allocs/op
+BenchmarkNewOrder/items=1-12      	 3217957	       373.9 ns/op	     176 B/op	       3 allocs/op
+BenchmarkNewOrder/items=10-12     	  646268	      1860 ns/op	    1424 B/op	      12 allocs/op
+BenchmarkNewOrder/items=10-12     	  653832	      1858 ns/op	    1424 B/op	      12 allocs/op
+BenchmarkNewOrder/items=10-12     	  651440	      1868 ns/op	    1424 B/op	      12 allocs/op
+BenchmarkNewOrder/items=10-12     	  650168	      1863 ns/op	    1424 B/op	      12 allocs/op
+BenchmarkNewOrder/items=10-12     	  651313	      1863 ns/op	    1424 B/op	      12 allocs/op
+BenchmarkNewOrder/items=10-12     	  652148	      1879 ns/op	    1424 B/op	      12 allocs/op
+BenchmarkNewOrder/items=10-12     	  640558	      1883 ns/op	    1424 B/op	      12 allocs/op
+BenchmarkNewOrder/items=10-12     	  655738	      1858 ns/op	    1424 B/op	      12 allocs/op
+BenchmarkNewOrder/items=10-12     	  653610	      1856 ns/op	    1424 B/op	      12 allocs/op
+BenchmarkNewOrder/items=10-12     	  652568	      1882 ns/op	    1424 B/op	      12 allocs/op
+BenchmarkOrderItem_Subtotal-12    	622227390	         1.940 ns/op	       0 B/op	       0 allocs/op
+BenchmarkOrderItem_Subtotal-12    	637554903	         1.931 ns/op	       0 B/op	       0 allocs/op
+BenchmarkOrderItem_Subtotal-12    	636946339	         1.937 ns/op	       0 B/op	       0 allocs/op
+BenchmarkOrderItem_Subtotal-12    	625161717	         1.943 ns/op	       0 B/op	       0 allocs/op
+BenchmarkOrderItem_Subtotal-12    	630872400	         1.933 ns/op	       0 B/op	       0 allocs/op
+BenchmarkOrderItem_Subtotal-12    	626903565	         1.938 ns/op	       0 B/op	       0 allocs/op
+BenchmarkOrderItem_Subtotal-12    	623480671	         1.944 ns/op	       0 B/op	       0 allocs/op
+BenchmarkOrderItem_Subtotal-12    	617008086	         1.937 ns/op	       0 B/op	       0 allocs/op
+BenchmarkOrderItem_Subtotal-12    	624620455	         1.943 ns/op	       0 B/op	       0 allocs/op
+BenchmarkOrderItem_Subtotal-12    	622361178	         1.943 ns/op	       0 B/op	       0 allocs/op
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/services/order/internal/domain	36.233s
+ok  	github.com/maksimegorovdev/delivery-backend/services/order/internal/domain	36.538s
 goos: darwin
 goarch: arm64
 pkg: github.com/maksimegorovdev/delivery-backend/services/order/internal/event
 cpu: Apple M2 Pro
-BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1174048	      1013 ns/op	     784 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1223296	       977.7 ns/op	     784 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1207365	       994.1 ns/op	     784 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1000000	      1001 ns/op	     784 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1224494	       980.1 ns/op	     784 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1000000	      1003 ns/op	     784 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1209781	       993.6 ns/op	     784 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1000000	      1000 ns/op	     784 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1208098	       993.0 ns/op	     784 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1203133	       996.7 ns/op	     784 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  367616	      3364 ns/op	    2803 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  350932	      3463 ns/op	    2803 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  364676	      3450 ns/op	    2803 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  362286	      3372 ns/op	    2803 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  343005	      3462 ns/op	    2804 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  371340	      3341 ns/op	    2803 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  341660	      3361 ns/op	    2803 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  345256	      3356 ns/op	    2803 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  357338	      3338 ns/op	    2803 B/op	       5 allocs/op
-BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  372978	      3338 ns/op	    2803 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1219038	       970.9 ns/op	     784 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1247032	       960.5 ns/op	     784 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1255128	       956.3 ns/op	     784 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1255747	       955.9 ns/op	     784 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1257860	       955.5 ns/op	     784 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1252179	       958.4 ns/op	     784 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1258362	       954.8 ns/op	     784 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1250630	       960.2 ns/op	     784 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1255652	       956.1 ns/op	     784 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=1-12         	 1256086	       962.2 ns/op	     784 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  359851	      3221 ns/op	    2803 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  373646	      3205 ns/op	    2803 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  375986	      3219 ns/op	    2803 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  369294	      3217 ns/op	    2803 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  375550	      3217 ns/op	    2803 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  372226	      3205 ns/op	    2803 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  376476	      3207 ns/op	    2803 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  370462	      3221 ns/op	    2803 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  370386	      3232 ns/op	    2803 B/op	       5 allocs/op
+BenchmarkOrderEventBuilder_OrderCreated/items=10-12        	  377166	      3201 ns/op	    2803 B/op	       5 allocs/op
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/services/order/internal/event	23.869s
+ok  	github.com/maksimegorovdev/delivery-backend/services/order/internal/event	24.313s
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/services/order/internal/repository/pg	0.292s
+ok  	github.com/maksimegorovdev/delivery-backend/services/order/internal/repository/pg	0.293s
 goos: darwin
 goarch: arm64
 pkg: github.com/maksimegorovdev/delivery-backend/services/order/internal/service
 cpu: Apple M2 Pro
-BenchmarkOrderService_CreateOrder/items=1-12         	 1920532	       610.8 ns/op	     480 B/op	       6 allocs/op
-BenchmarkOrderService_CreateOrder/items=1-12         	 2075028	       582.3 ns/op	     480 B/op	       6 allocs/op
-BenchmarkOrderService_CreateOrder/items=1-12         	 1978750	       600.3 ns/op	     480 B/op	       6 allocs/op
-BenchmarkOrderService_CreateOrder/items=1-12         	 2070963	       582.0 ns/op	     480 B/op	       6 allocs/op
-BenchmarkOrderService_CreateOrder/items=1-12         	 2006997	       597.6 ns/op	     480 B/op	       6 allocs/op
-BenchmarkOrderService_CreateOrder/items=1-12         	 2052343	       594.8 ns/op	     480 B/op	       6 allocs/op
-BenchmarkOrderService_CreateOrder/items=1-12         	 2055304	       583.6 ns/op	     480 B/op	       6 allocs/op
-BenchmarkOrderService_CreateOrder/items=1-12         	 2039352	       590.5 ns/op	     480 B/op	       6 allocs/op
-BenchmarkOrderService_CreateOrder/items=1-12         	 2062836	       596.9 ns/op	     480 B/op	       6 allocs/op
-BenchmarkOrderService_CreateOrder/items=1-12         	 2014963	       597.1 ns/op	     480 B/op	       6 allocs/op
-BenchmarkOrderService_CreateOrder/items=10-12        	  427446	      2850 ns/op	    3704 B/op	      18 allocs/op
-BenchmarkOrderService_CreateOrder/items=10-12        	  443239	      2753 ns/op	    3704 B/op	      18 allocs/op
-BenchmarkOrderService_CreateOrder/items=10-12        	  435774	      2765 ns/op	    3704 B/op	      18 allocs/op
-BenchmarkOrderService_CreateOrder/items=10-12        	  453528	      2791 ns/op	    3704 B/op	      18 allocs/op
-BenchmarkOrderService_CreateOrder/items=10-12        	  410971	      2810 ns/op	    3704 B/op	      18 allocs/op
-BenchmarkOrderService_CreateOrder/items=10-12        	  441411	      2823 ns/op	    3704 B/op	      18 allocs/op
-BenchmarkOrderService_CreateOrder/items=10-12        	  434072	      2778 ns/op	    3704 B/op	      18 allocs/op
-BenchmarkOrderService_CreateOrder/items=10-12        	  424406	      2808 ns/op	    3704 B/op	      18 allocs/op
-BenchmarkOrderService_CreateOrder/items=10-12        	  446894	      2875 ns/op	    3704 B/op	      18 allocs/op
-BenchmarkOrderService_CreateOrder/items=10-12        	  434751	      2728 ns/op	    3704 B/op	      18 allocs/op
+BenchmarkOrderService_CreateOrder/items=1-12         	 2093463	       561.4 ns/op	     480 B/op	       6 allocs/op
+BenchmarkOrderService_CreateOrder/items=1-12         	 2177546	       550.7 ns/op	     480 B/op	       6 allocs/op
+BenchmarkOrderService_CreateOrder/items=1-12         	 2151831	       552.5 ns/op	     480 B/op	       6 allocs/op
+BenchmarkOrderService_CreateOrder/items=1-12         	 2189390	       548.8 ns/op	     480 B/op	       6 allocs/op
+BenchmarkOrderService_CreateOrder/items=1-12         	 2185731	       550.0 ns/op	     480 B/op	       6 allocs/op
+BenchmarkOrderService_CreateOrder/items=1-12         	 2180025	       551.0 ns/op	     480 B/op	       6 allocs/op
+BenchmarkOrderService_CreateOrder/items=1-12         	 2154553	       552.9 ns/op	     480 B/op	       6 allocs/op
+BenchmarkOrderService_CreateOrder/items=1-12         	 2169686	       551.9 ns/op	     480 B/op	       6 allocs/op
+BenchmarkOrderService_CreateOrder/items=1-12         	 2179684	       550.3 ns/op	     480 B/op	       6 allocs/op
+BenchmarkOrderService_CreateOrder/items=1-12         	 2187094	       549.7 ns/op	     480 B/op	       6 allocs/op
+BenchmarkOrderService_CreateOrder/items=10-12        	  476749	      2521 ns/op	    3704 B/op	      18 allocs/op
+BenchmarkOrderService_CreateOrder/items=10-12        	  480134	      2502 ns/op	    3704 B/op	      18 allocs/op
+BenchmarkOrderService_CreateOrder/items=10-12        	  484404	      2518 ns/op	    3704 B/op	      18 allocs/op
+BenchmarkOrderService_CreateOrder/items=10-12        	  479059	      2511 ns/op	    3704 B/op	      18 allocs/op
+BenchmarkOrderService_CreateOrder/items=10-12        	  480853	      2539 ns/op	    3704 B/op	      18 allocs/op
+BenchmarkOrderService_CreateOrder/items=10-12        	  473340	      2540 ns/op	    3704 B/op	      18 allocs/op
+BenchmarkOrderService_CreateOrder/items=10-12        	  472986	      2505 ns/op	    3704 B/op	      18 allocs/op
+BenchmarkOrderService_CreateOrder/items=10-12        	  478305	      2520 ns/op	    3704 B/op	      18 allocs/op
+BenchmarkOrderService_CreateOrder/items=10-12        	  475147	      2514 ns/op	    3704 B/op	      18 allocs/op
+BenchmarkOrderService_CreateOrder/items=10-12        	  480024	      2510 ns/op	    3704 B/op	      18 allocs/op
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/services/order/internal/service	24.386s
+ok  	github.com/maksimegorovdev/delivery-backend/services/order/internal/service	24.293s
 ?   	github.com/maksimegorovdev/delivery-backend/services/order/internal/service/mocks	[no test files]
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/services/order/internal/transport/grpc	0.389s
+ok  	github.com/maksimegorovdev/delivery-backend/services/order/internal/transport/grpc	0.394s
 ?   	github.com/maksimegorovdev/delivery-backend/services/order/internal/transport/grpc/mocks	[no test files]
 ?   	github.com/maksimegorovdev/delivery-backend/services/notification/cmd	[no test files]
 ?   	github.com/maksimegorovdev/delivery-backend/services/notification/internal/app	[no test files]
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/services/notification/internal/config	0.387s
+ok  	github.com/maksimegorovdev/delivery-backend/services/notification/internal/config	0.305s
 ?   	github.com/maksimegorovdev/delivery-backend/services/notification/internal/domain	[no test files]
 ?   	github.com/maksimegorovdev/delivery-backend/services/notification/internal/repository/pg	[no test files]
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/services/notification/internal/service	0.284s
+ok  	github.com/maksimegorovdev/delivery-backend/services/notification/internal/service	0.281s
 ?   	github.com/maksimegorovdev/delivery-backend/services/notification/internal/service/mocks	[no test files]
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/services/notification/internal/transport/kafka	0.274s
+ok  	github.com/maksimegorovdev/delivery-backend/services/notification/internal/transport/kafka	0.306s
 goos: darwin
 goarch: arm64
 pkg: github.com/maksimegorovdev/delivery-backend/services/notification/internal/transport/kafka/order
 cpu: Apple M2 Pro
-BenchmarkHandler_Handle_OrderCreated-12    	  299383	      3540 ns/op	    1384 B/op	      55 allocs/op
-BenchmarkHandler_Handle_OrderCreated-12    	  342064	      3418 ns/op	    1384 B/op	      55 allocs/op
-BenchmarkHandler_Handle_OrderCreated-12    	  361351	      3441 ns/op	    1384 B/op	      55 allocs/op
-BenchmarkHandler_Handle_OrderCreated-12    	  340237	      3528 ns/op	    1384 B/op	      55 allocs/op
-BenchmarkHandler_Handle_OrderCreated-12    	  342973	      3434 ns/op	    1384 B/op	      55 allocs/op
-BenchmarkHandler_Handle_OrderCreated-12    	  340640	      3493 ns/op	    1384 B/op	      55 allocs/op
-BenchmarkHandler_Handle_OrderCreated-12    	  345534	      3456 ns/op	    1384 B/op	      55 allocs/op
-BenchmarkHandler_Handle_OrderCreated-12    	  350518	      3467 ns/op	    1384 B/op	      55 allocs/op
-BenchmarkHandler_Handle_OrderCreated-12    	  331264	      3517 ns/op	    1384 B/op	      55 allocs/op
-BenchmarkHandler_Handle_OrderCreated-12    	  346464	      3405 ns/op	    1384 B/op	      55 allocs/op
+BenchmarkHandler_Handle_OrderCreated-12    	  356461	      3366 ns/op	    1384 B/op	      55 allocs/op
+BenchmarkHandler_Handle_OrderCreated-12    	  361560	      3281 ns/op	    1384 B/op	      55 allocs/op
+BenchmarkHandler_Handle_OrderCreated-12    	  365943	      3282 ns/op	    1384 B/op	      55 allocs/op
+BenchmarkHandler_Handle_OrderCreated-12    	  360128	      3294 ns/op	    1384 B/op	      55 allocs/op
+BenchmarkHandler_Handle_OrderCreated-12    	  367764	      3278 ns/op	    1384 B/op	      55 allocs/op
+BenchmarkHandler_Handle_OrderCreated-12    	  366277	      3285 ns/op	    1384 B/op	      55 allocs/op
+BenchmarkHandler_Handle_OrderCreated-12    	  367120	      3269 ns/op	    1384 B/op	      55 allocs/op
+BenchmarkHandler_Handle_OrderCreated-12    	  356592	      3289 ns/op	    1384 B/op	      55 allocs/op
+BenchmarkHandler_Handle_OrderCreated-12    	  367737	      3289 ns/op	    1384 B/op	      55 allocs/op
+BenchmarkHandler_Handle_OrderCreated-12    	  364851	      3357 ns/op	    1384 B/op	      55 allocs/op
 PASS
-ok  	github.com/maksimegorovdev/delivery-backend/services/notification/internal/transport/kafka/order	12.126s
+ok  	github.com/maksimegorovdev/delivery-backend/services/notification/internal/transport/kafka/order	12.361s
 ?   	github.com/maksimegorovdev/delivery-backend/services/notification/internal/transport/kafka/order/mocks	[no test files]

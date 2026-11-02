@@ -23,7 +23,7 @@ tasks:
       - '{{.COMPOSE}} down -v'
 
   k6:
-    desc: Run the k6 scenario with PROFILE against a running stack (GATEWAY_URL overrides the target, RUN_ID names the results dir)
+    desc: Run the k6 scenario with PROFILE against a running stack (LOAD_GATEWAY_URL overrides the target, only the stack or localhost unless LOAD_ALLOW_REMOTE=1; RUN_ID names the results dir)
     internal: true
     silent: true
     requires:
@@ -42,12 +42,24 @@ tasks:
           echo "seed-id не найдены: стек поднят (task load-up)?" >&2
           exit 1
         fi
+        # Цель нагрузки — только load-стек или локальный хост: stress создаёт заказы сотнями RPS десятки минут.
+        # Имя с префиксом LOAD_, чтобы переменная из shell другого окружения не подменила цель.
+        gateway_url="${LOAD_GATEWAY_URL:-http://gateway:8080}"
+        case "$gateway_url" in
+          http://gateway:* | http://localhost:* | http://127.0.0.1:*) ;;
+          *)
+            if [ "${LOAD_ALLOW_REMOTE:-}" != "1" ]; then
+              echo "LOAD_GATEWAY_URL=$gateway_url вне load-стека; LOAD_ALLOW_REMOTE=1 разрешает явно" >&2
+              exit 1
+            fi
+            ;;
+        esac
         {{.COMPOSE}} run --rm \
           -e PROFILE={{.PROFILE}} \
           -e RUN_ID="{{.RUN_ID}}" \
           -e STRESS_RATES="${STRESS_RATES:-}" \
           -e REGRESSION_P95_MS="${REGRESSION_P95_MS:-}" \
-          -e GATEWAY_URL="${GATEWAY_URL:-http://gateway:8080}" \
+          -e GATEWAY_URL="$gateway_url" \
           -e SEED_ADDRESS_ID="$address_id" \
           -e SEED_PRODUCT_IDS="$product_ids" \
           k6 run /scripts/create_order.js

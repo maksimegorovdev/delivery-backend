@@ -1,37 +1,34 @@
 import './env.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { profile, stageAt, stressPlan } from '../lib/config.js';
+import { calibration, profile, setupSec, stageAt, stressPlan } from '../lib/config.js';
 
 const plan = stressPlan();
 const sec = (s) => s * 1000;
 
-test('stageAt stress: окно оценки начинается через evalAfterPlateauSec после начала плато', () => {
+test('stageAt stress: разгон и плато ступени', () => {
   const s = plan.stages[1];
-  assert.equal(stageAt('stress', sec(s.startSec + 1)).eval, false, 'разгон');
-  assert.equal(stageAt('stress', sec(s.plateauStartSec)).eval, false, 'начало плато');
-  assert.equal(stageAt('stress', sec(s.plateauStartSec + 29.999)).eval, false, 'до окна оценки');
-  assert.equal(stageAt('stress', sec(s.plateauStartSec + 30)).eval, true, 'начало окна оценки');
-  assert.equal(stageAt('stress', sec(s.endSec - 0.001)).eval, true, 'конец плато');
+  assert.deepEqual(stageAt('stress', sec(s.startSec)), { stage: 2, phase: 'ramp', target: plan.stages[0].rate });
+  assert.equal(stageAt('stress', sec(s.plateauStartSec - 0.001)).phase, 'ramp');
+  assert.deepEqual(stageAt('stress', sec(s.plateauStartSec)), { stage: 2, phase: 'plateau', target: s.rate });
+  assert.equal(stageAt('stress', sec(s.endSec)).stage, 3);
 });
 
-test('stageAt вне stress не размечает окно оценки', () => {
-  for (const name of ['smoke', 'regression', 'soak']) {
-    assert.equal(stageAt(name, sec(100)).eval, undefined, name);
-  }
+test('setup() stress длится setupSec: калибровка по времени, setupTimeout с запасом', () => {
+  assert.equal(setupSec, calibration.warmupSec + calibration.measureSec);
+  assert.equal(profile('stress').setupTimeout, `${setupSec + calibration.slackSec}s`);
 });
 
-test('пороги abort stress не зависят от времени setup()', () => {
+test('пороги abort stress оцениваются через 30 с плато с учётом setup()', () => {
   const { thresholds } = profile('stress');
   for (const s of plan.stages) {
-    for (const name of [`http_req_failed{stage:${s.n},eval:1}`, `slow{stage:${s.n},eval:1}`]) {
+    // delayAbortEval отсчитывается от старта прогона вместе с setup().
+    const delay = `${setupSec + s.plateauStartSec + 30}s`;
+    for (const name of [`http_req_failed{stage:${s.n},phase:plateau}`, `slow{stage:${s.n},phase:plateau}`]) {
       const [t] = thresholds[name] || [];
       assert.ok(t, `нет порога ${name}`);
       assert.equal(t.abortOnFail, true, name);
-      // delayAbortEval отсчитывается от старта прогона вместе с setup(): окно задаёт тег eval, а не задержка.
-      assert.equal(t.delayAbortEval, undefined, name);
+      assert.equal(t.delayAbortEval, delay, name);
     }
-    // Статистика плато для summary — по всему плато.
-    assert.deepEqual(thresholds[`http_req_duration{stage:${s.n},phase:plateau}`], []);
   }
 });
