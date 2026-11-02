@@ -534,6 +534,6 @@ min–max 11%. Логгер пишет в свой `nopWriter` (не `io.Discard
 
 ## Checkpoint: Complete
 - [ ] Все Success Criteria [спеки](spec.md) отмечены
-- [ ] `task lint`, `task test`, `task e2e` зелёные
+- [x] `task lint`, `task test`, `task e2e` зелёные (2026-11-02, коммит `ff55960`: все три с кодом 0)
 - [ ] «Итоги модуля `load`» в [map.md](../../../specs/testing/map.md); профилирование — ссылка на `observability/profiling`
 - [ ] Завершение по `spec-workflow` (статус `done`, публикация, архив, ссылки) — после подтверждения пользователя
