@@ -16,8 +16,9 @@ function value(data, name, key) {
   return m === undefined || m.values === undefined ? undefined : m.values[key];
 }
 
+// iso возвращает время в ISO 8601 или null, если его нет (например, setup() упал до старта сценария).
 function iso(ms) {
-  return new Date(ms).toISOString();
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
 }
 
 function failedThresholds(data) {
@@ -65,24 +66,31 @@ function markDegradation(stages, stoppedStage) {
   const first = stages.find((s) => s.reached);
   for (const s of stages) {
     s.reasons = [];
-    if (!s.reached) {
-      continue;
+    if (s.reached) {
+      s.p95_ratio_to_first = first.p95_ms > 0 ? Number((s.p95_ms / first.p95_ms).toFixed(2)) : undefined;
+      if (s.error_rate > degradation.maxErrorRate) {
+        s.reasons.push(`error_rate ${s.error_rate} > ${degradation.maxErrorRate}`);
+      }
+      if (s.p95_ratio_to_first > degradation.p95Factor) {
+        s.reasons.push(`p95 ${s.p95_ratio_to_first}x of first stage > ${degradation.p95Factor}x`);
+      }
+      if (!s.partial && s.achieved_share < degradation.minRPSShare) {
+        s.reasons.push(`achieved ${s.achieved_share} of target < ${degradation.minRPSShare}`);
+      }
     }
-    s.p95_ratio_to_first = first.p95_ms > 0 ? Number((s.p95_ms / first.p95_ms).toFixed(2)) : undefined;
-    if (s.error_rate > degradation.maxErrorRate) {
-      s.reasons.push(`error_rate ${s.error_rate} > ${degradation.maxErrorRate}`);
-    }
-    if (s.p95_ratio_to_first > degradation.p95Factor) {
-      s.reasons.push(`p95 ${s.p95_ratio_to_first}x of first stage > ${degradation.p95Factor}x`);
-    }
-    if (!s.partial && s.achieved_share < degradation.minRPSShare) {
-      s.reasons.push(`achieved ${s.achieved_share} of target < ${degradation.minRPSShare}`);
-    }
+    // Ступень остановки по пропускам деградировала, даже если до её плато запросы не дошли (пропуски на разгоне).
     if (s.stage === stoppedStage) {
       s.reasons.push('dropped_iterations');
     }
     s.degraded = s.reasons.length > 0;
   }
+}
+
+// stoppedStageAt возвращает номер ступени, начавшейся к моменту остановки elapsedMs (с запасом stopSlackMs);
+// в первые секунды сценария и без времени старта — первую ступень.
+function stoppedStageAt(plan, elapsedMs) {
+  const started = plan.stages.filter((s) => s.startSec * 1000 <= elapsedMs - stopSlackMs);
+  return started.length > 0 ? started[started.length - 1].n : plan.stages[0].n;
 }
 
 // markThresholdStages помечает деградировавшими ступени, на которых сработал порог abortOnFail: пороги и
@@ -135,14 +143,17 @@ function soakSummary(data, runID, failed) {
   const endMs = startMs + soak.durationSec * 1000;
   const first = soakWindowStats(data, 'first', startMs, startMs + windowMs);
   const last = soakWindowStats(data, 'last', endMs - windowMs, endMs);
-  const ratio = first.p99_ms > 0 ? Number((last.p99_ms / first.p99_ms).toFixed(2)) : undefined;
+  // Без p99 одного из окон дрейф не оценить: NaN не проходит ни одно сравнение и дал бы completed.
+  const hasP99 = first.p99_ms > 0 && Number.isFinite(last.p99_ms);
+  const ratio = hasP99 ? Number((last.p99_ms / first.p99_ms).toFixed(2)) : undefined;
 
   const iterations = value(data, 'iterations', 'count') || 0;
   const checked = value(data, 'checked_iterations', 'count') || 0;
+  const noWindowData = startMs === undefined || first.requests === 0 || last.requests === 0 || !hasP99;
   let verdict = 'completed';
-  if (failed.length > 0 || checked === 0 || checked < iterations || first.requests === 0 || last.requests === 0) {
+  if (failed.length > 0 || checked === 0 || checked < iterations || noWindowData) {
     verdict = 'failed';
-  } else if (ratio === undefined || ratio > soak.p99Factor) {
+  } else if (ratio > soak.p99Factor) {
     verdict = 'drift';
   }
   const stages = [first, last].map((w, i) => ({
@@ -216,10 +227,7 @@ export function buildSummary(data, profileName, runID) {
     const elapsedMs = finishedMs - scenarioStartMs;
     const dropped = value(data, 'dropped_iterations', 'count') || 0;
     // Пропущенные итерации не несут тега stage: ступень остановки определяется по времени.
-    const stoppedStage =
-      dropped > 0
-        ? plan.stages.filter((s) => s.startSec * 1000 <= elapsedMs - stopSlackMs).pop().n
-        : undefined;
+    const stoppedStage = dropped > 0 ? stoppedStageAt(plan, elapsedMs) : undefined;
 
     const stages = plan.stages.map((s) => stageStats(data, s, plan, scenarioStartMs, elapsedMs));
     markDegradation(stages, stoppedStage);
@@ -228,10 +236,12 @@ export function buildSummary(data, profileName, runID) {
     const unexpected = failed.filter((f) => !limitThresholds.some((re) => re.test(f)));
     const limitCrossed = failed.length > unexpected.length;
     // Итерации, не дошедшие до проверок, упали исключением в сценарии: результат ступеней недостоверен.
+    // Без подметрик плато (сломаны теги stage/phase) «предел не найден» неотличим от отсутствия данных.
     const iterations = value(data, 'iterations', 'count') || 0;
     const checked = value(data, 'checked_iterations', 'count') || 0;
+    const noStageData = scenarioStartMs === undefined || !stages.some((s) => s.reached);
     let verdict = 'completed';
-    if (unexpected.length > 0 || checked === 0 || checked < iterations) {
+    if (unexpected.length > 0 || checked === 0 || checked < iterations || noStageData) {
       verdict = 'failed';
     } else if (limitCrossed) {
       verdict = 'limit_reached';

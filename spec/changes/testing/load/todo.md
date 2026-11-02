@@ -546,6 +546,8 @@ min–max 11%. Логгер пишет в свой `nopWriter` (не `io.Discard
 - [x] Пороги abort stress не зависят от длительности `setup()`; статистика плато в summary — по всему плато
 - [x] Остановка по `dropped_iterations` даёт `verdict=limit_reached`
 - [x] Node-тесты логики k6 (`task load-js-test`) воспроизводят оба дефекта и зелёные после исправления
+- [x] `summary.js`: пропуски на разгоне помечают ступень остановки; summary пишется без `scenario_start_ts` и при
+  пропусках в первые секунды; stress без подметрик плато и soak без p99 окна — `failed`, а не `completed`
 - [ ] Stress перепрогнан, `baseline.md` и пороги `regression` в `config.js` обновлены по новому пределу
 
 **Verification:**
