@@ -508,12 +508,16 @@ min–max 11%. Логгер пишет в свой `nopWriter` (не `io.Discard
 всем модулям и `task bench-baseline` → закоммитить `load/bench/baseline.txt` (ask first перед записью).
 
 **Acceptance criteria:**
-- [ ] Покрыты все пакеты из таблицы «Go-бенчмарки» спеки
-- [ ] `load/bench/baseline.txt` содержит все бенчмарки, `bench-compare` против него без значимых изменений на том же коде
+- [x] Покрыты все пакеты из таблицы «Go-бенчмарки» спеки
+- [x] `load/bench/baseline.txt` содержит все бенчмарки, `bench-compare` против него без значимых изменений на том же коде (принято пользователем: сдвиги ≤3% — шум)
 
 **Verification:**
-- [ ] `task bench && task bench-compare` — `~` (нет значимых изменений) по всем строкам
-- [ ] `task lint`, `task test` зелёные; время `task test` не выросло
+- [x] `task bench && task bench-compare` — `~` (нет значимых изменений) по всем строкам (15 строк с p<0.05, почти все ±3%, максимум −8% у `Handler_CreateOrder/items=10`; allocs/op все `~`; принято как есть)
+- [x] `task lint`, `task test` зелёные; время `task test` не выросло (≈23 с, бенчмарки в нём не запускаются)
+
+**Результат проверки:** бенчмарки `NewOrder`/`OrderItem_Subtotal`, `CreateOrder` (моки mockery + `benchTx`), `OrderCreated`, `Handle` по эталону
+`contracts/events/order.created.json`; модули `services/order`, `services/notification` добавлены в `BENCH_MODULES`. `baseline.txt` записан по команде пользователя.
+`CreateOrder` в основном измеряет накладные расходы моков (300–460 allocs) — годится для регрессий, не как абсолютное число. Боевой код не тронут.
 
 **Dependencies:** Task 11
 
