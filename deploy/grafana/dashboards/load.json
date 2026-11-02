@@ -1,0 +1,1150 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Нагрузочное тестирование: метрики k6 рядом с RED, runtime Go и пулом pgx сервисов за тот же интервал.",
+  "editable": true,
+  "graphTooltip": 1,
+  "links": [],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": [
+    "delivery",
+    "load",
+    "otel"
+  ],
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Delivery / Load",
+  "uid": "delivery-load",
+  "version": 1,
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 101,
+      "panels": [],
+      "title": "k6: генератор нагрузки",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "k6_http_reqs / интервал против k6_target_rps (gauge из сценария). Расхождение вместе с dropped_iterations — генератор или система не успевает.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "reqps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "id": 102,
+      "title": "RPS: целевой и достигнутый",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, 'достигнутый (http_reqs)' AS series, sum(Value) / $__interval_s AS value\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND ServiceName = 'k6' AND MetricName = 'k6_http_reqs'\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, 'целевой (target_rps)' AS series, max(Value) AS value\nFROM otel.otel_metrics_gauge\nWHERE $__timeFilter(TimeUnix) AND ServiceName = 'k6' AND MetricName = 'k6_target_rps'\nGROUP BY time, series\nORDER BY time",
+          "refId": "B"
+        }
+      ],
+      "interval": "5s"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "p50/p95/p99 клиентской задержки POST /orders по гистограмме k6 (бакеты k6 грубые: 5/10/25/50/75/100/250/500/750/1000 мс, значение интерполируется внутри бакета). Точные числа ступеней — в summary.json прогона.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "ms",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      },
+      "id": 103,
+      "title": "Latency k6 (http_req_duration)",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "WITH h AS (\n  SELECT $__timeInterval(TimeUnix) AS time, 'p50' AS series, any(ExplicitBounds) AS b, sumForEach(BucketCounts) AS c\n  FROM otel.otel_metrics_histogram\n  WHERE $__timeFilter(TimeUnix) AND MetricName = 'k6_http_req_duration' AND ServiceName = 'k6'\n  GROUP BY time, series\n), q AS (\n  SELECT *, arraySum(c) AS n, arrayCumSum(c) AS cum, arrayFirstIndex(x -> x >= 0.5 * n, cum) AS i FROM h WHERE n > 0\n)\nSELECT time, series, (b[i - 1] + (if(i > length(b), b[length(b)], b[i]) - b[i - 1]) * (0.5 * n - cum[i - 1]) / c[i]) * 1 AS value\nFROM q\nORDER BY time",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "WITH h AS (\n  SELECT $__timeInterval(TimeUnix) AS time, 'p95' AS series, any(ExplicitBounds) AS b, sumForEach(BucketCounts) AS c\n  FROM otel.otel_metrics_histogram\n  WHERE $__timeFilter(TimeUnix) AND MetricName = 'k6_http_req_duration' AND ServiceName = 'k6'\n  GROUP BY time, series\n), q AS (\n  SELECT *, arraySum(c) AS n, arrayCumSum(c) AS cum, arrayFirstIndex(x -> x >= 0.95 * n, cum) AS i FROM h WHERE n > 0\n)\nSELECT time, series, (b[i - 1] + (if(i > length(b), b[length(b)], b[i]) - b[i - 1]) * (0.95 * n - cum[i - 1]) / c[i]) * 1 AS value\nFROM q\nORDER BY time",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "WITH h AS (\n  SELECT $__timeInterval(TimeUnix) AS time, 'p99' AS series, any(ExplicitBounds) AS b, sumForEach(BucketCounts) AS c\n  FROM otel.otel_metrics_histogram\n  WHERE $__timeFilter(TimeUnix) AND MetricName = 'k6_http_req_duration' AND ServiceName = 'k6'\n  GROUP BY time, series\n), q AS (\n  SELECT *, arraySum(c) AS n, arrayCumSum(c) AS cum, arrayFirstIndex(x -> x >= 0.99 * n, cum) AS i FROM h WHERE n > 0\n)\nSELECT time, series, (b[i - 1] + (if(i > length(b), b[length(b)], b[i]) - b[i - 1]) * (0.99 * n - cum[i - 1]) / c[i]) * 1 AS value\nFROM q\nORDER BY time",
+          "refId": "C"
+        }
+      ],
+      "interval": "5s"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Доля неуспешных запросов (http_req_failed) и доля проваленных проверок (checks) по k6.total: condition=zero — значение 0 (успех для http_req_failed, провал для checks).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "id": 104,
+      "title": "Ошибки k6",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, 'http_req_failed' AS series,\n  sumIf(Value, Attributes['condition'] = 'nonzero') / sum(Value) AS value\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND ServiceName = 'k6' AND MetricName = 'k6_http_req_failed.total'\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, concat('check: ', Attributes['check']) AS series,\n  sumIf(Value, Attributes['condition'] = 'zero') / sum(Value) AS value\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND ServiceName = 'k6' AND MetricName = 'k6_checks.total'\nGROUP BY time, series\nORDER BY time",
+          "refId": "B"
+        }
+      ],
+      "interval": "5s"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "k6_dropped_iterations появляется только при пропусках (нет данных = пропусков не было). VU против vus_max: упёрлись в maxVUs — генератор не успевает.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 9
+      },
+      "id": 105,
+      "title": "dropped_iterations и VU",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, 'dropped_iterations' AS series, sum(Value) / $__interval_s AS value\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND ServiceName = 'k6' AND MetricName = 'k6_dropped_iterations'\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, 'vus' AS series, max(Value) AS value\nFROM otel.otel_metrics_gauge\nWHERE $__timeFilter(TimeUnix) AND ServiceName = 'k6' AND MetricName = 'k6_vus'\nGROUP BY time, series\nORDER BY time",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, 'vus_max' AS series, max(Value) AS value\nFROM otel.otel_metrics_gauge\nWHERE $__timeFilter(TimeUnix) AND ServiceName = 'k6' AND MetricName = 'k6_vus_max'\nGROUP BY time, series\nORDER BY time",
+          "refId": "C"
+        }
+      ],
+      "interval": "5s"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Итоги k6 за выбранный диапазон по тегу stage. Тег появится вместе с профилем stress; в smoke одна строка «—». Перцентили — по бакетам гистограммы k6 (грубо); точные числа — в summary.json.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "error_rate"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p50"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p95"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p99"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 8,
+        "y": 9
+      },
+      "id": 106,
+      "title": "k6 по ступеням (stage)",
+      "type": "table",
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "rawSql": "WITH h AS (\n  SELECT if(Attributes['stage'] = '', '—', Attributes['stage']) AS stage, any(ExplicitBounds) AS b, sumForEach(BucketCounts) AS c\n  FROM otel.otel_metrics_histogram\n  WHERE $__timeFilter(TimeUnix) AND ServiceName = 'k6' AND MetricName = 'k6_http_req_duration'\n  GROUP BY stage\n), q AS (\n  SELECT *, arraySum(c) AS n, arrayCumSum(c) AS cum,\n         arrayFirstIndex(x -> x >= 0.5 * n, cum) AS i50, arrayFirstIndex(x -> x >= 0.95 * n, cum) AS i95, arrayFirstIndex(x -> x >= 0.99 * n, cum) AS i99\n  FROM h WHERE n > 0\n), f AS (\n  SELECT stage, n,\n    b[i50 - 1] + (if(i50 > length(b), b[length(b)], b[i50]) - b[i50 - 1]) * (0.5 * n - cum[i50 - 1]) / c[i50] AS p50,\n    b[i95 - 1] + (if(i95 > length(b), b[length(b)], b[i95]) - b[i95 - 1]) * (0.95 * n - cum[i95 - 1]) / c[i95] AS p95,\n    b[i99 - 1] + (if(i99 > length(b), b[length(b)], b[i99]) - b[i99 - 1]) * (0.99 * n - cum[i99 - 1]) / c[i99] AS p99\n  FROM q\n), e AS (\n  SELECT if(Attributes['stage'] = '', '—', Attributes['stage']) AS stage, sumIf(Value, Attributes['condition'] = 'nonzero') / sum(Value) AS error_rate\n  FROM otel.otel_metrics_sum\n  WHERE $__timeFilter(TimeUnix) AND ServiceName = 'k6' AND MetricName = 'k6_http_req_failed.total'\n  GROUP BY stage\n), d AS (\n  SELECT if(Attributes['stage'] = '', '—', Attributes['stage']) AS stage, sum(Value) AS dropped\n  FROM otel.otel_metrics_sum\n  WHERE $__timeFilter(TimeUnix) AND ServiceName = 'k6' AND MetricName = 'k6_dropped_iterations'\n  GROUP BY stage\n)\nSELECT f.stage AS stage, f.n AS requests, e.error_rate AS error_rate, f.p50 AS p50, f.p95 AS p95, f.p99 AS p99, d.dropped AS dropped\nFROM f LEFT JOIN e ON f.stage = e.stage LEFT JOIN d ON f.stage = d.stage\nORDER BY stage",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "id": 107,
+      "panels": [],
+      "title": "RED сервисов (server): gateway — HTTP, order/user/product — gRPC",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Серверные запросы в секунду: gateway — http.server.request.duration, остальные — rpc.server.call.duration.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "reqps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 18
+      },
+      "id": 108,
+      "title": "RPS сервисов",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS series, sum(Count) / $__interval_s AS value\nFROM otel.otel_metrics_histogram\nWHERE $__timeFilter(TimeUnix) AND ServiceName IN ('gateway', 'order', 'user', 'product') AND MetricName IN ('http.server.request.duration', 'rpc.server.call.duration')\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "interval": "10s"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "gateway: HTTP 5xx; order/user/product: gRPC-статусы UNKNOWN, DEADLINE_EXCEEDED, UNIMPLEMENTED, INTERNAL, UNAVAILABLE, DATA_LOSS. Клиентские 4xx/NotFound не считаются ошибкой.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 18
+      },
+      "id": 109,
+      "title": "Error rate сервисов",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS series,\n  sumIf(Count, if(MetricName = 'http.server.request.duration', toUInt16OrZero(Attributes['http.response.status_code']) >= 500,\n                  Attributes['rpc.response.status_code'] IN ('UNKNOWN', 'DEADLINE_EXCEEDED', 'UNIMPLEMENTED', 'INTERNAL', 'UNAVAILABLE', 'DATA_LOSS'))) / sum(Count) AS value\nFROM otel.otel_metrics_histogram\nWHERE $__timeFilter(TimeUnix) AND ServiceName IN ('gateway', 'order', 'user', 'product') AND MetricName IN ('http.server.request.duration', 'rpc.server.call.duration')\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "interval": "10s"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "p95 серверной задержки по delta-гистограммам (интерполяция внутри бакета, точность до бакета).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "ms",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 18
+      },
+      "id": 110,
+      "title": "p95 сервисов",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "WITH h AS (\n  SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS series, any(ExplicitBounds) AS b, sumForEach(BucketCounts) AS c\n  FROM otel.otel_metrics_histogram\n  WHERE $__timeFilter(TimeUnix) AND ServiceName IN ('gateway', 'order', 'user', 'product') AND MetricName IN ('http.server.request.duration', 'rpc.server.call.duration')\n  GROUP BY time, series\n), q AS (\n  SELECT *, arraySum(c) AS n, arrayCumSum(c) AS cum, arrayFirstIndex(x -> x >= 0.95 * n, cum) AS i FROM h WHERE n > 0\n)\nSELECT time, series, (b[i - 1] + (if(i > length(b), b[length(b)], b[i]) - b[i - 1]) * (0.95 * n - cum[i - 1]) / c[i]) * 1000 AS value\nFROM q\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "interval": "10s"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "p99 серверной задержки — по нему видно, какой сервис первым уходит в хвост.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "ms",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 26
+      },
+      "id": 111,
+      "title": "p99 сервисов",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "WITH h AS (\n  SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS series, any(ExplicitBounds) AS b, sumForEach(BucketCounts) AS c\n  FROM otel.otel_metrics_histogram\n  WHERE $__timeFilter(TimeUnix) AND ServiceName IN ('gateway', 'order', 'user', 'product') AND MetricName IN ('http.server.request.duration', 'rpc.server.call.duration')\n  GROUP BY time, series\n), q AS (\n  SELECT *, arraySum(c) AS n, arrayCumSum(c) AS cum, arrayFirstIndex(x -> x >= 0.99 * n, cum) AS i FROM h WHERE n > 0\n)\nSELECT time, series, (b[i - 1] + (if(i > length(b), b[length(b)], b[i]) - b[i - 1]) * (0.99 * n - cum[i - 1]) / c[i]) * 1000 AS value\nFROM q\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "interval": "10s"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "id": 112,
+      "panels": [],
+      "title": "Runtime (Go)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Память, используемая рантаймом Go (stack + other), по сервисам.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "id": 113,
+      "title": "go.memory.used (сумма по типам)",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT time, ServiceName AS series, sum(used) AS value FROM (\n  SELECT $__timeInterval(TimeUnix) AS time, ServiceName, Attributes['go.memory.type'] AS t, argMax(Value, TimeUnix) AS used\n  FROM otel.otel_metrics_sum\n  WHERE $__timeFilter(TimeUnix) AND MetricName = 'go.memory.used' AND ServiceName IN ('gateway', 'order', 'user', 'product', 'notification')\n  GROUP BY time, ServiceName, t\n) GROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "interval": "10s"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Число горутин по сервисам: рост под постоянной нагрузкой — признак накопления.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "id": 114,
+      "title": "go.goroutine.count",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, ServiceName AS series, argMax(Value, TimeUnix) AS value\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'go.goroutine.count' AND ServiceName IN ('gateway', 'order', 'user', 'product', 'notification')\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "interval": "10s"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "id": 115,
+      "panels": [],
+      "title": "Пул pgx (order / user / product / notification)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "pgxpool.acquired_connections / pgxpool.max_connections. 1.0 — пул исчерпан: запросы ждут соединение.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 44
+      },
+      "id": 116,
+      "title": "Утилизация пула (acquired / max)",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, concat(ServiceName, ' · ', Attributes['db.client.connection.pool.name']) AS series,\n  argMaxIf(Value, TimeUnix, MetricName = 'pgxpool.acquired_connections') / nullIf(argMaxIf(Value, TimeUnix, MetricName = 'pgxpool.max_connections'), 0) AS value\nFROM (\n  SELECT ServiceName, MetricName, Attributes, TimeUnix, Value FROM otel.otel_metrics_sum WHERE MetricName = 'pgxpool.acquired_connections'\n  UNION ALL\n  SELECT ServiceName, MetricName, Attributes, TimeUnix, Value FROM otel.otel_metrics_gauge WHERE MetricName = 'pgxpool.max_connections'\n)\nWHERE $__timeFilter(TimeUnix) AND ServiceName IN ('order', 'user', 'product', 'notification')\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "interval": "10s"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Захваты, когда в пуле не было свободного соединения (pgxpool.empty_acquire). Устойчивая ненулевая скорость — пул мал или запросы медленные.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 44
+      },
+      "id": 117,
+      "title": "empty_acquire /s",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, concat(ServiceName, ' · ', Attributes['db.client.connection.pool.name']) AS series, sum(Value) / $__interval_s AS value\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'pgxpool.empty_acquire' AND ServiceName IN ('order', 'user', 'product', 'notification')\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "interval": "10s"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Суммарное ожидание свободного соединения в секунду (pgxpool.empty_acquire_wait_time, ns → с/с). 1.0 ≈ в среднем одна горутина всегда ждёт.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 44
+      },
+      "id": 118,
+      "title": "empty_acquire_wait_time (с ожидания в секунду)",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, concat(ServiceName, ' · ', Attributes['db.client.connection.pool.name']) AS series, sum(Value) / 1e9 / $__interval_s AS value\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'pgxpool.empty_acquire_wait_time' AND ServiceName IN ('order', 'user', 'product', 'notification')\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "interval": "10s"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Захваты, отменённые по контексту (таймаут/отмена запроса) до получения соединения — прямой признак насыщения пула.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 52
+      },
+      "id": 119,
+      "title": "canceled_acquires /s",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, concat(ServiceName, ' · ', Attributes['db.client.connection.pool.name']) AS series, sum(Value) / $__interval_s AS value\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName = 'pgxpool.canceled_acquires' AND ServiceName IN ('order', 'user', 'product', 'notification')\nGROUP BY time, series\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "interval": "10s"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "description": "Среднее время захвата соединения: pgxpool.acquire_duration / pgxpool.acquires.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.series}",
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 52
+      },
+      "id": 120,
+      "title": "acquire_duration (среднее)",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(TimeUnix) AS time, concat(ServiceName, ' · ', Attributes['db.client.connection.pool.name']) AS series,\n  sumIf(Value, MetricName = 'pgxpool.acquire_duration') / 1e9 / sumIf(Value, MetricName = 'pgxpool.acquires') AS value\nFROM otel.otel_metrics_sum\nWHERE $__timeFilter(TimeUnix) AND MetricName IN ('pgxpool.acquire_duration', 'pgxpool.acquires') AND ServiceName IN ('order', 'user', 'product', 'notification')\nGROUP BY time, series\nHAVING sumIf(Value, MetricName = 'pgxpool.acquires') > 0\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "interval": "10s"
+    }
+  ]
+}

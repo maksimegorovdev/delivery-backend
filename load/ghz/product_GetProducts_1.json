@@ -1,0 +1,10 @@
+{
+  "proto": "/proto/product/v1/product_service.proto",
+  "call": "product.v1.ProductService/GetProducts",
+  "host": "product:8092",
+  "import-paths": ["/proto", "/third_party"],
+  "insecure": true,
+  "concurrency": 10,
+  "duration": "60s",
+  "data": { "ids": ["__PRODUCT_1__"] }
+}

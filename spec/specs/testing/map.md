@@ -22,7 +22,7 @@ Build order: `test-foundation` → `unit`, `integration` (параллельно
 | `unit` | [spec](unit/spec.md) | done |
 | `integration` | [spec](integration/spec.md) | done |
 | `e2e` | [spec](e2e/spec.md) | done |
-| `load` | — | todo |
+| `load` | [spec](../../changes/testing/load/spec.md) | approved |
 
 ## Принятые решения
 

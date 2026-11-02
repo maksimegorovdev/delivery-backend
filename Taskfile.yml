@@ -29,24 +29,35 @@ tasks:
     cmds:
       - docker compose down
 
-  e2e-images-check:
-    desc: Infrastructure image versions in e2e/compose.yaml match compose.yaml
+  images-check:
+    desc: Infrastructure image versions in a stack compose file match compose.yaml (FILE=..., PREFIX=<service image prefix>)
+    internal: true
     silent: true
+    requires:
+      vars: [FILE, PREFIX]
     cmds:
       - |
         set -eu
         root=$(docker compose config --images | sort -u)
-        # Образы сервисов (delivery-e2e-*) и одноразовых контейнеров (migrate, curl) в корневом файле не нужны.
-        e2e=$(docker compose -f e2e/compose.yaml config --images | sort -u \
-          | grep -v -e '^delivery-e2e-' -e '^migrate/migrate:' -e '^curlimages/curl:')
+        # Образы сервисов ({{.PREFIX}}*), одноразовых контейнеров (migrate, curl) и генераторов нагрузки
+        # (k6, ghz) в корневом файле не нужны.
+        stack=$(docker compose -f {{.FILE}} --profile '*' config --images | sort -u \
+          | grep -v -e '^{{.PREFIX}}' -e '^migrate/migrate:' -e '^curlimages/curl:' -e '^grafana/k6:' -e '^obvionaoe/ghz:')
         status=0
-        for img in $e2e; do
+        for img in $stack; do
           if ! printf '%s\n' "$root" | grep -qxF "$img"; then
-            echo "e2e/compose.yaml: образ $img не совпадает с compose.yaml" >&2
+            echo "{{.FILE}}: образ $img не совпадает с compose.yaml" >&2
             status=1
           fi
         done
         exit $status
+
+  e2e-images-check:
+    desc: Infrastructure image versions in e2e/compose.yaml match compose.yaml
+    silent: true
+    cmds:
+      - task: images-check
+        vars: { FILE: e2e/compose.yaml, PREFIX: delivery-e2e- }
 
   e2e-up:
     desc: Start the isolated e2e stack (project delivery-e2e) and wait until it is ready
@@ -77,6 +88,81 @@ tasks:
     desc: Remove the e2e stack with its volumes
     cmds:
       - docker compose -f e2e/compose.yaml -p delivery-e2e down -v
+
+  load-up:
+    desc: Start the isolated load stack (project delivery-load) and wait until it is ready
+    cmds:
+      - task: images-check
+        vars: { FILE: load/compose.yaml, PREFIX: delivery-load- }
+      - task -d load up
+
+  load-down:
+    desc: Remove the load stack with its volumes
+    cmds:
+      - task -d load down
+
+  load-smoke:
+    desc: k6 smoke against a running load stack (task load-up) - 5 RPS for 1 min
+    cmds:
+      - task -d load smoke
+
+  load-stress:
+    desc: k6 stress against a running load stack (task load-up) - RPS steps until degradation (STRESS_RATES overrides the steps)
+    cmds:
+      - task -d load stress
+
+  load-regression:
+    desc: k6 regression gate against a running load stack (task load-up) - 70% of the baseline limit for 5 min, fails when p95 or errors exceed baseline thresholds (REGRESSION_P95_MS overrides the p95 limit)
+    cmds:
+      - task -d load regression
+
+  load-soak:
+    desc: k6 soak against a running load stack (task load-up) - the regression RPS for 30 min, SQL snapshots at start and end (use a fresh stack)
+    cmds:
+      - task -d load soak
+
+  load-lag:
+    desc: Order -> notification lag by stage for the last load run (RUN=<dir in load/results/raw> picks another)
+    cmds:
+      - task -d load lag RUN={{.RUN}}
+
+  load-grpc:
+    desc: ghz against every gRPC method of a running load stack, concurrency steps (METHOD=<name in load/ghz> picks one, GHZ_STAGES and GHZ_DURATION override)
+    cmds:
+      - task -d load grpc METHOD={{.METHOD}}
+
+  load-js-test:
+    desc: Unit tests of the k6 scenario logic with node --test (no stack needed)
+    cmds:
+      - task -d load js-test
+
+  bench:
+    desc: Go benchmarks of the hot paths into load/bench/new.txt
+    cmds:
+      - task -d load bench
+
+  bench-compare:
+    desc: benchstat of load/bench/baseline.txt against load/bench/new.txt
+    cmds:
+      - task -d load bench-compare
+
+  bench-baseline:
+    desc: Overwrite load/bench/baseline.txt with the current load/bench/new.txt (by hand, after an intentional change)
+    cmds:
+      - task -d load bench-baseline
+
+  load:
+    desc: Bring up the load stack, run smoke, remove the stack (LOAD_KEEP=1 keeps it)
+    cmds:
+      # defer объявлен до load-up: частично поднятый стек убирается и при падении подъёма.
+      - defer: |
+          if [ "${LOAD_KEEP:-}" = "1" ]; then
+            echo "LOAD_KEEP=1: стек delivery-load оставлен (task load-down)"
+          else
+            task load-down
+          fi
+      - task: load-up
+      - task: load-smoke
 
   e2e-logs:
     desc: Show logs of the e2e stack (for failure analysis)

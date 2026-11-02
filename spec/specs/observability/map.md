@@ -14,8 +14,9 @@ OpenTelemetry → OTel Collector → ClickHouse → Grafana.
 | `metrics` | RED-метрики HTTP/gRPC/pgx/Kafka из автоинструментации, runtime-метрики Go | `telemetry-sdk` |
 | `async-propagation` | `traceparent` через outbox → Debezium (headers) → Kafka → notification: миграция outbox, коннектор, extract в консьюмере | `tracing` |
 | `dashboards` | Grafana dashboards as code: готовые OTel-дашборды плагина + RED-обзор сервисов, переходы логи ↔ трейсы | `logs`, `tracing`, `metrics` |
+| `profiling` | `platform/debugserver` (pprof по `PPROF_ADDR`), автоснимки профилей в задачах `load-stress`/`load-soak`, continuous profiling (кандидат — Grafana Pyroscope + Alloy; отступление от «только ClickHouse» решается в спеке) | `dashboards`, [`testing/load`](../testing/map.md) |
 
-Build order: `obs-stack` → `telemetry-sdk` → `logs`, `tracing`, `metrics` (параллельно) → `async-propagation` → `dashboards`
+Build order: `obs-stack` → `telemetry-sdk` → `logs`, `tracing`, `metrics` (параллельно) → `async-propagation` → `dashboards` → `profiling` (после `testing/load`)
 
 ## Спеки модулей
 
@@ -28,6 +29,7 @@ Build order: `obs-stack` → `telemetry-sdk` → `logs`, `tracing`, `metrics` (�
 | `metrics` | [spec](metrics/spec.md) | done |
 | `async-propagation` | [spec](async-propagation/spec.md) | done |
 | `dashboards` | [spec](dashboards/spec.md) | done |
+| `profiling` | — | todo |
 
 ## Принятые решения
 

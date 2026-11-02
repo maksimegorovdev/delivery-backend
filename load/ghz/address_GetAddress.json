@@ -1,0 +1,10 @@
+{
+  "proto": "/proto/address/v1/address_service.proto",
+  "call": "address.v1.AddressService/GetAddress",
+  "host": "user:8091",
+  "import-paths": ["/proto", "/third_party"],
+  "insecure": true,
+  "concurrency": 10,
+  "duration": "60s",
+  "data": { "id": "__ADDRESS_ID__" }
+}

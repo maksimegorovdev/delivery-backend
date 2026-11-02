@@ -1,0 +1,226 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  COMPOSE: docker compose -f {{.TASKFILE_DIR}}/compose.yaml -p delivery-load
+  # Совпадает с FAKE_AUTH_USER_ID gateway в compose.yaml и сидом миграций user: адрес берётся у этого пользователя.
+  SEED_USER_ID: 01a0d1fa-a4e8-75a1-802d-d6e3c642b0f3
+  # Модули с Go-бенчмарками (относительно корня репозитория); новые модули добавляются сюда.
+  BENCH_MODULES: services/gateway platform services/order services/notification
+  # benchstat — tool в e2e/go.mod: тестовый модуль никем не импортируется, зависимость не попадает в граф сервисов.
+  BENCHSTAT: cd {{.TASKFILE_DIR}}/../e2e && go tool benchstat
+
+tasks:
+  up:
+    desc: Start the load stack without the image check (prefer the root task load-up)
+    cmds:
+      - '{{.COMPOSE}} up -d --build --wait'
+
+  down:
+    desc: Remove the load stack with its volumes
+    cmds:
+      - '{{.COMPOSE}} down -v'
+
+  k6:
+    desc: Run the k6 scenario with PROFILE against a running stack (GATEWAY_URL overrides the target, RUN_ID names the results dir)
+    internal: true
+    silent: true
+    requires:
+      vars: [PROFILE]
+    cmds:
+      - |
+        set -eu
+        # k6 не умеет в SQL: seed-id берутся из БД стека и передаются в env сценария.
+        address_id=$({{.COMPOSE}} exec -T user-postgres \
+          psql -U postgres -d userdb -At \
+          -c "SELECT id FROM addresses WHERE user_id = '{{.SEED_USER_ID}}' ORDER BY created_at LIMIT 1")
+        product_ids=$({{.COMPOSE}} exec -T product-postgres \
+          psql -U postgres -d productdb -At \
+          -c "SELECT string_agg(id::text, ',' ORDER BY name) FROM products")
+        if [ -z "$address_id" ] || [ -z "$product_ids" ]; then
+          echo "seed-id не найдены: стек поднят (task load-up)?" >&2
+          exit 1
+        fi
+        {{.COMPOSE}} run --rm \
+          -e PROFILE={{.PROFILE}} \
+          -e RUN_ID="{{.RUN_ID}}" \
+          -e STRESS_RATES="${STRESS_RATES:-}" \
+          -e REGRESSION_P95_MS="${REGRESSION_P95_MS:-}" \
+          -e GATEWAY_URL="${GATEWAY_URL:-http://gateway:8080}" \
+          -e SEED_ADDRESS_ID="$address_id" \
+          -e SEED_PRODUCT_IDS="$product_ids" \
+          k6 run /scripts/create_order.js
+
+  smoke:
+    desc: k6 smoke against a running stack - 5 RPS for 1 min, fails on any failed check; group-lag.csv goes to results/raw/<run>
+    vars:
+      RUN_ID:
+        sh: date +%Y%m%d-%H%M%S
+    cmds:
+      - mkdir -p results/raw/{{.RUN_ID}}
+      - cmd: |
+          sh scripts/group-lag.sh delivery-load notification results/raw/{{.RUN_ID}}/group-lag.csv 2 >/dev/null 2>&1 &
+      # $! в интерпретаторе Task не годится для kill: сэмплер гасится по пути своего прогона.
+      - defer: pkill -f 'scripts/group-lag.sh .*results/raw/{{.RUN_ID}}/' || true
+      - task: k6
+        vars: { PROFILE: smoke, RUN_ID: '{{.RUN_ID}}' }
+
+  stress:
+    desc: k6 stress - RPS steps until degradation, summary and docker-stats.csv go to results/raw/<run> (STRESS_RATES overrides the steps)
+    vars:
+      RUN_ID:
+        sh: date +%Y%m%d-%H%M%S
+    cmds:
+      - mkdir -p results/raw/{{.RUN_ID}}
+      - cmd: |
+          sh scripts/docker-stats.sh delivery-load results/raw/{{.RUN_ID}}/docker-stats.csv 5 >/dev/null 2>&1 &
+      - cmd: |
+          sh scripts/group-lag.sh delivery-load notification results/raw/{{.RUN_ID}}/group-lag.csv 5 >/dev/null 2>&1 &
+      - defer: pkill -f 'scripts/(docker-stats|group-lag).sh .*results/raw/{{.RUN_ID}}/' || true
+      # Код 99 у k6 — нарушены пороги: для stress штатный исход «предел найден». Исход решает вердикт в summary.json.
+      - task: k6
+        vars: { PROFILE: stress, RUN_ID: '{{.RUN_ID}}' }
+        ignore_error: true
+      - cmd: |
+          summary=results/raw/{{.RUN_ID}}/summary.json
+          if [ ! -f "$summary" ]; then echo "stress: summary.json не создан, прогон не состоялся" >&2; exit 1; fi
+          if grep -q '"verdict": "failed"' "$summary"; then echo "stress: вердикт failed, см. $summary" >&2; exit 1; fi
+          echo "stress: результаты в load/results/raw/{{.RUN_ID}}"
+
+  regression:
+    desc: k6 regression gate - constant 70% of the baseline limit for 5 min, non-zero exit when a threshold is crossed (REGRESSION_P95_MS overrides the p95 limit)
+    vars:
+      RUN_ID:
+        sh: date +%Y%m%d-%H%M%S
+    cmds:
+      - task: k6
+        vars: { PROFILE: regression, RUN_ID: '{{.RUN_ID}}' }
+
+  soak-snapshot:
+    desc: Table sizes, query times, Debezium slot and WAL snapshot into results/raw/<run>/soak-<label>.txt
+    internal: true
+    silent: true
+    requires:
+      vars: [RUN_ID, LABEL]
+    cmds:
+      - |
+        {{.COMPOSE}} exec -T notification-postgres psql -U postgres -d notificationdb -X -q \
+          -v ON_ERROR_STOP=1 \
+          -v order_dsn='host=order-postgres dbname=orderdb user=postgres password=postgres' \
+          -v label={{.LABEL}} \
+          -f - <sql/soak-snapshot.sql | tee results/raw/{{.RUN_ID}}/soak-{{.LABEL}}.txt
+
+  soak:
+    desc: k6 soak - the regression RPS for 30 min, SQL snapshots at start and end, docker stats and group lag samplers; results go to results/raw/<run>
+    vars:
+      RUN_ID:
+        sh: date +%Y%m%d-%H%M%S
+    cmds:
+      - mkdir -p results/raw/{{.RUN_ID}}
+      - task: soak-snapshot
+        vars: { RUN_ID: '{{.RUN_ID}}', LABEL: start }
+      - cmd: |
+          sh scripts/docker-stats.sh delivery-load results/raw/{{.RUN_ID}}/docker-stats.csv 10 >/dev/null 2>&1 &
+      - cmd: |
+          sh scripts/group-lag.sh delivery-load notification results/raw/{{.RUN_ID}}/group-lag.csv 10 >/dev/null 2>&1 &
+      - defer: pkill -f 'scripts/(docker-stats|group-lag).sh .*results/raw/{{.RUN_ID}}/' || true
+      # Код k6 99 (порог нарушен) не прерывает задачу: снимок конца нужен и после падения. Исход решает вердикт в summary.json.
+      - task: k6
+        vars: { PROFILE: soak, RUN_ID: '{{.RUN_ID}}' }
+        ignore_error: true
+      - task: soak-snapshot
+        vars: { RUN_ID: '{{.RUN_ID}}', LABEL: end }
+      - cmd: |
+          summary=results/raw/{{.RUN_ID}}/summary.json
+          if [ ! -f "$summary" ]; then echo "soak: summary.json не создан, прогон не состоялся" >&2; exit 1; fi
+          if grep -q '"verdict": "failed"' "$summary"; then echo "soak: вердикт failed, см. $summary" >&2; exit 1; fi
+          if grep -q '"verdict": "drift"' "$summary"; then echo "soak: p99 последних 5 мин больше 1.5x первых, см. $summary"; fi
+          echo "soak: результаты в load/results/raw/{{.RUN_ID}}"
+
+  lag:
+    desc: Order -> notification lag by stage for the last run (RUN=<dir name> picks another), table goes to results/raw/<run>/lag.txt
+    silent: true
+    vars:
+      RUN:
+        sh: '{{if .RUN}}echo {{.RUN}}{{else}}ls -1 results/raw | tail -1{{end}}'
+    cmds:
+      - |
+        set -eu
+        dir=results/raw/{{.RUN}}
+        if [ -z "{{.RUN}}" ] || [ ! -d "$dir" ]; then echo "lag: прогон не найден (task load-smoke или load-stress)" >&2; exit 1; fi
+        summary=""
+        if [ -f "$dir/summary.json" ]; then summary=$(cat "$dir/summary.json"); fi
+        grouplag=""
+        if [ -f "$dir/group-lag.csv" ]; then grouplag=$(cat "$dir/group-lag.csv"); fi
+        {{.COMPOSE}} exec -T notification-postgres psql -U postgres -d notificationdb -X -q \
+          -v ON_ERROR_STOP=1 \
+          -v order_dsn='host=order-postgres dbname=orderdb user=postgres password=postgres' \
+          -v summary="$summary" -v grouplag="$grouplag" \
+          -f - <sql/lag.sql | tee "$dir/lag.txt"
+        echo "lag: таблица в load/$dir/lag.txt"
+
+  grpc:
+    desc: ghz against gRPC services in the stack network, concurrency steps, JSON and summary go to results/raw/<run>/ghz (METHOD=<ghz config name> picks one; GHZ_STAGES, GHZ_DURATION override)
+    silent: true
+    vars:
+      RUN_ID:
+        sh: date +%Y%m%d-%H%M%S
+    cmds:
+      - |
+        set -eu
+        user_id={{.SEED_USER_ID}}
+        address_id=$({{.COMPOSE}} exec -T user-postgres \
+          psql -U postgres -d userdb -At \
+          -c "SELECT id FROM addresses WHERE user_id = '$user_id' ORDER BY created_at LIMIT 1")
+        product_ids=$({{.COMPOSE}} exec -T product-postgres \
+          psql -U postgres -d productdb -At \
+          -c "SELECT string_agg(id::text, ',' ORDER BY name) FROM products")
+        if [ -z "$address_id" ] || [ -z "$product_ids" ]; then
+          echo "seed-id не найдены: стек поднят (task load-up)?" >&2
+          exit 1
+        fi
+        USER_ID=$user_id ADDRESS_ID=$address_id PRODUCT_IDS=$product_ids \
+          sh scripts/grpc.sh delivery-load results/raw/{{.RUN_ID}} "{{.METHOD}}"
+
+  js-test:
+    desc: Unit tests of the k6 scenario logic (profiles, stage tags, summary verdict) with node --test, no stack needed
+    cmds:
+      - node --test 'k6/test/*.test.js'
+
+  bench:
+    desc: Go benchmarks of the hot paths (-benchmem, -count=10) from every module in BENCH_MODULES into bench/new.txt
+    silent: true
+    cmds:
+      - |
+        set -eu
+        mkdir -p bench
+        : > bench/new.txt
+        for module in {{.BENCH_MODULES}}; do
+          # Вывод модулей склеивается: benchstat различает пакеты по строкам pkg:.
+          (cd {{.TASKFILE_DIR}}/../$module && go test -run='^$' -bench=. -benchmem -count=10 ./...) | tee -a bench/new.txt
+        done
+        if ! grep -q '^Benchmark' bench/new.txt; then echo "bench: бенчмарков не найдено" >&2; exit 1; fi
+        echo "bench: результаты в load/bench/new.txt"
+
+  bench-compare:
+    desc: benchstat of bench/baseline.txt against bench/new.txt (a first run without a baseline compares new.txt with itself)
+    silent: true
+    cmds:
+      - |
+        set -eu
+        if [ ! -f bench/new.txt ]; then echo "bench-compare: нет bench/new.txt (task bench)" >&2; exit 1; fi
+        base=$(pwd)
+        old=bench/baseline.txt
+        if [ ! -f "$old" ]; then echo "bench-compare: baseline.txt нет, new.txt сравнивается сам с собой"; old=bench/new.txt; fi
+        {{.BENCHSTAT}} "$base/$old" "$base/bench/new.txt"
+
+  bench-baseline:
+    desc: Overwrite bench/baseline.txt with the current bench/new.txt (run by hand after an intentional change)
+    silent: true
+    cmds:
+      - |
+        set -eu
+        if [ ! -f bench/new.txt ]; then echo "bench-baseline: нет bench/new.txt (task bench)" >&2; exit 1; fi
+        cp bench/new.txt bench/baseline.txt
+        echo "bench-baseline: bench/baseline.txt обновлён"

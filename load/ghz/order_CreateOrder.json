@@ -1,0 +1,17 @@
+{
+  "proto": "/proto/order/v1/order_service.proto",
+  "call": "order.v1.OrderService/CreateOrder",
+  "host": "order:8090",
+  "import-paths": ["/proto", "/third_party"],
+  "insecure": true,
+  "concurrency": 10,
+  "duration": "60s",
+  "data": {
+    "user_id": "__USER_ID__",
+    "address_id": "__ADDRESS_ID__",
+    "items": [
+      { "product_id": "__PRODUCT_1__", "quantity": "{{randomInt 1 5}}" },
+      { "product_id": "__PRODUCT_2__", "quantity": "{{randomInt 1 5}}" }
+    ]
+  }
+}
