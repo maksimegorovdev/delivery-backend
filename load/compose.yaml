@@ -112,6 +112,9 @@ services:
     environment:
       BOOTSTRAP_SERVERS: redpanda:9092
       GROUP_ID: debezium-cdc-cluster
+      # Образ по умолчанию берёт -Xmx2G: при лимите контейнера 1G куча растёт за лимит, JVM
+      # зависает на GC, а cgroup убивает процесс (OOMKilled, код 137). Куча держится ниже лимита.
+      KAFKA_HEAP_OPTS: "-Xms256M -Xmx512M"
       CONFIG_STORAGE_TOPIC: connect_configs
       OFFSET_STORAGE_TOPIC: connect_offsets
       STATUS_STORAGE_TOPIC: connect_statuses
