@@ -1,7 +1,8 @@
 import { degradation, regressionRPS, soak, stressPlan } from './config.js';
 
 // Пороги, нарушение которых означает «предел найден»; любое другое нарушение — дефект прогона.
-const limitThresholds = [/^http_req_failed\{stage:/, /^slow\{stage:/, /^dropped_iterations$/];
+// Сопоставляются со строками failedThresholds вида "<метрика>: <выражение>".
+const limitThresholds = [/^http_req_failed\{stage:/, /^slow\{stage:/, /^dropped_iterations: /];
 
 // Запас на время между остановкой сценария и вызовом handleSummary при определении ступени остановки.
 const stopSlackMs = 5000;

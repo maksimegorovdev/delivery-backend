@@ -21,7 +21,9 @@ const stress = {
   maxVUs: 500,
 };
 
-// Через сколько секунд плато начинать оценивать пороги: первые секунды выборка слишком мала.
+// Через сколько секунд плато начинать оценивать пороги abort: сразу после разгона идёт переходный всплеск.
+// Окно оценки размечается тегом eval (см. stageAt), а не delayAbortEval: тот отсчитывается от старта прогона
+// вместе с setup(), а калибровка в setup() длится минуту и больше, и оценка начиналась бы раньше задуманного.
 const evalAfterPlateauSec = 30;
 
 // Статистики трендов в summary профилей stress, regression и soak.
@@ -102,14 +104,14 @@ function stressProfile() {
     stages.push({ duration: `${plan.plateauSec}s`, target: s.rate });
 
     const plateau = `{stage:${s.n},phase:plateau}`;
-    // Оценка начинается через evalAfterPlateauSec после начала плато ступени (время от старта теста).
-    const delayAbortEval = `${s.plateauStartSec + evalAfterPlateauSec}s`;
-    thresholds[`http_req_failed${plateau}`] = [
-      { threshold: `rate<${degradation.maxErrorRate}`, abortOnFail: true, delayAbortEval },
-    ];
+    // Пороги abort — на окне оценки ступени: до него подметрика пуста, а пустые k6 во время прогона не оценивает.
+    const evalWindow = `{stage:${s.n},eval:1}`;
+    thresholds[`http_req_failed${evalWindow}`] = [{ threshold: `rate<${degradation.maxErrorRate}`, abortOnFail: true }];
     // p95 > K× эталона ⇔ доля запросов медленнее K× эталона больше 5% (метрика slow, см. create_order.js).
-    thresholds[`slow${plateau}`] = [{ threshold: 'rate<0.05', abortOnFail: true, delayAbortEval }];
-    // Пустые пороги создают подметрики, которые попадают в summary.
+    thresholds[`slow${evalWindow}`] = [{ threshold: 'rate<0.05', abortOnFail: true }];
+    // Пустые пороги создают подметрики всего плато, которые попадают в summary.
+    thresholds[`http_req_failed${plateau}`] = [];
+    thresholds[`slow${plateau}`] = [];
     thresholds[`http_req_duration${plateau}`] = [];
     thresholds[`http_reqs${plateau}`] = [];
     thresholds[`checks${plateau}`] = [];
@@ -251,6 +253,7 @@ export function profile(name) {
 
 // stageAt возвращает ступень, фазу (ramp|plateau) и целевой RPS профиля name через elapsedMs после старта
 // сценария. Нужен для тега stage и метрики target_rps (панель «целевой/достигнутый» дашборда Load).
+// Для stress eval сообщает, идёт ли окно оценки порогов abort (тег eval).
 // Считается по собственному плану, а не по options: k6 нормализует options и в VU они уже не в исходной форме.
 export function stageAt(name, elapsedMs) {
   if (name === 'stress') {
@@ -259,10 +262,12 @@ export function stageAt(name, elapsedMs) {
     const s = plan.stages[i];
     const intoStageMs = Math.max(0, elapsedMs - s.startSec * 1000);
     if (intoStageMs >= plan.rampSec * 1000) {
-      return { stage: s.n, phase: 'plateau', target: s.rate };
+      const evalWindow = intoStageMs >= (plan.rampSec + evalAfterPlateauSec) * 1000;
+      return { stage: s.n, phase: 'plateau', eval: evalWindow, target: s.rate };
     }
     const from = i === 0 ? s.rate : plan.stages[i - 1].rate;
-    return { stage: s.n, phase: 'ramp', target: from + ((s.rate - from) * intoStageMs) / (plan.rampSec * 1000) };
+    const target = from + ((s.rate - from) * intoStageMs) / (plan.rampSec * 1000);
+    return { stage: s.n, phase: 'ramp', eval: false, target };
   }
   const target = profile(name).scenarios.create_order.rate;
   if (name === 'soak') {

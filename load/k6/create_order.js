@@ -85,6 +85,11 @@ export default function (seed) {
   if (at.window !== undefined) {
     exec.vu.tags.window = at.window;
   }
+  // Теги VU живут между итерациями: eval перезаписывается на каждой, иначе окно оценки ступени перешло бы
+  // на разгон следующей.
+  if (at.eval !== undefined) {
+    exec.vu.tags.eval = at.eval ? '1' : '0';
+  }
   targetRPS.add(at.target);
 
   const res = http.post(orderURL, JSON.stringify(randomOrder(seed)), {

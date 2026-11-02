@@ -534,6 +534,35 @@ min–max 11%. Логгер пишет в свой `nopWriter` (не `io.Discard
 
 ---
 
+## Task 13: Блокеры ревью `/ship` — окно оценки stress и вердикт по `dropped_iterations`
+
+**Description:** (1) `delayAbortEval` k6 отсчитывается от старта прогона вместе с `setup()` (`MarkStarted` до setup
+в `internal/execution/scheduler.go` k6), калибровка длится ~74 с — пороги abort оценивали плато с первых секунд
+(в baseline ступень 16 прервана через ~8 с плато). Окно оценки размечается тегом `eval` (`stageAt`), пороги abort —
+на подметриках `{stage:N,eval:1}` без `delayAbortEval`. (2) `limitThresholds` в `summary.js` не совпадал со строкой
+`dropped_iterations: count==0` — остановка по пропущенным итерациям давала `failed` вместо `limit_reached`.
+
+**Acceptance criteria:**
+- [x] Пороги abort stress не зависят от длительности `setup()`; статистика плато в summary — по всему плато
+- [x] Остановка по `dropped_iterations` даёт `verdict=limit_reached`
+- [x] Node-тесты логики k6 (`task load-js-test`) воспроизводят оба дефекта и зелёные после исправления
+- [ ] Stress перепрогнан, `baseline.md` и пороги `regression` в `config.js` обновлены по новому пределу
+
+**Verification:**
+- [x] `task load-js-test` зелёный; `k6 inspect -e PROFILE=stress` (k6 2.3.0) принимает пороги `{stage:N,eval:1}`
+- [ ] `task load-stress` на свежем стеке
+
+**Dependencies:** Task 12
+
+**Files likely touched:**
+- `load/k6/lib/config.js`, `load/k6/lib/summary.js`, `load/k6/create_order.js`
+- `load/k6/test/*.test.js`, `load/Taskfile.yml`, `Taskfile.yml`
+- `load/results/baseline.md`, `load/results/baseline/**`
+
+**Estimated scope:** M
+
+---
+
 ## Checkpoint: Complete
 - [ ] Все Success Criteria [спеки](spec.md) отмечены
 - [x] `task lint`, `task test`, `task e2e` зелёные (2026-11-02, коммит `ff55960`: все три с кодом 0)

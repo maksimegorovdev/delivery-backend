@@ -183,6 +183,11 @@ tasks:
         USER_ID=$user_id ADDRESS_ID=$address_id PRODUCT_IDS=$product_ids \
           sh scripts/grpc.sh delivery-load results/raw/{{.RUN_ID}} "{{.METHOD}}"
 
+  js-test:
+    desc: Unit tests of the k6 scenario logic (profiles, stage tags, summary verdict) with node --test, no stack needed
+    cmds:
+      - node --test 'k6/test/*.test.js'
+
   bench:
     desc: Go benchmarks of the hot paths (-benchmem, -count=10) from every module in BENCH_MODULES into bench/new.txt
     silent: true
