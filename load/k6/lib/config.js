@@ -28,3 +28,9 @@ export function profile(name) {
   }
   return p;
 }
+
+// targetRate возвращает целевой RPS профиля name для метрики target_rps (панель «целевой/достигнутый» дашборда Load).
+// Пока профили с постоянной интенсивностью; ступенчатые профили добавят зависимость от времени.
+export function targetRate(name) {
+  return profile(name).scenarios.create_order.rate;
+}

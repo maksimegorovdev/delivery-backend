@@ -114,20 +114,43 @@ gateway/order/user/product; runtime Go (`go.memory.used`, `go.goroutine.count`);
 `canceled_acquires`, `acquire_duration`) — по [каталогу метрик](../../../specs/observability/metrics/metrics-catalog.md).
 
 **Acceptance criteria:**
-- [ ] Во время `load-smoke` метрики k6 появляются в ClickHouse и на дашборде `Load`
-- [ ] На том же дашборде видны RED, runtime и пул pgx сервисов за тот же интервал
-- [ ] Дашборд загружается provisioning-ом и в dev-стеке (корневой `compose.yaml`) без ошибок панелей
+- [x] Во время `load-smoke` метрики k6 появляются в ClickHouse и на дашборде `Load`
+- [x] На том же дашборде видны RED, runtime и пул pgx сервисов за тот же интервал
+- [x] Дашборд загружается provisioning-ом и в dev-стеке (корневой `compose.yaml`) без ошибок панелей
 
 **Verification:**
-- [ ] `LOAD_KEEP=1 task load` → Grafana load-стека, дашборд `Load`, все панели с данными за интервал smoke
-- [ ] SQL в ClickHouse: метрики с префиксом k6 есть в `otel_metrics_*` за последний прогон
-- [ ] Скриншот/описание панелей записаны в todo (результат проверки)
+- [x] `LOAD_KEEP=1 task load` → Grafana load-стека, дашборд `Load`, все панели с данными за интервал smoke
+- [x] SQL в ClickHouse: метрики с префиксом k6 есть в `otel_metrics_*` за последний прогон
+- [x] Скриншот/описание панелей записаны в todo (результат проверки)
+
+**Результат проверки:** RED — до прогона в `otel_metrics_*` 0 строк `k6_%`. k6 2.3.0 пишет в
+`otel-collector` встроенным выводом `opentelemetry` (env `K6_OUT=opentelemetry`, `K6_OTEL_*`,
+префикс `k6_`, `service.name=k6`, экспорт раз в 5 с) — без изменений `deploy/otel-collector`. По умолчанию
+k6 шлёт кумулятивные счётчики/гистограммы; `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta`
+переводит их в приращения, как у сервисов. После smoke в ClickHouse: sum 7, gauge 3, histogram 8 метрик `k6_*`.
+Дашборд `Delivery / Load` (`deploy/grafana/dashboards/load.json`, 20 элементов, 22 запроса): k6 (RPS целевой/
+достигнутый, p50/p95/p99, ошибки http_req_failed и checks, dropped_iterations и VU, таблица по `stage`),
+RED gateway/order/user/product, `go.memory.used`, горутины, пул pgx (утилизация, `empty_acquire`,
+`empty_acquire_wait_time`, `canceled_acquires`, `acquire_duration`). Через `/api/ds/query` Grafana load-стека
+после `LOAD_KEEP=1 task load` все 22 запроса без ошибок, все панели с данными (кроме `dropped_iterations`
+и таблицы `stage` — см. ниже). В dev-Grafana (корневой compose, отдельный проект) дашборд загрузился,
+22 запроса на пустых данных — без ошибок. Принудительный сценарий (200 RPS на 1 VU, неверный путь): панели
+показали error rate 100% и `dropped_iterations`. Нюансы: сервисы экспортируют раз в 10 с, поэтому у сервисных
+панелей шаг ≥ 10 с (у k6 — 5 с); перцентили k6 — по грубым бакетам гистограммы (точные — в summary.json, T4);
+`dropped_iterations` у k6 появляется только при пропусках (нет данных = пропусков не было); тег `stage`
+появится в T4 (до того одна строка «—»); `target_rps` — gauge из сценария, считается на init
+(`currentTargetRate`), т.к. в VU объект options уже изменён k6. Скриншота нет (нет браузера), панели проверены API.
+`task lint` (0 issues), `task test` зелёные; боевой код сервисов не менялся.
+
+**Замечание вне задачи:** если итерация k6 падает исключением (так было при ошибке в `targetRate`), проверок
+нет, `checks rate == 1` не нарушается и smoke возвращает код 0. Для T4/T8 стоит добавить порог на минимум
+итераций/`checks` count. Не исправлялось.
 
 **Dependencies:** Task 2
 
 **Files likely touched:**
 - `load/compose.yaml`
-- `load/Taskfile.yml`
+- `load/k6/create_order.js`, `load/k6/lib/config.js`
 - `deploy/grafana/dashboards/load.json`
 
 **Estimated scope:** M

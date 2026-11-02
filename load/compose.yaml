@@ -433,6 +433,20 @@ services:
   k6:
     image: grafana/k6:2.3.0
     profiles: ["tools"]
+    environment:
+      # Метрики генератора уходят в тот же otel-collector, что и телеметрия сервисов (service.name = k6).
+      K6_OUT: opentelemetry
+      K6_OTEL_SERVICE_NAME: k6
+      K6_OTEL_METRIC_PREFIX: k6_
+      K6_OTEL_EXPORTER_PROTOCOL: grpc
+      K6_OTEL_GRPC_EXPORTER_ENDPOINT: otel-collector:4317
+      K6_OTEL_GRPC_EXPORTER_INSECURE: "true"
+      K6_OTEL_EXPORT_INTERVAL: 5s
+      # Как у сервисов: счётчики и гистограммы шлются приращениями, SQL панелей остаётся простым.
+      OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: delta
+    depends_on:
+      otel-collector:
+        condition: service_started
     volumes:
       - ./k6:/scripts:ro
       - ./results:/results
