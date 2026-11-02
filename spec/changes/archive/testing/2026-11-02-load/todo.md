@@ -111,7 +111,7 @@ load-стеке 1 ГБ: куча росла за лимит, JVM зависал�
 целевой/достигнутый, p50/p95/p99 и доля ошибок k6 по `stage`, `dropped_iterations`; RED
 gateway/order/user/product; runtime Go (`go.memory.used`, `go.goroutine.count`); пул pgx по каждому
 сервису с БД (`acquired`/`max_connections`, скорость `empty_acquire` и `empty_acquire_wait_time`,
-`canceled_acquires`, `acquire_duration`) — по [каталогу метрик](../../../specs/observability/metrics/metrics-catalog.md).
+`canceled_acquires`, `acquire_duration`) — по [каталогу метрик](../../../../specs/observability/metrics/metrics-catalog.md).
 
 **Acceptance criteria:**
 - [x] Во время `load-smoke` метрики k6 появляются в ClickHouse и на дашборде `Load`
@@ -158,10 +158,11 @@ RED gateway/order/user/product, `go.memory.used`, горутины, пул pgx (
 ---
 
 ## Checkpoint 1: После задач 1–3
-- [ ] `task load` зелёный от чистого состояния, стек убирается и при падении
-- [ ] `task e2e`, `task lint`, `task test` зелёные
-- [ ] Дашборд `Load` показывает k6 и сервисы в одном интервале
-- [ ] Ревью с пользователем перед поиском предела
+- [x] `task load` зелёный от чистого состояния, стек убирается и при падении (Task 2; повторно 2026-11-02 на `79f075e`:
+  код 0, после — 0 контейнеров `delivery-load`)
+- [x] `task e2e`, `task lint`, `task test` зелёные (2026-11-02 на `79f075e`)
+- [x] Дашборд `Load` показывает k6 и сервисы в одном интервале (Task 3)
+- [x] Ревью с пользователем перед поиском предела (перед полным прогоном, Checkpoint 2)
 
 ---
 
@@ -399,7 +400,7 @@ WAL) — снимок в начале и в конце. `task load-soak` с сэ
 
 **Verification:**
 - [x] Снимки SQL начала и конца в `raw/<run>/`
-- [ ] Тренды памяти/горутин/пула за 30 мин видны на дашборде `Load` (панели в `load.json` есть, те же метрики сняты запросами к ClickHouse в `baseline/soak/trends.txt`; в Grafana глазами не проверялось)
+- [ ] Тренды памяти/горутин/пула за 30 мин видны на дашборде `Load` (панели в `load.json` есть, те же метрики сняты запросами к ClickHouse в `baseline/soak/trends.txt`; в Grafana глазами не проверялось — оставлено при архивировании, на критерии спеки не влияет)
 
 **Результат проверки:** Прогон `20261102-150614` на свежем стеке, 30 мин без abort, 468 000 итераций, 0 ошибок. Код `task load-soak` = 201:
 вердикт `failed` из-за порога `dropped_iterations == 0` (109 пропусков в провале ~10 с на 24-й минуте). Дрейф p99 ×3.78 (порог 1.5×),
@@ -423,9 +424,10 @@ k6 ≈ 14% CPU, `order` ≈ 31% (генератор не насыщен); на 1
 ---
 
 ## Checkpoint 3: После задач 7–9
-- [ ] `baseline.md` закрывает разделы 1–7 и soak
-- [ ] `load-regression` зелёный и падает на заниженном пороге
-- [ ] Ревью с пользователем (ask first: перезапись baseline, найденные проблемы)
+- [x] `baseline.md` закрывает разделы 1–7 и soak (плюс раздел 8 — повторный stress)
+- [x] `load-regression` зелёный и падает на заниженном пороге (2026-11-02 на `79f075e`: 78 000 запросов, p95 3.3 мс,
+  код 0; `REGRESSION_P95_MS=1` — код 201, нарушен `p(95)<=1`)
+- [x] Ревью с пользователем (ask first: перезапись baseline, найденные проблемы) — ревью `/ship`, решения в Task 13
 
 ---
 
@@ -573,7 +575,7 @@ min–max 11%. Логгер пишет в свой `nopWriter` (не `io.Discard
 ---
 
 ## Checkpoint: Complete
-- [ ] Все Success Criteria [спеки](spec.md) отмечены
+- [x] Все Success Criteria [спеки](spec.md) отмечены (критерий `task load` уточнён: smoke без stress, утверждено пользователем)
 - [x] `task lint`, `task test`, `task e2e` зелёные (2026-11-02, коммит `ff55960`: все три с кодом 0)
-- [ ] «Итоги модуля `load`» в [map.md](../../../specs/testing/map.md); профилирование — ссылка на `observability/profiling`
-- [ ] Завершение по `spec-workflow` (статус `done`, публикация, архив, ссылки) — после подтверждения пользователя
+- [x] «Итоги модуля `load`» в [map.md](../../../../specs/testing/map.md); профилирование — ссылка на `observability/profiling`
+- [x] Завершение по `spec-workflow` (статус `done`, публикация, архив, ссылки) — по команде пользователя 2026-11-02

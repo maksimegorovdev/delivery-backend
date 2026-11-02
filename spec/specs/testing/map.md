@@ -22,7 +22,7 @@ Build order: `test-foundation` → `unit`, `integration` (параллельно
 | `unit` | [spec](unit/spec.md) | done |
 | `integration` | [spec](integration/spec.md) | done |
 | `e2e` | [spec](e2e/spec.md) | done |
-| `load` | [spec](../../changes/testing/load/spec.md) | approved |
+| `load` | [spec](load/spec.md) | done |
 
 ## Принятые решения
 
@@ -101,3 +101,20 @@ user 34.5%, product 32.0%, notification 44.8%. Остаток — `app` и `repo
 Баги: happy path выявил расхождение боевого кода с контрактом событий — тип события `OrderCreated` вместо `order.created` и суммы строками в payload. Исправлено в `order` и `notification` (коммит `8791c0c`).
 
 Изменения боевого кода: gRPC health в `platform/grpcserver` (`SERVING`, при graceful stop `NOT_SERVING`); исправление типа события и формата сумм (см. выше); `services/<svc>/Dockerfile` для каждого сервиса, `.dockerignore`, переименование `docker-compose.yml` → `compose.yaml`.
+
+## Итоги модуля `load`
+
+Стек `delivery-load` (`load/compose.yaml`, порты 38xxx только на 127.0.0.1, лимиты CPU/памяти); задачи `load`, `load-smoke`, `load-stress`, `load-regression`, `load-soak`, `load-grpc`, `load-lag`, `load-js-test`, `bench`, `bench-compare`, `bench-baseline`. Отчёт — [`load/results/baseline.md`](../../../load/results/baseline.md), эталон бенчмарков — `load/bench/baseline.txt`.
+
+| Что | Результат (Apple M2 Pro, лимиты контейнеров baseline) |
+|---|---|
+| Предел HTTP `POST /api/v1/orders` | 375 RPS (на 400 RPS p95 19.7 мс, 4.08× от первой ступени); повторный прогон — 325 RPS, разброс ±2 ступени |
+| Пределы gRPC | `GetUser` ≈ 5.0k, `GetAddress` ≈ 4.9–5.0k, `GetProducts` 1 id ≈ 4.1–4.2k, 10 id ≈ 3.3k RPS; `CreateOrder` не найден до 2.3k RPS |
+| Узкое место HTTP | ожидание соединения из пула pgx `order` (10 соединений) при кратковременных задержках записи: трейсы + метрики пула + docker stats; причина задержек без профиля не видна |
+| Лаг заказ → уведомление | p95 ≈ 0.80–0.87 с на всех ступенях, `notification` догоняет |
+| Гейт регрессий | 260 RPS × 5 мин, p95 ≤ 6 мс, ошибки < 1%, пропусков нет |
+| Soak 30 мин, 260 RPS | утечек памяти и горутин нет; p99 ×3.78 к концу, доля ожиданий пула `order` 0.01% → 1.08%, провал ~10 с (109 пропусков) — вердикт `failed`, оставлен как находка |
+
+Баги: в самой инфраструктуре нагрузки найдены и исправлены по ревью `/ship` — `delayAbortEval` k6 считается вместе с `setup()` (калибровка стала по времени, задержка сдвинута на `setupSec`), остановка по `dropped_iterations` давала `failed`, `summary.js` падал или выдавал `completed` на неполных данных. Логика k6 покрыта node-тестами (`task load-js-test`).
+
+Изменения боевого кода: нет. Открытые вопросы — гипотеза пула pgx (`PG_MAX_CONNS=20` у `order`), CPU-throttling `user`/`product` на gRPC, ретенция `outbox_events`/`inbox_events`; профиль `order` снимается в модуле `profiling` ([observability/map.md](../observability/map.md)).
