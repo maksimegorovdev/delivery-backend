@@ -46,16 +46,16 @@
 
 ## Task 2: Пакет platform/debugserver
 
-**Description:** HTTP-сервер отладочных эндпоинтов на собственном `http.ServeMux` с маршрутами `net/http/pprof` (`/debug/pprof/` через `Index`, `cmdline`, `profile`, `symbol`, `trace`). Функциональные опции: `WithMutexProfileFraction`, `WithBlockProfileRate` (по умолчанию 0), `WithLogger`, `WithTimeouts`. Таймауты: `ReadHeaderTimeout` 5 с, `WriteTimeout` 65 с, `IdleTimeout` 60 с. Без `otelhttp`. Жизненный цикл — как у `httpserver`: `Serve(ctx, lis)` на листенере из `listener.Listen`, graceful shutdown по отмене `ctx` с таймаутом.
+**Description:** HTTP-сервер отладочных эндпоинтов на собственном `http.ServeMux` с маршрутами как у `net/http/pprof` (`/debug/pprof/` — индекс, именованные профили, `cmdline`, `profile`, `symbol`, `trace`); хендлеры — поверх `runtime/pprof` и `runtime/trace`, без импорта `net/http/pprof` (его `init()` регистрирует профили на `DefaultServeMux`). Функциональные опции: `WithMutexProfileFraction`, `WithBlockProfileRate` (по умолчанию 0), `WithLogger`, `WithTimeouts`. Таймауты: `ReadHeaderTimeout` 5 с, `WriteTimeout` 65 с, `IdleTimeout` 60 с. Без `otelhttp`. Жизненный цикл — как у `httpserver`: `Serve(ctx, lis)` на листенере из `listener.Listen`, graceful shutdown по отмене `ctx` с таймаутом.
 
 **Acceptance criteria:**
-- [ ] `/debug/pprof/` → 200 со списком профилей; `goroutine?debug=1`, `heap`, `profile?seconds=1` отдают данные; `seconds` > `WriteTimeout` → ошибка обработчика
-- [ ] Неизвестный путь и пути вне `/debug/pprof/` → 404; второй сервер на `http.DefaultServeMux` в том же процессе не отдаёт профили
-- [ ] Сервер останавливается по отмене ctx; `goleak` чистый; покрытие не ниже порога
+- [x] `/debug/pprof/` → 200 со списком профилей; `goroutine?debug=1`, `heap`, `profile?seconds=1` отдают данные; `seconds` > `WriteTimeout` → ошибка обработчика
+- [x] Неизвестный путь и пути вне `/debug/pprof/` → 404; второй сервер на `http.DefaultServeMux` в том же процессе не отдаёт профили
+- [x] Сервер останавливается по отмене ctx; `goleak` чистый; покрытие не ниже порога
 
 **Verification:**
-- [ ] `cd platform && go test -race ./debugserver/...`
-- [ ] `task lint`, `task cover`
+- [x] `cd platform && go test -race ./debugserver/...`
+- [x] `task lint`, `task cover`
 
 **Dependencies:** None
 
