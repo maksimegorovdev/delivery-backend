@@ -22,11 +22,15 @@ host=${PPROF_HOST:-127.0.0.1}
 if [ "$mode" = loop ]; then
   interval=${2:-30}
   # CPU-профиль занимает interval-5 секунд: оставшиеся 5 секунд уходят на остальные профили и паузу.
+  # Потолок 30 с: debugserver отклоняет seconds больше WriteTimeout (65 с), а при soak с интервалом 300 с это HTTP 400.
   if [ "$interval" -le 5 ]; then
     echo "pprof-snapshots: interval должен быть больше 5 секунд, получено $interval" >&2
     exit 2
   fi
   cpu_seconds=$((interval - 5))
+  if [ "$cpu_seconds" -gt 30 ]; then
+    cpu_seconds=30
+  fi
 else
   label=${2:?"pprof-snapshots: не задана метка снимка (start или end)"}
 fi
