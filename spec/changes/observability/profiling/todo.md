@@ -288,7 +288,7 @@
 - [x] Сэмплер гасится через `defer`
 
 **Verification:**
-- [ ] Ручная: укороченный soak (переменная длительности профиля soak, если есть, иначе полный) + `task load-soak-leaks`
+- [x] Ручная: укороченный soak (5 мин вместо 30, длительность временно правлена в `load/k6/lib/config.js` и возвращена) + `task load-soak-leaks`
 
 **Dependencies:** Task 11
 
