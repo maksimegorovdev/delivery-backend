@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"runtime/pprof"
 	"runtime/trace"
 	"strings"
@@ -182,6 +183,61 @@ func TestServer_NamedProfiles(t *testing.T) {
 	}
 }
 
+func TestServer_InvalidDebug(t *testing.T) {
+	t.Parallel()
+
+	lis := start(t)
+
+	for _, value := range []string{"-1", "abc", "1.5"} {
+		t.Run(value, func(t *testing.T) {
+			t.Parallel()
+
+			resp := get(t, lis.url("/debug/pprof/goroutine?debug="+value))
+
+			assert.Equal(t, http.StatusBadRequest, resp.status)
+			assert.Contains(t, string(resp.body), "invalid debug")
+		})
+	}
+}
+
+// gc=1 запускает сборку мусора только перед heap: у остальных профилей она лишь тормозит процесс.
+// Автоматическая сборка выключена, чтобы NumGC менялся только от запроса; GOGC глобален, тест не параллельный.
+//
+//nolint:paralleltest // GOGC глобален для процесса
+func TestServer_GCOnlyForHeap(t *testing.T) {
+	lis := start(t)
+
+	prevGCPercent := debug.SetGCPercent(-1)
+	t.Cleanup(func() { debug.SetGCPercent(prevGCPercent) })
+
+	tests := []struct {
+		name   string
+		path   string
+		wantGC bool
+	}{
+		{name: "heap", path: "/debug/pprof/heap?gc=1", wantGC: true},
+		{name: "allocs", path: "/debug/pprof/allocs?gc=1", wantGC: false},
+		{name: "goroutine", path: "/debug/pprof/goroutine?gc=1", wantGC: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			before := numGC()
+
+			require.Equal(t, http.StatusOK, get(t, lis.url(tt.path)).status)
+
+			assert.Equal(t, tt.wantGC, numGC() > before, "сборка мусора перед профилем")
+		})
+	}
+}
+
+func numGC() uint32 {
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+
+	return ms.NumGC
+}
+
 func TestServer_Cmdline(t *testing.T) {
 	t.Parallel()
 
@@ -285,7 +341,13 @@ func TestServer_SecondsExceedsWriteTimeout(t *testing.T) {
 
 	lis := start(t, debugserver.WithTimeouts(debugserver.Timeouts{Write: 2 * time.Second}))
 
-	for _, path := range []string{"/debug/pprof/profile?seconds=5", "/debug/pprof/trace?seconds=5"} {
+	// seconds, равный WriteTimeout, тоже отклоняется: на запись ответа после сна времени не остаётся.
+	for _, path := range []string{
+		"/debug/pprof/profile?seconds=5",
+		"/debug/pprof/trace?seconds=5",
+		"/debug/pprof/profile?seconds=2",
+		"/debug/pprof/trace?seconds=2",
+	} {
 		resp := get(t, lis.url(path))
 
 		assert.Equal(t, http.StatusBadRequest, resp.status, path)
@@ -374,9 +436,68 @@ func TestServe_AppliesAndRestoresMutexFraction(t *testing.T) {
 	assert.Equal(t, before, runtime.SetMutexProfileFraction(-1), "прежняя доля восстановлена")
 }
 
+// Получить текущий block rate из runtime нельзя, поэтому он проверяется по поведению:
+// блокировка в blockBriefly попадает в профиль, пока сервер работает, и не попадает после его остановки.
+//
 //nolint:paralleltest // профилирование глобально для процесса
-func TestServe_BlockProfileRateOption(t *testing.T) {
-	lis := start(t, debugserver.WithBlockProfileRate(1))
+func TestServe_AppliesAndResetsBlockProfileRate(t *testing.T) {
+	lis := listen(t)
+	srv := debugserver.New(debugserver.WithBlockProfileRate(1))
 
-	assert.Equal(t, http.StatusOK, get(t, lis.url("/debug/pprof/block?debug=1")).status)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	result := make(chan error, 1)
+	go func() { result <- srv.Serve(ctx, lis) }()
+
+	require.Equal(t, http.StatusOK, get(t, lis.url("/debug/pprof/")).status)
+
+	before := blockEvents(t)
+	blockBriefly()
+	assert.Greater(t, blockEvents(t), before, "block-профиль включён на время работы сервера")
+
+	cancel()
+	require.NoError(t, receive(t, result, "Serve result"))
+
+	before = blockEvents(t)
+	blockBriefly()
+	assert.Equal(t, before, blockEvents(t), "block-профиль выключен после остановки сервера")
+}
+
+// blockBriefly блокируется на канале примерно на миллисекунду.
+//
+//go:noinline // функция ищется по имени в стеке block-профиля
+func blockBriefly() {
+	ch := make(chan struct{})
+	go func() {
+		time.Sleep(time.Millisecond)
+		close(ch)
+	}()
+	<-ch
+}
+
+// blockEvents возвращает число событий блокировки в block-профиле, у которых в стеке есть blockBriefly.
+func blockEvents(t *testing.T) int64 {
+	t.Helper()
+
+	n, _ := runtime.BlockProfile(nil)
+	records := make([]runtime.BlockProfileRecord, n+16)
+	n, ok := runtime.BlockProfile(records)
+	require.True(t, ok, "буфер block-профиля мал")
+
+	var events int64
+	for _, rec := range records[:n] {
+		frames := runtime.CallersFrames(rec.Stack())
+		for {
+			frame, more := frames.Next()
+			if strings.HasSuffix(frame.Function, ".blockBriefly") {
+				events += rec.Count
+				break
+			}
+			if !more {
+				break
+			}
+		}
+	}
+
+	return events
 }
