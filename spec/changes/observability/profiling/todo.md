@@ -350,23 +350,21 @@
 
 **Estimated scope:** M
 
-## Task 15: map.md, README, версии в спеке
+## Task 15: map.md, версии в спеке
 
-**Description:** В `map.md` — «Принятые решения»: профили в Pyroscope (нет сигнала profiles в ClickHouse-экспортёре, сигнал Alpha), сбор Grafana Alloy (`pyroscope.scrape`), а не Collector (`pprofreceiver` сливает mutex и block). README — раздел Observability: профилирование (debug-порты, `task pprof`, Grafana, load-задачи, `LOAD_PROFILING`). Теги Pyroscope и Alloy — в спеке.
+**Description:** В `map.md` — «Принятые решения»: профили в Pyroscope (нет сигнала profiles в ClickHouse-экспортёре, сигнал Alpha), сбор Grafana Alloy (`pyroscope.scrape`), а не Collector (`pprofreceiver` сливает mutex и block). Теги Pyroscope и Alloy — в спеке.
 
 **Acceptance criteria:**
-- [ ] Два решения записаны в `map.md`
-- [ ] README описывает все команды из раздела Commands спеки
+- [x] Два решения записаны в `map.md`
 - [ ] Все Success Criteria спеки отмечены
 
 **Verification:**
-- [ ] Ссылки в `spec/` и README резолвятся; ручная сверка команд README
+- [x] Ссылки в `spec/` резолвятся
 
 **Dependencies:** Tasks 1–14
 
 **Files likely touched:**
 - `spec/specs/observability/map.md`
-- `README.md`
 - `spec/changes/observability/profiling/spec.md`
 
 **Estimated scope:** S

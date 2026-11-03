@@ -14,7 +14,7 @@ OpenTelemetry → OTel Collector → ClickHouse → Grafana.
 | `metrics` | RED-метрики HTTP/gRPC/pgx/Kafka из автоинструментации, runtime-метрики Go | `telemetry-sdk` |
 | `async-propagation` | `traceparent` через outbox → Debezium (headers) → Kafka → notification: миграция outbox, коннектор, extract в консьюмере | `tracing` |
 | `dashboards` | Grafana dashboards as code: готовые OTel-дашборды плагина + RED-обзор сервисов, переходы логи ↔ трейсы | `logs`, `tracing`, `metrics` |
-| `profiling` | `platform/debugserver` (pprof по `PPROF_ADDR`), автоснимки профилей в задачах `load-stress`/`load-soak`, continuous profiling (кандидат — Grafana Pyroscope + Alloy; отступление от «только ClickHouse» решается в спеке) | `dashboards`, [`testing/load`](../testing/map.md) |
+| `profiling` | `platform/debugserver` (pprof по `PPROF_ADDR`), автоснимки профилей в задачах `load-stress`/`load-soak`, continuous profiling (Grafana Alloy `pyroscope.scrape` → Grafana Pyroscope; отступление от «только ClickHouse» зафиксировано в «Принятых решениях») | `dashboards`, [`testing/load`](../testing/map.md) |
 
 Build order: `obs-stack` → `telemetry-sdk` → `logs`, `tracing`, `metrics` (параллельно) → `async-propagation` → `dashboards` → `profiling` (после `testing/load`)
 
@@ -38,3 +38,8 @@ Build order: `obs-stack` → `telemetry-sdk` → `logs`, `tracing`, `metrics` (�
 - Асинхронный трейс пробрасывается через outbox (не начинается заново в notification).
 - Метрики первой итерации — технические + RED; бизнес-метрики отложены.
 - Grafana: датасорс и дашборды через provisioning, алерты — следующий этап.
+- Профили хранятся в Grafana Pyroscope, а не в ClickHouse: в ClickHouse-экспортёре OTel Collector нет сигнала profiles,
+  а сам сигнал profiles в OTel ещё не стабилен (Alpha). Логи, метрики и трейсы по-прежнему только в ClickHouse.
+- Профили собирает Grafana Alloy (`pyroscope.scrape` → `pyroscope.write`), а не OTel Collector: `pprofreceiver`
+  сливает mutex и block в один тип `contentions`, теряет resource-атрибуты с точками и плодит label `bytes` на heap
+  (spike 2026-11-03). Конфиг Collector профилями не затрагивается.

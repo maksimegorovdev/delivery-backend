@@ -289,16 +289,16 @@ pyroscope.scrape "order" {
 
 ## Success Criteria
 
-- [ ] Spike AC6 (a)–(d) на Alloy пройден; результат и версии записаны в спеку.
-- [ ] `platform/debugserver` с тестами; покрытие не ниже порога; `goleak` чистый.
-- [ ] Во всех 5 сервисах при `PPROF_ADDR` из `.env.example` `curl 127.0.0.1:606x/debug/pprof/` → 200; без `PPROF_ADDR` порт не слушается.
-- [ ] `task pprof SERVICE=order` создаёт открываемый `go tool pprof` профиль.
-- [ ] `task load-stress` кладёт CPU/heap/goroutine/mutex/block-профили всех пяти сервисов по ступеням в `results/raw/<run>/pprof/`.
+- [x] Spike AC6 (a)–(d) на Alloy пройден; результат и версии записаны в спеку.
+- [x] `platform/debugserver` с тестами; покрытие не ниже порога; `goleak` чистый.
+- [x] Во всех 5 сервисах при `PPROF_ADDR` из `.env.example` `curl 127.0.0.1:606x/debug/pprof/` → 200; без `PPROF_ADDR` порт не слушается.
+- [x] `task pprof SERVICE=order` создаёт открываемый `go tool pprof` профиль.
+- [x] `task load-stress` кладёт CPU/heap/goroutine/mutex/block-профили всех пяти сервисов по ступеням в `results/raw/<run>/pprof/`.
 - [ ] `task load-soak` кладёт снимки начала/конца; `task load-soak-leaks` показывает рост горутин и `inuse_space`.
-- [ ] `task load-pprof-diff` открывает diff с эталоном из `load/results/baseline/pprof/`.
-- [ ] После `task compose-up` + `task watch-all` в Grafana (датасорс Pyroscope) видны профили всех 5 сервисов, diff двух интервалов работает.
-- [ ] `LOAD_PROFILING=1 task load-up` поднимает Pyroscope и Alloy в load-стеке; без флага их нет; `images-check` проходит.
-- [ ] В `baseline.md` записан разбор узкого места `order` (пул pgx, CPU `user`/`product`) со ссылками на профили.
+- [x] `task load-pprof-diff` открывает diff с эталоном из `load/results/baseline/pprof/`.
+- [x] После `task compose-up` + `task watch-all` в Grafana (датасорс Pyroscope) видны профили всех 5 сервисов, diff двух интервалов работает.
+- [x] `LOAD_PROFILING=1 task load-up` поднимает Pyroscope и Alloy в load-стеке; без флага их нет; `images-check` проходит.
+- [x] В `baseline.md` записан разбор узкого места `order` (пул pgx, CPU `user`/`product`) со ссылками на профили.
 - [ ] `map.md`: решение о Pyroscope в «Принятых решениях», модуль `profiling` — `done`; README обновлён.
 
 ## Assumptions
