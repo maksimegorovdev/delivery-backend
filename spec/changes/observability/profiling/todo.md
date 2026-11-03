@@ -304,17 +304,18 @@
 **Description:** Каталог `load/results/baseline/pprof/`. `task load-pprof-diff SERVICE=<svc> TYPE=<type> [RUN=<dir>]`: эталон из `baseline/pprof/`, профиль прогона по умолчанию — последний прогон, CPU-профиль на пиковой ступени (`last_good_stage` из `summary.json`); открывает `go tool pprof -http=:0 -diff_base=<эталон> <профиль>`.
 
 **Acceptance criteria:**
-- [ ] При наличии эталона открывается diff; без эталона или профиля — понятная ошибка, ненулевой код
-- [ ] Выбор профиля пиковой ступени детерминирован и описан в `desc` задачи
+- [x] При наличии эталона открывается diff; без эталона или профиля — понятная ошибка, ненулевой код
+- [x] Выбор профиля пиковой ступени детерминирован и описан в `desc` задачи
 
 **Verification:**
-- [ ] Ручная: временно положить профиль прогона как эталон → `task load-pprof-diff SERVICE=order TYPE=profile` открывает UI
+- [x] Ручная: временно положить профиль прогона как эталон → `task load-pprof-diff SERVICE=order TYPE=profile` открывает UI
 
 **Dependencies:** Task 11
 
 **Files likely touched:**
 - `Taskfile.yml`, `load/Taskfile.yml`
 - `load/results/baseline/pprof/.gitkeep`
+- `load/scripts/pprof-diff.sh`, `load/scripts/pprof-diff.test.sh`
 
 **Estimated scope:** S
 

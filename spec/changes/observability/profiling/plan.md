@@ -94,7 +94,7 @@ Spike не зависит от debugserver: для проверки достат
 - [x] Task 10: `load/compose.profiling.yaml` (pyroscope + alloy) + `profiles.load.alloy` + `LOAD_PROFILING`, `images-check`
 - [ ] Task 11: Сэмплер `pprof-snapshots.sh` в `load-stress`
 - [ ] Task 12: Снимки soak и `task load-soak-leaks`
-- [ ] Task 13: Эталонные профили и `task load-pprof-diff`
+- [x] Task 13: Эталонные профили и `task load-pprof-diff`
 
 ### Checkpoint 3: load
 - [ ] stress/soak кладут профили; diff и leaks работают; `load-regression` без профилирования в пределах эталона

@@ -189,6 +189,21 @@ tasks:
         done
         if [ "$found" -eq 0 ]; then echo "soak-leaks: в $dir нет ни одного набора снимков soak (task load-soak)" >&2; exit 1; fi
 
+  pprof-diff:
+    desc: pprof diff of a run profile against results/baseline/pprof (SERVICE, TYPE=profile by default, RUN=<dir name> picks another run, default the last); profile is the CPU snapshot last taken on the plateau of last_good_stage (the last stage if null)
+    silent: true
+    vars:
+      RUN:
+        sh: '{{if .RUN}}echo {{.RUN}}{{else}}ls -1 results/raw | tail -1{{end}}'
+      TYPE: '{{if .TYPE}}{{.TYPE}}{{else}}profile{{end}}'
+    preconditions:
+      - sh: test -n "{{.SERVICE}}"
+        msg: 'pprof-diff: не задан SERVICE (order, user, product, gateway, notification)'
+      - sh: test -n "{{.RUN}}" && test -d "results/raw/{{.RUN}}"
+        msg: 'pprof-diff: прогон не найден в load/results/raw (task load-stress)'
+    cmds:
+      - sh scripts/pprof-diff.sh results/raw/{{.RUN}} {{.SERVICE}} {{.TYPE}}
+
   lag:
     desc: Order -> notification lag by stage for the last run (RUN=<dir name> picks another), table goes to results/raw/<run>/lag.txt
     silent: true

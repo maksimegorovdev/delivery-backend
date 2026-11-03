@@ -129,6 +129,11 @@ tasks:
     cmds:
       - task -d load soak-leaks RUN={{.RUN}}
 
+  load-pprof-diff:
+    desc: pprof diff against the baseline in load/results/baseline/pprof (SERVICE=<svc> TYPE=profile|heap|allocs|goroutine|mutex|block, default profile; RUN=<dir in load/results/raw> picks another run, default the last). Run profile - the CPU snapshot taken last on the plateau of last_good_stage (the last stage if there is none) from summary.json, other types use the same snapshot time
+    cmds:
+      - task -d load pprof-diff SERVICE={{.SERVICE}} TYPE={{.TYPE}} RUN={{.RUN}}
+
   load-lag:
     desc: Order -> notification lag by stage for the last load run (RUN=<dir in load/results/raw> picks another)
     cmds:
