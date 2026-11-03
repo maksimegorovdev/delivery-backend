@@ -261,14 +261,14 @@
 **Description:** `load/scripts/pprof-snapshots.sh <out-dir> [interval]` в стиле `docker-stats.sh`: каждые `N` с для `PPROF_TARGETS` (по умолчанию `order,user,product,gateway,notification`) снимает `profile?seconds=<N-5>`, `heap`, `goroutine`, `mutex`, `block` в `<out-dir>/<service>/<HHMMSS>-<type>.pb.gz`; ошибки — в `<out-dir>/errors.log`, сэмплер не падает. `load-stress` запускает его с периодом 30 с и гасит через `defer`.
 
 **Acceptance criteria:**
-- [ ] После `task load-stress` в `results/raw/<run>/pprof/<service>/` есть профили всех 5 типов; на каждую ступень (по `started_at`/`ended_at` из `summary.json`) — хотя бы один CPU-профиль
-- [ ] Остановленный целевой сервис → строки в `errors.log`, сэмплер продолжает работу
-- [ ] После завершения/прерывания `load-stress` процессов сэмплера нет
+- [x] После `task load-stress` в `results/raw/<run>/pprof/<service>/` есть профили всех 5 типов; на каждую ступень (по `started_at`/`ended_at` из `summary.json`) — хотя бы один CPU-профиль
+- [x] Остановленный целевой сервис → строки в `errors.log`, сэмплер продолжает работу
+- [x] После завершения/прерывания `load-stress` процессов сэмплера нет
 
 **Verification:**
-- [ ] Короткий прогон: `STRESS_RATES=25,50 task load-stress`; `ls results/raw/<run>/pprof/*`; `pgrep -f pprof-snapshots` пусто
-- [ ] `docker compose -p delivery-load stop user` во время прогона → `errors.log`
-- [ ] `sh -n load/scripts/pprof-snapshots.sh` (и `shellcheck`, если есть)
+- [x] Короткий прогон: `STRESS_RATES=25,50 task load-stress`; `ls results/raw/<run>/pprof/*`; `pgrep -f pprof-snapshots` пусто
+- [x] `docker compose -p delivery-load stop user` во время прогона → `errors.log`
+- [x] `sh -n load/scripts/pprof-snapshots.sh` (и `shellcheck`, если есть)
 
 **Dependencies:** Task 9
 

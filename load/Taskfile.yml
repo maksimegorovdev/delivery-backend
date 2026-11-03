@@ -82,7 +82,7 @@ tasks:
         vars: { PROFILE: smoke, RUN_ID: '{{.RUN_ID}}' }
 
   stress:
-    desc: k6 stress - RPS steps until degradation, summary and docker-stats.csv go to results/raw/<run> (STRESS_RATES overrides the steps)
+    desc: k6 stress - RPS steps until degradation, summary, docker-stats.csv and pprof snapshots (every 30 s) go to results/raw/<run> (STRESS_RATES overrides the steps)
     vars:
       RUN_ID:
         sh: date +%Y%m%d-%H%M%S
@@ -92,7 +92,10 @@ tasks:
           sh scripts/docker-stats.sh delivery-load results/raw/{{.RUN_ID}}/docker-stats.csv 5 >/dev/null 2>&1 &
       - cmd: |
           sh scripts/group-lag.sh delivery-load notification results/raw/{{.RUN_ID}}/group-lag.csv 5 >/dev/null 2>&1 &
-      - defer: pkill -f 'scripts/(docker-stats|group-lag).sh .*results/raw/{{.RUN_ID}}/' || true
+      # Профили каждые 30 с (CPU — 25 с): на каждую ступень приходится хотя бы один CPU-профиль.
+      - cmd: |
+          sh scripts/pprof-snapshots.sh results/raw/{{.RUN_ID}}/pprof 30 >/dev/null 2>&1 &
+      - defer: pkill -f 'scripts/(docker-stats|group-lag|pprof-snapshots).sh .*results/raw/{{.RUN_ID}}/' || true
       # Код 99 у k6 — нарушены пороги: для stress штатный исход «предел найден». Исход решает вердикт в summary.json.
       - task: k6
         vars: { PROFILE: stress, RUN_ID: '{{.RUN_ID}}' }
