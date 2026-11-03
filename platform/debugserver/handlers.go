@@ -11,7 +11,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -51,7 +51,7 @@ func handleIndex(w http.ResponseWriter, _ *http.Request) {
 	for _, p := range profiles {
 		rows = append(rows, row{Name: p.Name(), Count: p.Count()})
 	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i].Name < rows[j].Name })
+	slices.SortFunc(rows, func(a, b row) int { return strings.Compare(a.Name, b.Name) })
 
 	var buf bytes.Buffer
 	if err := indexTemplate.Execute(&buf, rows); err != nil {
