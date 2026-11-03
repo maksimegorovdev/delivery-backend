@@ -1,0 +1,41 @@
+// Конфиг Alloy для непрерывного профилирования в dev (черновик spike, один сервис).
+// Сервисы запущены через Air на хосте и доступны из контейнера как host.docker.internal:606x.
+
+pyroscope.write "pyroscope" {
+  endpoint {
+    url = "http://pyroscope:4040"
+  }
+
+  external_labels = {
+    env = "dev",
+  }
+}
+
+pyroscope.scrape "order" {
+  targets = [
+    {
+      "__address__"  = "host.docker.internal:6061",
+      "service_name" = "order",
+    },
+  ]
+  scrape_interval = "15s"
+  forward_to      = [pyroscope.write.pyroscope.receiver]
+
+  profiling_config {
+    profile.process_cpu {
+      enabled = true
+    }
+    profile.memory {
+      enabled = true
+    }
+    profile.goroutine {
+      enabled = true
+    }
+    profile.mutex {
+      enabled = true
+    }
+    profile.block {
+      enabled = true
+    }
+  }
+}

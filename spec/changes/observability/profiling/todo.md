@@ -15,24 +15,24 @@
 
 ## Phase 0: Spike
 
-## Task 1: Spike — pprofreceiver → OTLP profiles → Pyroscope
+## Task 1: Spike — Alloy pyroscope.scrape → Pyroscope → Grafana
 
-**Description:** Проверить на `otel/opentelemetry-collector-contrib:0.163.2` пункты AC6 (a)–(d): в сборке есть `pprofreceiver` с режимом `remote`; pipeline `profiles` работает с `--feature-gates=service.profilesSupport`; процессор `resource` применяется к профилям; Pyroscope принимает OTLP-профили, в Grafana видны `service_name` и типы (CPU, память, горутины, mutex, block). Источник профилей — временный Go-процесс с `net/http/pprof` на хосте. Выбрать тег `grafana/pyroscope` (последний стабильный), черновой `profiles.dev.yaml` на один сервис.
+**Description:** Проверить на `grafana/alloy:v1.21.3` и `grafana/pyroscope:2.4.2` пункты AC6 (a)–(d): `pyroscope.scrape` опрашивает pprof на хосте через `host.docker.internal`; в Pyroscope у сервиса раздельные типы CPU, память (heap), горутины, mutex, block; `external_labels = { env = ... }` даёт label `env`, а heap не плодит label `bytes`; в Grafana (датасорс Pyroscope, Explore и Profiles Drilldown) видны `service_name`, типы, flame graph и diff. Источник профилей — временный Go-процесс с `net/http/pprof` на хосте. Результат записать в спеку. Предыдущая попытка (Collector + `pprofreceiver`) отклонена, её итог уже в спеке.
 
 **Acceptance criteria:**
-- [ ] (a)–(d) подтверждены командами и выводом (`components`, `validate`, логи Collector, запрос в API Pyroscope `/pyroscope/render` или Grafana Explore)
-- [ ] Итог (версии Collector и Pyroscope, точные ключи `pprofreceiver`) записан в спеку (Tech Stack / AC6)
-- [ ] При провале любого пункта — работа по AC6 остановлена, вопрос вынесен пользователю (Alloy)
+- [x] (a)–(d) подтверждены командами и выводом (`alloy validate`, UI/логи Alloy, запросы в API Pyroscope, Grafana Explore)
+- [x] Итог (версии Alloy и Pyroscope, точные аргументы `pyroscope.scrape`) записан в спеку (Tech Stack / AC6)
+- [x] При провале любого пункта — работа по AC6 остановлена, вопрос вынесен пользователю
 
 **Verification:**
-- [ ] `docker run --rm otel/opentelemetry-collector-contrib:0.163.2 components | grep -i pprof`
-- [ ] `docker compose run … otelcol-contrib validate --config=config.yaml --config=profiles.dev.yaml --feature-gates=service.profilesSupport`
+- [x] `docker run --rm … grafana/alloy:v1.21.3 validate <конфиг>` (или `fmt --test`)
+- [x] API Pyroscope: `LabelValues(service_name)`, `ProfileTypes`, `Series` с `__profile_type__` и `env`
 - [ ] Ручная: в Grafana Explore (Pyroscope) виден `service_name` тестового процесса с 5 типами профилей
 
 **Dependencies:** None
 
 **Files likely touched:**
-- `deploy/otel-collector/profiles.dev.yaml` (черновик)
+- `deploy/alloy/profiles.dev.alloy` (черновик)
 - `spec/changes/observability/profiling/spec.md` (результат spike)
 
 **Estimated scope:** S
@@ -161,25 +161,25 @@
 
 ## Phase 2: Continuous profiling в dev
 
-## Task 7: Pyroscope и профильные pipeline'ы Collector в compose.yaml
+## Task 7: Pyroscope и Alloy в compose.yaml
 
-**Description:** Сервис `pyroscope` (тег из spike, volume, `127.0.0.1:4040`). `profiles.dev.yaml` в полном виде: 25 receiver'ов `pprof/<svc>_<type>` (`host.docker.internal:606x`, `collection_interval: 15s`, YAML-якоря), `resource/<svc>` (`service.name`, `deployment.environment.name=dev`), 5 pipeline'ов `profiles/<svc>`, экспортёр `otlp/pyroscope`. У `otel-collector`: второй `--config`, `--feature-gates=service.profilesSupport`, `extra_hosts: host.docker.internal:host-gateway`, монтирование файла, `depends_on: pyroscope`.
+**Description:** Сервисы `pyroscope` (тег из spike, volume, `127.0.0.1:4040`) и `alloy` (`grafana/alloy:v1.21.3`, `extra_hosts: host.docker.internal:host-gateway`, UI `127.0.0.1:12345`, `depends_on: pyroscope`, монтирование конфига read-only). `deploy/alloy/profiles.dev.alloy` в полном виде: 5 блоков `pyroscope.scrape "<svc>"` (`host.docker.internal:606x`, `service_name`, `scrape_interval = "15s"`, 5 типов в `profiling_config`) и один `pyroscope.write` → `http://pyroscope:4040` с `external_labels = { env = "dev" }`. Collector не меняется.
 
 **Acceptance criteria:**
-- [ ] `task compose-up` поднимает Collector и Pyroscope; Collector healthy (`13133`); `config.yaml` не изменён
-- [ ] Остановленный сервис даёт ошибки скрейпа в логах Collector, но остальные pipeline'ы и traces/metrics/logs работают
-- [ ] В API Pyroscope есть `service_name` всех 5 запущенных сервисов
+- [ ] `task compose-up` поднимает Alloy и Pyroscope; `deploy/otel-collector/config.yaml` не изменён
+- [ ] Остановленный сервис даёт ошибки скрейпа в логах/UI Alloy, но остальные цели и traces/metrics/logs работают
+- [ ] В API Pyroscope есть `service_name` всех 5 запущенных сервисов, mutex и block — отдельные типы
 
 **Verification:**
-- [ ] `docker compose exec otel-collector … validate --config=… --config=…` (или `docker run … validate`)
-- [ ] `docker logs otel-collector 2>&1 | grep -i pprof`
+- [ ] `docker run --rm -v …/deploy/alloy:/cfg grafana/alloy:v1.21.3 validate /cfg/profiles.dev.alloy` (или `fmt --test`)
+- [ ] `docker logs alloy 2>&1 | tail`
 - [ ] `git diff --exit-code deploy/otel-collector/config.yaml`
 
 **Dependencies:** Task 1, Tasks 3–5
 
 **Files likely touched:**
 - `compose.yaml`
-- `deploy/otel-collector/profiles.dev.yaml`
+- `deploy/alloy/profiles.dev.alloy`
 - `deploy/pyroscope/config.yaml` (если нужен)
 
 **Estimated scope:** M
@@ -233,24 +233,24 @@
 
 **Estimated scope:** XS
 
-## Task 10: load/compose.profiling.yaml, profiles.load.yaml, LOAD_PROFILING
+## Task 10: load/compose.profiling.yaml, profiles.load.alloy, LOAD_PROFILING
 
-**Description:** Override-файл: `pyroscope` (тот же тег) и переопределённая команда `otel-collector` (второй `--config=…/profiles.load.yaml`, feature gate, монтирование). `profiles.load.yaml` — как dev, но адреса по именам контейнеров (`order:6060`, …) и `deployment.environment.name=load`. `load-up`/`load-down` и `COMPOSE` в `load/Taskfile.yml` подключают override при `LOAD_PROFILING=1`. `images-check` проверяет набор файлов, включая override.
+**Description:** Override-файл: `pyroscope` и `alloy` (те же теги, что в `compose.yaml`; конфиг `profiles.load.alloy` смонтирован). `profiles.load.alloy` — как dev, но цели по именам контейнеров (`order:6060`, …) и `external_labels = { env = "load" }`. `load-up`/`load-down` и `COMPOSE` в `load/Taskfile.yml` подключают override при `LOAD_PROFILING=1`. `images-check` проверяет набор файлов, включая override.
 
 **Acceptance criteria:**
-- [ ] `task load-up` — без Pyroscope и профильных pipeline'ов; `LOAD_PROFILING=1 task load-up` — с ними, профили `env=load` в Pyroscope
-- [ ] Неверный тег Pyroscope в override → `images-check` падает
+- [ ] `task load-up` — без Pyroscope и Alloy; `LOAD_PROFILING=1 task load-up` — с ними, профили `env=load` в Pyroscope
+- [ ] Неверный тег Pyroscope или Alloy в override → `images-check` падает
 - [ ] `task load-down` удаляет стек в обоих режимах
 
 **Verification:**
-- [ ] `task load-up && docker compose -p delivery-load ps` (нет pyroscope); `LOAD_PROFILING=1 task load-up` (есть)
+- [ ] `task load-up && docker compose -p delivery-load ps` (нет pyroscope и alloy); `LOAD_PROFILING=1 task load-up` (есть)
 - [ ] Ручная порча тега в override → `task load-up` падает на `images-check`
 
 **Dependencies:** Task 1, Task 7, Task 9
 
 **Files likely touched:**
 - `load/compose.profiling.yaml`
-- `deploy/otel-collector/profiles.load.yaml`
+- `deploy/alloy/profiles.load.alloy`
 - `load/Taskfile.yml`
 - `Taskfile.yml` (`images-check`, `load-up`)
 
@@ -351,7 +351,7 @@
 
 ## Task 15: map.md, README, версии в спеке
 
-**Description:** В `map.md` — «Принятые решения»: профили в Pyroscope (нет сигнала profiles в ClickHouse-экспортёре, сигнал Alpha), сбор тем же Collector без агента. README — раздел Observability: профилирование (debug-порты, `task pprof`, Grafana, load-задачи, `LOAD_PROFILING`). Тег Pyroscope и итоговая версия Collector — в спеке.
+**Description:** В `map.md` — «Принятые решения»: профили в Pyroscope (нет сигнала profiles в ClickHouse-экспортёре, сигнал Alpha), сбор Grafana Alloy (`pyroscope.scrape`), а не Collector (`pprofreceiver` сливает mutex и block). README — раздел Observability: профилирование (debug-порты, `task pprof`, Grafana, load-задачи, `LOAD_PROFILING`). Теги Pyroscope и Alloy — в спеке.
 
 **Acceptance criteria:**
 - [ ] Два решения записаны в `map.md`

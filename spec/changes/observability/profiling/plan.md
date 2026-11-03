@@ -5,8 +5,8 @@
 ## Overview
 
 Профилирование Go-сервисов тремя способами: pprof по запросу на отдельном debug-порту (`platform/debugserver`),
-автоснимки профилей в `load-stress`/`load-soak` со сравнением с эталоном, непрерывный сбор через существующий
-OTel Collector (`pprofreceiver` → OTLP profiles → Grafana Pyroscope). Итог модуля — не только инструмент,
+автоснимки профилей в `load-stress`/`load-soak` со сравнением с эталоном, непрерывный сбор через Grafana Alloy
+(`pyroscope.scrape`) в Grafana Pyroscope. Итог модуля — не только инструмент,
 но и разбор узкого места `order` под stress, записанный в `load/results/baseline.md`.
 
 ## Что уже есть в коде (опора плана)
@@ -27,13 +27,13 @@ OTel Collector (`pprofreceiver` → OTLP profiles → Grafana Pyroscope). Ито
 ## Dependency Graph
 
 ```
-Spike AC6 (Collector pprofreceiver + profiles pipeline + Pyroscope)  ── go/no-go для фазы 2–3 (continuous)
+Spike AC6 (Alloy pyroscope.scrape + Pyroscope + Grafana)  ── go/no-go для фазы 2–3 (continuous)
 platform/debugserver
    └── подключение в сервисах (config + app + .env.example)
           ├── task pprof (снимки по запросу)
-          ├── profiles.dev.yaml + pyroscope в compose.yaml + датасорс Grafana   ← spike
+          ├── profiles.dev.alloy + pyroscope и alloy в compose.yaml + датасорс Grafana   ← spike
           └── load/compose.yaml: PPROF_* и порты
-                 ├── load/compose.profiling.yaml + profiles.load.yaml + LOAD_PROFILING  ← spike
+                 ├── load/compose.profiling.yaml + profiles.load.alloy + LOAD_PROFILING  ← spike
                  └── pprof-snapshots.sh
                         ├── load-stress (сэмплер 30 с)
                         ├── load-soak (start/end + сэмплер 300 с) → load-soak-leaks
@@ -42,21 +42,24 @@ platform/debugserver
                                       └── map.md, README, публикация
 ```
 
-Spike не зависит от debugserver: для проверки достаточно процесса с pprof (например, `go tool pprof`-совместимый
-эндпоинт любого Go-бинаря или временный сервис на `net/http/pprof`), поэтому он идёт первым — высокий риск, fail fast.
+Spike не зависит от debugserver: для проверки достаточно процесса с pprof (временный Go-процесс на `net/http/pprof`),
+поэтому он идёт первым — высокий риск, fail fast.
 
 ## Architecture Decisions
 
-- **Spike первым** (AC6): `pprofreceiver` и сигнал profiles — Alpha. Если (a)–(d) не проходят — стоп и согласование
-  Alloy; задачи 2–6 и 9–14 от исхода не зависят и могут продолжаться.
+- **Spike первым** (AC6): проверка Alloy + Pyroscope + Grafana. Collector с `pprofreceiver` уже проверен и отклонён
+  (mutex и block сливаются в один тип, см. спеку); выбран Alloy. Если spike на Alloy не пройдёт — стоп и вопрос
+  пользователю; задачи 2–6 и 9–14 от исхода не зависят и могут продолжаться.
 - **Жизненный цикл debugserver — как у `httpserver`**: листенер через `listener.Listen` в `App.New`
   (занятый порт — ошибка старта), `Serve(ctx, lis)` в `errgroup` в `App.Run`, graceful shutdown по отмене `ctx`
   (согласовано с пользователем, AC1 спеки обновлён).
 - **Вертикальные срезы по сервисам**: сначала `order` (на нём цель разбора) — эталонная интеграция, затем остальные
   четыре сервиса по тому же шаблону, двумя задачами.
-- **Профильный конфиг Collector — отдельные файлы** на окружение, второй `--config`; основной `config.yaml` не трогается.
-- **Load-профилирование — override-файл**, включается `LOAD_PROFILING=1`; `images-check` расширяется до набора
-  файлов (`-f load/compose.yaml -f load/compose.profiling.yaml`), чтобы тег Pyroscope сверялся с `compose.yaml`.
+- **Профильный конфиг Alloy — отдельные файлы** на окружение (`profiles.dev.alloy`, `profiles.load.alloy`); OTel Collector
+  и его `config.yaml` не трогаются.
+- **Load-профилирование — override-файл** (`pyroscope` + `alloy`), включается `LOAD_PROFILING=1`; `images-check`
+  расширяется до набора файлов (`-f load/compose.yaml -f load/compose.profiling.yaml`), чтобы теги Pyroscope и Alloy
+  сверялись с `compose.yaml`.
 - **Сэмплер — POSIX sh в стиле `docker-stats.sh`**, сопоставление снимков со ступенями — по времени файла и
   `summary.json` (в момент снимка ступень ещё неизвестна, поэтому имя файла — время `HHMMSS`, без номера ступени).
 - **Новых Go-зависимостей нет**: только stdlib `net/http/pprof`, `runtime`.
@@ -64,10 +67,10 @@ Spike не зависит от debugserver: для проверки достат
 ## Task List
 
 ### Phase 0: Spike
-- [ ] Task 1: Spike — `pprofreceiver` → OTLP profiles → Pyroscope на Collector из compose
+- [ ] Task 1: Spike — Alloy `pyroscope.scrape` → Pyroscope → Grafana
 
 ### Checkpoint 0: go/no-go continuous profiling
-- [ ] Пункты (a)–(d) AC6 подтверждены (или работа по AC6 остановлена и вынесена на согласование)
+- [ ] Пункты (a)–(d) AC6 подтверждены на Alloy (или работа по AC6 остановлена и вынесена на согласование)
 
 ### Phase 1: pprof по запросу
 - [ ] Task 2: Пакет `platform/debugserver` с тестами
@@ -80,15 +83,15 @@ Spike не зависит от debugserver: для проверки достат
 - [ ] `task test`, `task test-integration`, `task lint` зелёные; 5 эндпоинтов отвечают 200; `task pprof` работает
 
 ### Phase 2: Continuous profiling в dev
-- [ ] Task 7: Pyroscope + профильные pipeline'ы Collector в `compose.yaml`
+- [ ] Task 7: Pyroscope и Alloy в `compose.yaml`
 - [ ] Task 8: Датасорс Pyroscope в Grafana
 
 ### Checkpoint 2: Grafana
-- [ ] В Profiles Drilldown 5 сервисов × 5 типов, diff двух интервалов работает; основной конфиг Collector не изменён
+- [ ] В Profiles Drilldown 5 сервисов × 5 типов (mutex и block раздельно), diff двух интервалов работает; конфиг Collector не изменён
 
 ### Phase 3: Профилирование в load-стеке
 - [ ] Task 9: `load/compose.yaml`: debug-порты и mutex/block у сервисов
-- [ ] Task 10: `load/compose.profiling.yaml` + `profiles.load.yaml` + `LOAD_PROFILING`, `images-check`
+- [ ] Task 10: `load/compose.profiling.yaml` (pyroscope + alloy) + `profiles.load.alloy` + `LOAD_PROFILING`, `images-check`
 - [ ] Task 11: Сэмплер `pprof-snapshots.sh` в `load-stress`
 - [ ] Task 12: Снимки soak и `task load-soak-leaks`
 - [ ] Task 13: Эталонные профили и `task load-pprof-diff`
@@ -107,10 +110,10 @@ Spike не зависит от debugserver: для проверки достат
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| `pprofreceiver` нет в contrib 0.163.2 или ключи конфига иные | High | Spike первым; сверка с README компонента нужной версии; при необходимости — подъём тега Collector во всех compose-файлах |
-| Pyroscope не принимает OTLP-профили от этой версии Collector (несовпадение версии proto profiles) | High | Spike (d); подбор тега Pyroscope под версию OTLP Collector; при провале — стоп и Alloy по согласованию |
-| `host.docker.internal` недоступен из контейнера Collector | Med | `extra_hosts: host-gateway`; проверка `curl` из контейнера в spike |
-| CPU-профиль 25 скрейпов/15 с нагружает сервисы и искажает dev-замеры | Low | Только dev; в load по умолчанию выключено; `profile?seconds=10` |
+| Alloy не достаёт сервисы на хосте (`host.docker.internal`) | Med | `extra_hosts: host-gateway`; проверка в spike; ошибки скрейпа видны в UI Alloy `127.0.0.1:12345` |
+| Pyroscope 2.x: профили видны не сразу (задержка приёма) | Low | В spike и Task 7 ждать ≥1–2 минуты перед запросом; сверять через API Pyroscope |
+| Аргументы `pyroscope.scrape` отличаются в выбранной версии Alloy | Med | Spike на `grafana/alloy:v1.21.3`; сверка с документацией компонента; `alloy validate` в Task 7 |
+| CPU-профиль каждые 15 с нагружает сервисы и искажает dev-замеры | Low | Только dev; в load по умолчанию выключено |
 | Сэмплер в stress искажает замеры ступеней | Med | Сравнение stress с сэмплером и эталона в Task 14; вывод в `baseline.md`; `load-regression` гоняется без сэмплера |
 | mutex/block rate в load меняют латентность | Med | Значения из спеки (5, 10000 нс); регрессия p95 проверяется в Checkpoint 3 |
 | `WriteTimeout` обрезает длинный `trace`/`profile` | Low | Тест на `seconds` > `WriteTimeout`; `WriteTimeout` 65 с при максимуме 60 с |

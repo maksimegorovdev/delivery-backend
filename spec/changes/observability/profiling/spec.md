@@ -9,9 +9,9 @@
 1. **По запросу:** pprof-эндпоинт в каждом сервисе на отдельном debug-порту.
 2. **Под нагрузкой:** профили снимаются автоматически в задачах `load-stress` и `load-soak`, сохраняются
    рядом с остальными результатами прогона и сравниваются с эталоном.
-3. **Непрерывно:** существующий OTel Collector опрашивает pprof-эндпоинты (`pprofreceiver`) и отправляет
-   профили четвёртым сигналом OTel (OTLP profiles) в Grafana Pyroscope; flame graph и сравнение периодов
-   доступны в Grafana. Все сигналы идут через один Collector, отдельного агента нет.
+3. **Непрерывно:** Grafana Alloy (`pyroscope.scrape`) опрашивает pprof-эндпоинты и отправляет профили в
+   Grafana Pyroscope; flame graph и сравнение периодов доступны в Grafana. Логи, метрики и трейсы по-прежнему
+   идут через OTel Collector в ClickHouse.
 
 Практические цели первой итерации:
 
@@ -73,38 +73,50 @@
      -diff_base=<эталон> <профиль прогона>` (по умолчанию — последний прогон и CPU-профиль на пиковой ступени).
    - Задача `task load-soak-leaks [RUN=<dir>]` печатает по каждому сервису число горутин в начале/конце soak и
      топ роста `inuse_space` (`go tool pprof -top -diff_base=soak-start-heap soak-end-heap`).
-6. **Continuous profiling: OTel Collector (`pprofreceiver`) → OTLP → Grafana Pyroscope.**
-   - **Проверка (spike) — первая задача плана.** На образе `otel/opentelemetry-collector-contrib:0.163.2` подтвердить:
-     (a) в сборке есть `pprofreceiver` с режимом `remote`; (b) профильный pipeline работает с feature gate
-     `service.profilesSupport`; (c) процессор `resource` применяется к профилям; (d) Pyroscope принимает OTLP-профили
-     от Collector, в Grafana видны `service_name` и типы профилей (CPU, память, горутины, mutex, block).
-     Если нужна более новая версия Collector — обновить тег во всех compose-файлах (`images-check`). Если хотя бы
-     пункт (a)–(d) не проходит — остановиться и согласовать запасной вариант (Grafana Alloy `pyroscope.scrape`):
-     debugserver, эндпоинты и AC1–AC5 от этого не меняются.
-   - В `compose.yaml` добавлен `pyroscope` (single binary, данные в volume, порт `127.0.0.1:4040`, OTLP gRPC на
-     том же порту).
-   - Профильная часть конфига Collector — **отдельные файлы**, которые сливаются с основным конфигом
-     (`--config=config.yaml --config=profiles.dev.yaml`): основной `config.yaml` (traces/metrics/logs → ClickHouse)
-     не меняется. Collector запускается с `--feature-gates=service.profilesSupport`.
-   - `deploy/otel-collector/profiles.dev.yaml`: по одному `pprof/<svc>_<type>` receiver'у в режиме `remote` на
-     каждую пару сервис × тип (5 × 5: `profile?seconds=10`, `heap`, `goroutine`, `mutex`, `block`) с адресом
-     `host.docker.internal:606x` (сервисы запущены через Air на хосте), `collection_interval: 15s`; один pipeline
-     `profiles/<svc>` на сервис с процессором `resource/<svc>` (`service.name=<svc>`, `deployment.environment.name=dev`),
-     экспорт `otlp/pyroscope` → `pyroscope:4040`. Повторяющиеся блоки — через YAML-якоря.
-     Недоступный сервис (не запущен) даёт ошибки скрейпа в логах Collector, но не останавливает его и другие pipeline'ы.
-   - У `otel-collector` в compose `extra_hosts: host.docker.internal:host-gateway` (Linux).
+6. **Continuous profiling: Grafana Alloy (`pyroscope.scrape`) → Grafana Pyroscope.**
+   - **Проверка (spike) — первая задача плана.** На `grafana/alloy:v1.21.3` и `grafana/pyroscope:2.4.2` подтвердить:
+     (a) `pyroscope.scrape` опрашивает pprof-эндпоинт на хосте через `host.docker.internal`; (b) в Pyroscope у сервиса
+     раздельные типы: CPU, память (heap), горутины, mutex, block; (c) `external_labels = { env = ... }` даёт label
+     `env`, а heap не плодит label `bytes`; (d) в Grafana (датасорс Pyroscope, Explore и Profiles Drilldown) видны
+     `service_name`, типы, flame graph и diff. Если пункт не проходит — остановиться и спросить пользователя.
+   - В `compose.yaml` добавлены `pyroscope` (single binary, данные в volume, порт `127.0.0.1:4040`) и `alloy`
+     (`extra_hosts: host.docker.internal:host-gateway`, конфиг смонтирован read-only, UI на `127.0.0.1:12345`).
+   - `deploy/alloy/profiles.dev.alloy`: по одному `pyroscope.scrape "<svc>"` на сервис (цель
+     `host.docker.internal:606x`, `service_name=<svc>`, `scrape_interval = "15s"`, все 5 типов в `profiling_config`),
+     один `pyroscope.write` → `http://pyroscope:4040` с `external_labels = { env = "dev" }`.
+     Недоступный сервис (не запущен) даёт ошибки скрейпа в логах Alloy, но не мешает остальным.
+   - OTel Collector и его `config.yaml` не меняются.
    - В load-стеке профилирование подключается **override-файлом** `load/compose.profiling.yaml`: добавляет `pyroscope`
-     и переопределяет команду `otel-collector` (`--config=…/profiles.load.yaml`, feature gate). По умолчанию выключено,
-     чтобы не искажать замеры. `profiles.load.yaml` опрашивает сервисы по именам контейнеров (`order:6060`, …),
-     `deployment.environment.name=load`. Включение: `LOAD_PROFILING=1 task load-up`.
+     и `alloy` с `deploy/alloy/profiles.load.alloy` (цели по именам контейнеров `order:6060`, …, `env = "load"`).
+     По умолчанию выключено, чтобы не искажать замеры. Включение: `LOAD_PROFILING=1 task load-up`.
    - Grafana: датасорс Pyroscope (`uid: pyroscope`) провиженится рядом с ClickHouse; в Explore и в приложении
      Profiles Drilldown видны все сервисы, flame graph и сравнение двух интервалов (diff view) работают.
-   - Образ `grafana/pyroscope` с фиксированным тегом; одинаковый в `compose.yaml` и `load/compose.profiling.yaml`;
-     `images-check` учитывает override-файл.
+   - Образы `grafana/pyroscope` и `grafana/alloy` с фиксированными тегами; одинаковые в `compose.yaml` и
+     `load/compose.profiling.yaml`; `images-check` учитывает override-файл.
+   - **Результат spike на Alloy (2026-11-03, `grafana/alloy:v1.21.3`, `grafana/pyroscope:2.4.2`, `grafana/grafana:13.2.4`): пройден.**
+     - (a) ✅ `alloy validate` проходит; `pyroscope.scrape` опрашивает хост через `host.docker.internal`, компонент `healthy`,
+       ошибок в логах нет. Аргументы: `targets` (`__address__`, `service_name`), `scrape_interval = "15s"`,
+       `forward_to`, `profiling_config { profile.process_cpu | memory | goroutine | mutex | block { enabled } }`;
+       `pyroscope.write { endpoint { url }, external_labels }`. Feature gates не нужны.
+     - (b) ✅ типы у `order` раздельные: `process_cpu`, `memory` (alloc/inuse), `goroutine`, `mutex`, `block`;
+       flame graph через `/pyroscope/render` получен для каждого (mutex и block — отдельные ряды).
+     - (c) ✅ `external_labels = { env = "dev" }` даёт label `env`; label `bytes` не появляется; в списке label'ов только
+       `service_name`, `env`, `instance` и служебные `__*__`.
+     - (d) ✅ датасорс `grafana-pyroscope-datasource` (`uid: pyroscope`, `http://pyroscope:4040`) здоров через
+       `/api/datasources/uid/pyroscope/health`; запросы через прокси Grafana возвращают `service_name` и типы;
+       приложение `grafana-pyroscope-app` 3.1.0 включено; diff двух интервалов отвечает через `/pyroscope/render-diff`.
+       Не проверено глазами: отрисовка в UI Explore / Profiles Drilldown (проверка — в Task 8).
+     - Нюанс Pyroscope 2.x: первые данные появились через ~60 с после старта; запросы раньше возвращают `{}`.
+   - **Предыстория (spike 2026-11-03 на OTel Collector `0.163.2`, `pprofreceiver v0.163.0`, Pyroscope `2.4.2`):**
+     вариант отклонён. Приём OTLP-профилей работает (CPU, goroutine, heap), но (1) mutex и block неразличимы: у
+     `/debug/pprof/mutex` и `/debug/pprof/block` одинаковые `PeriodType: contentions count` и типы сэмплов, в
+     Pyroscope оба попадают в тип `contentions:*`; (2) из resource-атрибутов label'ами становятся только dotless-ключи
+     (`env` да, `deployment.environment.name`, `service.namespace`, `service.version` нет); (3) heap даёт label
+     `bytes` (серия на размер аллокации). Пользователь выбрал Alloy.
 7. **Отступление от «только ClickHouse» фиксируется** в разделе «Принятые решения» [map.md](../../../specs/observability/map.md):
    профили хранятся в Pyroscope, потому что в ClickHouse-экспортёре OTel Collector нет сигнала profiles,
    а сам сигнал в OTel ещё не стабилен (Alpha). Логи, метрики, трейсы остаются в ClickHouse. Там же — второе решение:
-   профили собирает тот же Collector (`pprofreceiver`, feature gate `service.profilesSupport`), без отдельного агента.
+   профили собирает Grafana Alloy (`pyroscope.scrape`), а не OTel Collector, по итогам spike (см. AC6).
 8. **Разбор узкого места `order`** — результат модуля, а не только инструмент: прогон `load-stress` с сэмплером,
    вывод (подтверждена/опровергнута гипотеза пула pgx, где CPU у `user`/`product`) с flame graph / `top` и ссылками
    на профили записан в `load/results/baseline.md`, профили — в `load/results/baseline/pprof/`.
@@ -112,10 +124,9 @@
 ## Tech Stack
 
 - Go (версия из `go.work`), stdlib `net/http/pprof`, `runtime`. **Без новых Go-зависимостей.**
-- OTel Collector contrib `0.163.2` (уже есть): `pprofreceiver` (Alpha), процессор `resource`, экспортёр OTLP gRPC,
-  feature gate `service.profilesSupport`. Версия может подняться по итогам spike (AC6).
-- Grafana Pyroscope (single binary) — новый контейнер; тег фиксируется на последнем стабильном релизе на момент
-  реализации и записывается в эту спеку.
+- Grafana Alloy `v1.21.3` (новый контейнер): компоненты `pyroscope.scrape`, `pyroscope.write`.
+- Grafana Pyroscope `2.4.2` (single binary) — новый контейнер, порт `127.0.0.1:4040`.
+- OTel Collector contrib `0.163.2` — без изменений, профили не обрабатывает.
 - Grafana `13.2.4` (уже есть): встроенный датасорс `grafana-pyroscope-datasource`, приложение Profiles Drilldown.
 - Taskfile, POSIX sh, `curl`, `go tool pprof`.
 
@@ -123,17 +134,17 @@
 
 ```bash
 # dev
-task compose-up                                   # + pyroscope, профильные pipeline'ы Collector
+task compose-up                                   # + pyroscope, alloy
 task watch-all                                    # сервисы с PPROF_ADDR из .env
 task pprof SERVICE=order TYPE=profile SECONDS=30  # снимок в tmp/pprof/, печатает команду просмотра
 go tool pprof -http=:0 tmp/pprof/order-profile-<ts>.pb.gz
 curl -s 127.0.0.1:6061/debug/pprof/ | head       # эндпоинт жив
-docker logs otel-collector 2>&1 | grep -i pprof   # ошибки скрейпа профилей
+docker logs alloy 2>&1 | grep -i error        # ошибки скрейпа профилей
 open http://localhost:3001/a/grafana-pyroscope-app # Profiles Drilldown
 
 # load
-task load-up                                      # без Pyroscope и профильных pipeline'ов
-LOAD_PROFILING=1 task load-up                     # + load/compose.profiling.yaml
+task load-up                                      # без Pyroscope и Alloy
+LOAD_PROFILING=1 task load-up                     # + load/compose.profiling.yaml (pyroscope, alloy)
 task load-stress                                  # + results/raw/<run>/pprof/
 task load-soak                                    # + soak-start/end снимки и сэмплер
 task load-pprof-diff SERVICE=order TYPE=profile   # diff с эталоном
@@ -155,14 +166,14 @@ platform/debugserver/
 services/<svc>/internal/config/config.go  → Debug{Addr, MutexFraction, BlockRate}
 services/<svc>/internal/app/app.go        → при непустом адресе: listener.Listen + debugserver.New, Serve в errgroup
 services/<svc>/.env.example               → PPROF_ADDR=127.0.0.1:606x
-deploy/otel-collector/config.yaml         → без изменений (traces/metrics/logs → ClickHouse)
-deploy/otel-collector/profiles.dev.yaml   → pprof receivers host.docker.internal:6060..6064, profiles/<svc>, otlp/pyroscope
-deploy/otel-collector/profiles.load.yaml  → то же по именам контейнеров, env=load
+deploy/otel-collector/config.yaml         → без изменений
+deploy/alloy/profiles.dev.alloy           → pyroscope.scrape на host.docker.internal:6060..6064, pyroscope.write, env=dev
+deploy/alloy/profiles.load.alloy          → то же по именам контейнеров, env=load
 deploy/pyroscope/config.yaml              → (если нужен) хранение в volume, ретенция
 deploy/grafana/provisioning/datasources/  → + pyroscope.yaml (uid pyroscope)
-compose.yaml                              → pyroscope; otel-collector: второй --config, feature gate, extra_hosts
+compose.yaml                              → pyroscope и alloy (extra_hosts, порты на 127.0.0.1)
 load/compose.yaml                         → PPROF_* и порты у сервисов
-load/compose.profiling.yaml               → pyroscope + переопределение команды otel-collector
+load/compose.profiling.yaml               → pyroscope + alloy с profiles.load.alloy
 load/scripts/pprof-snapshots.sh           → фоновый сэмплер профилей
 load/Taskfile.yml, Taskfile.yml           → pprof, load-pprof-diff, load-soak-leaks; сэмплер в stress/soak
 load/results/baseline/pprof/              → эталонные профили (коммитятся)
@@ -214,44 +225,34 @@ func New(addr string, opts ...Option) *Server {
 ```
 
 - Значения в load-стеке: `PPROF_MUTEX_FRACTION=5`, `PPROF_BLOCK_RATE=10000` (нс; событие блокировки ≥10 мкс
-  попадает в профиль с вероятностью 1). В dev — 0, Collector получает пустые mutex/block-профили.
+  попадает в профиль с вероятностью 1). В dev — 0, Alloy получает пустые mutex/block-профили.
 - Имена файлов профилей: `<HHMMSS>-<type>.pb.gz`, `soak-<label>-<type>.pb.gz`; тип — как имя профиля pprof.
 - Shell-скрипты — POSIX `sh`, `set -eu`, как `docker-stats.sh`; комментарии на русском.
-- Конфиг Collector для профилей — отдельный файл на окружение; имена компонентов `pprof/<svc>_<type>`,
-  `resource/<svc>`, `profiles/<svc>`; повторы — через YAML-якоря. Точные ключи сверяются с README `pprofreceiver`
-  той версии Collector, что в compose (компонент Alpha, ключи могут меняться).
+- Конфиг Alloy для профилей — отдельный файл на окружение (`profiles.dev.alloy`, `profiles.load.alloy`); компоненты
+  `pyroscope.scrape "<svc>"`, один `pyroscope.write "pyroscope"`; окружение — `external_labels = { env = ... }`.
+  Точные аргументы сверяются с документацией `pyroscope.scrape` той версии Alloy, что в compose.
 
 Пример (dev, один сервис; остальные — по тому же шаблону):
 
-```yaml
-x-pprof-remote: &pprof-remote
-  collection_interval: 15s
-  initial_delay: 5s
+```alloy
+pyroscope.write "pyroscope" {
+  endpoint { url = "http://pyroscope:4040" }
+  external_labels = { env = "dev" }
+}
 
-receivers:
-  pprof/order_cpu:       { remote: { <<: *pprof-remote, endpoint: "http://host.docker.internal:6061/debug/pprof/profile?seconds=10" } }
-  pprof/order_heap:      { remote: { <<: *pprof-remote, endpoint: "http://host.docker.internal:6061/debug/pprof/heap" } }
-  pprof/order_goroutine: { remote: { <<: *pprof-remote, endpoint: "http://host.docker.internal:6061/debug/pprof/goroutine" } }
-  pprof/order_mutex:     { remote: { <<: *pprof-remote, endpoint: "http://host.docker.internal:6061/debug/pprof/mutex" } }
-  pprof/order_block:     { remote: { <<: *pprof-remote, endpoint: "http://host.docker.internal:6061/debug/pprof/block" } }
+pyroscope.scrape "order" {
+  targets         = [{ "__address__" = "host.docker.internal:6061", "service_name" = "order" }]
+  scrape_interval = "15s"
+  forward_to      = [pyroscope.write.pyroscope.receiver]
 
-processors:
-  resource/order:
-    attributes:
-      - { key: service.name, value: order, action: upsert }
-      - { key: deployment.environment.name, value: dev, action: upsert }
-
-exporters:
-  otlp/pyroscope:
-    endpoint: pyroscope:4040
-    tls: { insecure: true }
-
-service:
-  pipelines:
-    profiles/order:
-      receivers: [pprof/order_cpu, pprof/order_heap, pprof/order_goroutine, pprof/order_mutex, pprof/order_block]
-      processors: [memory_limiter, resource/order]
-      exporters: [otlp/pyroscope]
+  profiling_config {
+    profile.process_cpu { enabled = true }  // delta; seconds = scrape_interval - 1
+    profile.memory      { enabled = true }
+    profile.goroutine   { enabled = true }
+    profile.mutex       { enabled = true }
+    profile.block       { enabled = true }
+  }
+}
 ```
 
 ## Testing Strategy
@@ -263,9 +264,9 @@ service:
 | Unit `platform/debugserver` | `Serve` завершается graceful shutdown по отмене ctx и возвращает ошибку закрытого/занятого листенера; без утечек горутин | `goleak` |
 | Unit config сервисов | `PPROF_ADDR` пустой → `Debug.Addr == ""`; отрицательные rate/fraction → ошибка валидации | существующие `config_test.go` |
 | Integration (app) | при заданном `PPROF_ADDR` эндпоинт отвечает, при пустом порт не слушается | существующие `app_integration_test.go`, где они есть |
-| Spike | пункты (a)–(d) AC6 на версии Collector из compose | `docker run … --feature-gates=service.profilesSupport` с `profiles.dev.yaml`, запрос в Pyroscope API / Grafana |
-| Конфиг | Collector стартует с объединённым конфигом без ошибок валидации | `otelcol-contrib validate --config=… --config=…` в контейнере; healthcheck `13133` |
-| Ручная dev | в Grafana Profiles Drilldown 5 сервисов со всеми типами профилей, flame graph CPU под `ab`-нагрузкой; в логах Collector нет ошибок скрейпа для запущенных сервисов | `task compose-up`, `task watch-all` |
+| Spike | пункты (a)–(d) AC6 на Alloy и Pyroscope | `docker compose up` временного стека, запрос в Pyroscope API и Grafana Explore |
+| Конфиг | Alloy стартует с конфигом без ошибок | `alloy validate` (или `alloy fmt --test`) в контейнере; UI `127.0.0.1:12345`, все `pyroscope.scrape` healthy |
+| Ручная dev | в Grafana Profiles Drilldown 5 сервисов со всеми типами профилей (mutex и block раздельно), flame graph CPU под `ab`-нагрузкой; в логах Alloy нет ошибок скрейпа для запущенных сервисов | `task compose-up`, `task watch-all` |
 | Ручная load | после `load-stress` в `results/raw/<run>/pprof/` есть CPU-профиль на каждую ступень; после `load-soak` — `soak-start/end` снимки, `load-soak-leaks` печатает таблицу | `task load` / `LOAD_KEEP=1` |
 | Регрессия | `task load-regression` с сэмплером выключен и без профиля `profiling` даёт p95 в пределах эталона (профилирование по умолчанию не влияет на замеры) | сравнение с `baseline.md` |
 
@@ -274,9 +275,9 @@ service:
 ## Boundaries
 
 - **Always:** debug-порт отдельный от публичного API и привязан к `127.0.0.1` на хосте; `PPROF_ADDR` пустой →
-  сервер выключен; фиксировать теги образов Pyroscope и Collector; профили эталона класть в `load/results/baseline/pprof/`
+  сервер выключен; фиксировать теги образов Pyroscope и Alloy; профили эталона класть в `load/results/baseline/pprof/`
   вместе с записью в `baseline.md`; проверять `task lint` и тесты перед сдачей.
-- **Ask first:** переход на запасной вариант с Alloy, если spike (AC6) не прошёл; изменения основного
+- **Ask first:** изменения основного
   `deploy/otel-collector/config.yaml`; новые Go-зависимости (`pyroscope-go`, `otel-profiling-go`, `fgprof`);
   push-режим или span profiles; включение профилирования в load-стеке по умолчанию; ненулевые mutex/block rate в dev; дашборд Grafana
   с профилями в `deploy/grafana/dashboards`; ретенция Pyroscope больше дефолтной; изменения `e2e/compose.yaml`.
@@ -286,7 +287,7 @@ service:
 
 ## Success Criteria
 
-- [ ] Spike AC6 (a)–(d) пройден на версии Collector из compose; результат и версии записаны в спеку.
+- [ ] Spike AC6 (a)–(d) на Alloy пройден; результат и версии записаны в спеку.
 - [ ] `platform/debugserver` с тестами; покрытие не ниже порога; `goleak` чистый.
 - [ ] Во всех 5 сервисах при `PPROF_ADDR` из `.env.example` `curl 127.0.0.1:606x/debug/pprof/` → 200; без `PPROF_ADDR` порт не слушается.
 - [ ] `task pprof SERVICE=order` создаёт открываемый `go tool pprof` профиль.
@@ -294,17 +295,17 @@ service:
 - [ ] `task load-soak` кладёт снимки начала/конца; `task load-soak-leaks` показывает рост горутин и `inuse_space`.
 - [ ] `task load-pprof-diff` открывает diff с эталоном из `load/results/baseline/pprof/`.
 - [ ] После `task compose-up` + `task watch-all` в Grafana (датасорс Pyroscope) видны профили всех 5 сервисов, diff двух интервалов работает.
-- [ ] `LOAD_PROFILING=1 task load-up` поднимает Pyroscope и профильные pipeline'ы Collector в load-стеке; без флага их нет; `images-check` проходит.
+- [ ] `LOAD_PROFILING=1 task load-up` поднимает Pyroscope и Alloy в load-стеке; без флага их нет; `images-check` проходит.
 - [ ] В `baseline.md` записан разбор узкого места `order` (пул pgx, CPU `user`/`product`) со ссылками на профили.
 - [ ] `map.md`: решение о Pyroscope в «Принятых решениях», модуль `profiling` — `done`; README обновлён.
 
 ## Assumptions
 
-1. Сервисы в dev запускаются через Air на хосте; Collector в Docker достаёт их через `host.docker.internal`
+1. Сервисы в dev запускаются через Air на хосте; Alloy в Docker достаёт их через `host.docker.internal`
    (Docker Desktop на macOS). На Linux нужен `extra_hosts: host.docker.internal:host-gateway` — добавляется сразу.
-2. Pull-режим (Collector опрашивает pprof) выбран, чтобы в коде сервисов не было ничего, кроме debug-сервера.
-3. Alpha-статус сигнала profiles и `pprofreceiver` приемлем: стек локальный и учебный, основной конфиг Collector
-   отделён от профильного, и при поломке профилирование отключается удалением второго `--config`.
+2. Pull-режим (Alloy опрашивает pprof) выбран, чтобы в коде сервисов не было ничего, кроме debug-сервера.
+3. Отдельный агент (Alloy) принят как цена за раздельные типы профилей и зрелый путь в Pyroscope; OTel Collector
+   и его основной конфиг профилями не затрагиваются. При поломке профилирование отключается удалением сервиса `alloy`.
 4. Профили — локальное средство разработки; аутентификации на debug-порту нет, защита — привязка к `127.0.0.1`.
 5. Ретенция Pyroscope — дефолтная; данные теряются с `docker compose down -v`.
 
@@ -318,5 +319,6 @@ service:
 2. Связь профилей с трейсами (span profiles, кнопка «профиль спана» в Grafana) — **вне скоупа**. Штатная кнопка
    есть только у датасорса Tempo и требует обёртки `otel-profiling-go` в `platform/telemetry`; трейсы у нас в
    ClickHouse. Профили и трейсы сопоставляются вручную по `service_name` и интервалу времени.
-3. Сбор профилей — через существующий OTel Collector (`pprofreceiver` → OTLP → Pyroscope), а не Grafana Alloy.
-   Alloy — запасной вариант, только если spike (AC6) не прошёл, и только после согласования.
+3. Сбор профилей — через Grafana Alloy (`pyroscope.scrape` → `pyroscope.write` → Pyroscope), а не через OTel Collector.
+   Spike показал, что `pprofreceiver` (OTLP profiles) сливает mutex и block в один тип `contentions`, отбрасывает
+   resource-атрибуты кроме dotless-ключей и плодит label `bytes` на heap. Решение принято пользователем 2026-11-03.
