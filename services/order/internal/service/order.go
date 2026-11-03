@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/maksimegorovdev/delivery-backend/platform/apperr"
 
 	"github.com/maksimegorovdev/delivery-backend/services/order/internal/domain"
@@ -74,20 +76,7 @@ func NewOrderService(deps OrderServiceDeps) *OrderService {
 }
 
 func (uc *OrderService) CreateOrder(ctx context.Context, input CreateOrderInput) (domain.Order, error) {
-	if _, err := uc.users.GetUser(ctx, input.UserID); err != nil {
-		return domain.Order{}, err
-	}
-
-	addr, err := uc.users.GetAddress(ctx, input.AddressID)
-	if err != nil {
-		return domain.Order{}, err
-	}
-
-	ids := make([]string, len(input.Items))
-	for i, item := range input.Items {
-		ids[i] = item.ProductID
-	}
-	catalog, err := uc.products.GetProducts(ctx, ids)
+	addr, catalog, err := uc.resolve(ctx, input)
 	if err != nil {
 		return domain.Order{}, err
 	}
@@ -131,4 +120,45 @@ func (uc *OrderService) CreateOrder(ctx context.Context, input CreateOrderInput)
 	}
 
 	return order, nil
+}
+
+// resolve проверяет пользователя и загружает адрес доставки и каталог товаров заказа.
+// Вызовы независимы, поэтому идут параллельно: ожидание равно самому долгому из них, а не сумме.
+// Первая ошибка отменяет остальные вызовы через ctx и возвращается без изменений; если упали
+// несколько зависимостей сразу, возвращается та, что ответила первой.
+func (uc *OrderService) resolve(
+	ctx context.Context,
+	input CreateOrderInput,
+) (domain.Address, []domain.Product, error) {
+	ids := make([]string, len(input.Items))
+	for i, item := range input.Items {
+		ids[i] = item.ProductID
+	}
+
+	var (
+		addr    domain.Address
+		catalog []domain.Product
+	)
+
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		_, err := uc.users.GetUser(gctx, input.UserID)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		addr, err = uc.users.GetAddress(gctx, input.AddressID)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		catalog, err = uc.products.GetProducts(gctx, ids)
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
+		return domain.Address{}, nil, err
+	}
+
+	return addr, catalog, nil
 }

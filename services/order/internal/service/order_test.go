@@ -3,7 +3,10 @@ package service_test
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -88,8 +91,54 @@ func fixtureProducts() []domain.Product {
 // expectUserResolved настраивает успешное получение пользователя и адреса доставки.
 func expectUserResolved(d deps) {
 	d.users.EXPECT().GetUser(mock.Anything, "user-1").Return(domain.User{ID: "user-1"}, nil)
+	expectAddressResolved(d)
+}
+
+// expectAddressResolved настраивает успешное получение адреса доставки.
+func expectAddressResolved(d deps) {
 	d.users.EXPECT().GetAddress(mock.Anything, "address-1").
 		Return(domain.Address{ID: "address-1", Address: "Main st, 1"}, nil)
+}
+
+// expectProductsLoaded настраивает успешную загрузку каталога для fixtureInput.
+func expectProductsLoaded(d deps) {
+	d.products.EXPECT().GetProducts(mock.Anything, []string{"product-1", "product-2"}).
+		Return(fixtureProducts(), nil)
+}
+
+// errNotConcurrent — участник barrier не дождался остальных: вызовы идут не одновременно.
+var errNotConcurrent = errors.New("lookups are not concurrent")
+
+// barrier пропускает участников, только когда до него дошли все n. При последовательных
+// вызовах первый участник ждёт в одиночку и через секунду получает errNotConcurrent.
+type barrier struct {
+	n       int32
+	arrived atomic.Int32
+	all     chan struct{}
+}
+
+func newBarrier(n int32) *barrier {
+	return &barrier{n: n, all: make(chan struct{})}
+}
+
+func (b *barrier) wait() error {
+	if b.arrived.Add(1) == b.n {
+		close(b.all)
+	}
+
+	select {
+	case <-b.all:
+		return nil
+	case <-time.After(time.Second):
+		return errNotConcurrent
+	}
+}
+
+// waitCanceled блокируется до отмены ctx — имитирует зависимость, которая отвечает, только если её отменить.
+func waitCanceled(ctx context.Context) error {
+	<-ctx.Done()
+
+	return ctx.Err()
 }
 
 // expectOrderPrepared настраивает успешные вызовы до транзакции: пользователь, адрес, каталог, событие.
@@ -117,9 +166,13 @@ func TestOrderService_CreateOrder(t *testing.T) {
 		wantErr []error
 	}{
 		{
+			// Пользователь, адрес и каталог запрашиваются параллельно, поэтому адрес и каталог
+			// вызываются и при ошибке user; Create и Save без EXPECT — заказ не сохраняется.
 			name: "propagates user service error without saving order",
 			setup: func(d deps) {
 				d.users.EXPECT().GetUser(mock.Anything, "user-1").Return(domain.User{}, errUnavailable)
+				expectAddressResolved(d)
+				expectProductsLoaded(d)
 			},
 			wantErr: []error{errUnavailable},
 		},
@@ -128,6 +181,7 @@ func TestOrderService_CreateOrder(t *testing.T) {
 			setup: func(d deps) {
 				d.users.EXPECT().GetUser(mock.Anything, "user-1").Return(domain.User{ID: "user-1"}, nil)
 				d.users.EXPECT().GetAddress(mock.Anything, "address-1").Return(domain.Address{}, errUnavailable)
+				expectProductsLoaded(d)
 			},
 			wantErr: []error{errUnavailable},
 		},
@@ -245,6 +299,64 @@ func TestOrderService_CreateOrder_Success(t *testing.T) {
 	is.Equal(int64(100), got.Items[0].UnitPrice)
 	is.Equal("Bread", got.Items[1].ProductName)
 	is.Equal(int64(50), got.Items[1].UnitPrice)
+}
+
+func TestOrderService_CreateOrder_LookupsRunConcurrently(t *testing.T) {
+	t.Parallel()
+
+	// synctest: при последовательном коде barrier ждёт по фиктивным часам, и тест падает сразу.
+	synctest.Test(t, func(t *testing.T) {
+		d := newDeps(t)
+		lookups := newBarrier(3)
+
+		d.users.EXPECT().GetUser(mock.Anything, "user-1").
+			RunAndReturn(func(context.Context, string) (domain.User, error) {
+				return domain.User{ID: "user-1"}, lookups.wait()
+			})
+		d.users.EXPECT().GetAddress(mock.Anything, "address-1").
+			RunAndReturn(func(context.Context, string) (domain.Address, error) {
+				return domain.Address{ID: "address-1", Address: "Main st, 1"}, lookups.wait()
+			})
+		d.products.EXPECT().GetProducts(mock.Anything, []string{"product-1", "product-2"}).
+			RunAndReturn(func(context.Context, []string) ([]domain.Product, error) {
+				return fixtureProducts(), lookups.wait()
+			})
+		d.events.EXPECT().OrderCreated(mock.Anything).Return(domain.OutboxEvent{ID: "event-1"}, nil)
+		d.orders.EXPECT().Create(mock.Anything, mock.Anything).Return(nil)
+		d.outbox.EXPECT().Save(mock.Anything, mock.Anything).Return(nil)
+
+		got, err := d.service().CreateOrder(t.Context(), fixtureInput())
+
+		require.NoError(t, err)
+		assert.Equal(t, "Main st, 1", got.DeliveryAddress)
+		assert.Len(t, got.Items, 2)
+	})
+}
+
+func TestOrderService_CreateOrder_FirstLookupErrorCancelsOthers(t *testing.T) {
+	t.Parallel()
+
+	// synctest: если отмены нет, все горутины зависнут, и synctest сообщит о deadlock вместо таймаута теста.
+	synctest.Test(t, func(t *testing.T) {
+		errUnavailable := errors.New("user service unavailable")
+		d := newDeps(t)
+
+		d.users.EXPECT().GetUser(mock.Anything, "user-1").Return(domain.User{}, errUnavailable)
+		d.users.EXPECT().GetAddress(mock.Anything, "address-1").
+			RunAndReturn(func(ctx context.Context, _ string) (domain.Address, error) {
+				return domain.Address{}, waitCanceled(ctx)
+			})
+		d.products.EXPECT().GetProducts(mock.Anything, []string{"product-1", "product-2"}).
+			RunAndReturn(func(ctx context.Context, _ []string) ([]domain.Product, error) {
+				return nil, waitCanceled(ctx)
+			})
+
+		_, err := d.service().CreateOrder(t.Context(), fixtureInput())
+
+		// Возвращается исходная ошибка, а не context.Canceled отменённых соседей.
+		require.ErrorIs(t, err, errUnavailable)
+		require.NotErrorIs(t, err, context.Canceled)
+	})
 }
 
 func TestOrderService_CreateOrder_EmptyItems(t *testing.T) {
