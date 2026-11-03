@@ -334,12 +334,12 @@
 **Description:** Полный `task load-stress` с сэмплером. Анализ: CPU и mutex/block `order` (ожидание пула pgx, `PG_MAX_CONNS`), CPU `user`/`product` на gRPC на ступенях вокруг `last_good_stage`/`first_degraded_stage`; сравнение с `docker-stats.csv`. Вывод (гипотеза подтверждена/опровергнута) с `top`/flame graph и ссылками на профили — в `baseline.md`; используемые профили — в `baseline/pprof/`. Код горячих путей не меняется; найденные проблемы — в выводы и `TODO.md`.
 
 **Acceptance criteria:**
-- [ ] В `baseline.md` раздел с выводом по пулу pgx и CPU `user`/`product`, со ссылками на файлы в `baseline/pprof/`
-- [ ] Влияние сэмплера на предел stress оценено (сравнение с текущим эталоном)
-- [ ] `load-pprof-diff` работает против новых эталонных профилей
+- [x] В `baseline.md` раздел с выводом по пулу pgx и CPU `user`/`product`, со ссылками на файлы в `baseline/pprof/`
+- [x] Влияние сэмплера на предел stress оценено (сравнение с текущим эталоном)
+- [x] `load-pprof-diff` работает против новых эталонных профилей
 
 **Verification:**
-- [ ] `task load-stress`; ссылки в `baseline.md` резолвятся; `go tool pprof -top` по каждому эталонному профилю
+- [x] `STRESS_RATES=250,350,400 task load-stress` (сокращённый прогон по просьбе пользователя, полная лестница не снималась); ссылки в `baseline.md` резолвятся; `go tool pprof -top` по каждому эталонному профилю
 
 **Dependencies:** Tasks 11, 13 (желательно 10 — flame graph в Grafana)
 
