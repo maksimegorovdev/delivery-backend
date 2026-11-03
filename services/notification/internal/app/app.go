@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/closer"
+	"github.com/maksimegorovdev/delivery-backend/platform/debugserver"
 	"github.com/maksimegorovdev/delivery-backend/platform/kafka/kafkaconsumer"
+	"github.com/maksimegorovdev/delivery-backend/platform/listener"
 	"github.com/maksimegorovdev/delivery-backend/platform/logger"
 	"github.com/maksimegorovdev/delivery-backend/platform/postgres"
 	"github.com/maksimegorovdev/delivery-backend/platform/telemetry"
@@ -32,6 +35,10 @@ type App struct {
 	consumer *kafkaconsumer.Consumer
 	router   *kafka.Router
 	closer   *closer.Closer
+
+	// debugServer и debugLis nil, если PPROF_ADDR не задан.
+	debugServer *debugserver.Server
+	debugLis    net.Listener
 }
 
 func New(ctx context.Context) (_ *App, err error) {
@@ -120,7 +127,33 @@ func New(ctx context.Context) (_ *App, err error) {
 		closer:   cl,
 	}
 
+	// Debug-сервер (pprof) — только при заданном адресе
+	if err = app.initDebugServer(ctx, cl, cfg.Debug); err != nil {
+		return nil, err
+	}
+
 	return app, nil
+}
+
+// initDebugServer создаёт debug-сервер, если в конфиге задан адрес; иначе ничего не делает.
+func (a *App) initDebugServer(ctx context.Context, cl *closer.Closer, cfg config.Debug) error {
+	if cfg.Addr == "" {
+		return nil
+	}
+
+	lis, err := listener.Listen(ctx, cl, cfg.Addr)
+	if err != nil {
+		return err
+	}
+
+	a.debugLis = lis
+	a.debugServer = debugserver.New(
+		debugserver.WithMutexProfileFraction(cfg.MutexFraction),
+		debugserver.WithBlockProfileRate(cfg.BlockRate),
+		debugserver.WithLogger(a.log),
+	)
+
+	return nil
 }
 
 func newTelemetry(ctx context.Context, cfg *config.Config) (*telemetry.Telemetry, error) {
@@ -139,6 +172,15 @@ func newLogger(cfg *config.Config, tel *telemetry.Telemetry) *slog.Logger {
 	).With(
 		slog.String("app_name", cfg.App.Name),
 	)
+}
+
+// DebugAddr возвращает фактический адрес debug-сервера или nil, если он отключён.
+func (a *App) DebugAddr() net.Addr {
+	if a.debugLis == nil {
+		return nil
+	}
+
+	return a.debugLis.Addr()
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -160,6 +202,20 @@ func (a *App) Run(ctx context.Context) error {
 		a.consumer.Run(ctx, a.router)
 		return nil
 	})
+
+	if a.debugServer != nil {
+		g.Go(func() error {
+			a.log.InfoContext(ctx,
+				"debug server started",
+				slog.String("addr", a.debugLis.Addr().String()),
+			)
+			defer a.log.InfoContext(ctx,
+				"debug server stopped",
+				slog.String("addr", a.debugLis.Addr().String()),
+			)
+			return a.debugServer.Serve(ctx, a.debugLis)
+		})
+	}
 
 	return g.Wait()
 }

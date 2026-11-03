@@ -113,6 +113,10 @@ func setEnv(t *testing.T, httpAddr, orderAddr string) {
 	t.Setenv("ORDER_SERVICE_GRPC_ADDR", orderAddr)
 	t.Setenv("FAKE_AUTH_USER_ID", smokeUserID)
 	t.Setenv("OTEL_ENABLED", "false")
+	// Debug-сервер по умолчанию выключен; тесты, которым он нужен, задают PPROF_ADDR сами.
+	t.Setenv("PPROF_ADDR", "")
+	t.Setenv("PPROF_MUTEX_FRACTION", "0")
+	t.Setenv("PPROF_BLOCK_RATE", "0")
 }
 
 type orderResponse struct {
@@ -203,4 +207,60 @@ func TestApp_New_AddrInUse(t *testing.T) {
 	a, err := app.New(t.Context())
 	require.Error(t, err)
 	require.Nil(t, a)
+}
+
+//nolint:paralleltest // t.Setenv
+func TestApp_DebugServer_Disabled(t *testing.T) {
+	orderAddr, _ := startFakeOrder(t)
+	setEnv(t, "127.0.0.1:0", orderAddr)
+
+	a, err := app.New(t.Context())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = a.Close(context.Background()) })
+
+	assert.Nil(t, a.DebugAddr(), "при пустом PPROF_ADDR debug-сервер не создаётся и порт не слушается")
+}
+
+// getStatus выполняет GET и возвращает код ответа; ошибка запроса прерывает текущую попытку EventuallyWithT.
+func getStatus(ctx context.Context, c *assert.CollectT, url string) int {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	require.NoError(c, err)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(c, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	return resp.StatusCode
+}
+
+func TestApp_DebugServer_ServesPprofSeparatelyFromPublicPort(t *testing.T) {
+	orderAddr, _ := startFakeOrder(t)
+	setEnv(t, "127.0.0.1:0", orderAddr)
+	t.Setenv("PPROF_ADDR", "127.0.0.1:0")
+
+	a, err := app.New(t.Context())
+	require.NoError(t, err)
+	require.NotNil(t, a.DebugAddr())
+	require.NotEqual(t, a.Addr().String(), a.DebugAddr().String(), "debug-сервер слушает отдельный порт")
+
+	runCtx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	runDone := make(chan error, 1)
+	go func() { runDone <- a.Run(runCtx) }()
+
+	debugURL := "http://" + a.DebugAddr().String() + "/debug/pprof/"
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.Equal(c, http.StatusOK, getStatus(t.Context(), c, debugURL))
+	}, eventuallyTimeout, eventuallyTick)
+
+	// На публичном порту pprof не отдаётся.
+	publicURL := "http://" + a.Addr().String() + "/debug/pprof/"
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.Equal(c, http.StatusNotFound, getStatus(t.Context(), c, publicURL))
+	}, eventuallyTimeout, eventuallyTick)
+
+	cancel()
+	require.NoError(t, <-runDone, "остановка гасит и HTTP-, и debug-сервер без ошибок")
+	require.NoError(t, a.Close(t.Context()))
 }

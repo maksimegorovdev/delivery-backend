@@ -115,12 +115,12 @@
 **Description:** То же для `gateway` (`127.0.0.1:6060`, отдельно от публичного HTTP-сервера, pprof не на его роутере) и `notification` (`127.0.0.1:6064`, Kafka-консьюмер без HTTP-сервера).
 
 **Acceptance criteria:**
-- [ ] Конфиг, валидация и тесты как в Task 3 для обоих сервисов
-- [ ] `curl 127.0.0.1:6060/debug/pprof/` и `:6064` → 200; на публичном порту gateway `/debug/pprof/` → 404
+- [x] Конфиг, валидация и тесты как в Task 3 для обоих сервисов
+- [x] `curl 127.0.0.1:6060/debug/pprof/` и `:6064` → 200; на публичном порту gateway `/debug/pprof/` → 404
 
 **Verification:**
-- [ ] `task test`, `task test-integration`
-- [ ] Ручная: `task watch-all` + `curl` на debug-порт и на порт gateway
+- [x] `task test`, `task test-integration`
+- [x] Ручная: `task watch-all` + `curl` на debug-порт и на порт gateway
 
 **Dependencies:** Task 3
 
