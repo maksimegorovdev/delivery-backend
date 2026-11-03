@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,6 +49,48 @@ func TestLogger_SuccessfulRequest(t *testing.T) {
 	assert.Equal(t, "/orders", httpGroup["path"])
 	assert.InDelta(t, http.StatusCreated, httpGroup["status_code"], 0)
 	assert.Contains(t, httpGroup, "duration_ms")
+}
+
+func TestLogger_DurationInMilliseconds(t *testing.T) {
+	t.Parallel()
+
+	const handlerTime = 25 * time.Millisecond
+
+	tests := []struct {
+		name string
+		next http.HandlerFunc
+	}{
+		{
+			name: "handled request",
+			next: func(w http.ResponseWriter, _ *http.Request) {
+				time.Sleep(handlerTime)
+				w.WriteHeader(http.StatusOK)
+			},
+		},
+		{
+			name: "failed request",
+			next: func(w http.ResponseWriter, r *http.Request) {
+				time.Sleep(handlerTime)
+				response.Fail(w, r, apperr.Internal())
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Внутри synctest время фиктивное: Sleep сдвигает часы ровно на handlerTime,
+			// поэтому длительность сравнивается точно.
+			synctest.Test(t, func(t *testing.T) {
+				record := serveLogged(t, http.MethodGet, "/", tt.next)
+
+				httpGroup, ok := record["http"].(map[string]any)
+				require.True(t, ok)
+				assert.InDelta(t, 25.0, httpGroup["duration_ms"], 0, "duration_ms must be in milliseconds")
+			})
+		})
+	}
 }
 
 func TestLogger_ImplicitStatus(t *testing.T) {

@@ -32,7 +32,7 @@ func Logger(log *slog.Logger) func(http.Handler) http.Handler {
 						slog.String("method", r.Method),
 						slog.String("path", r.URL.Path),
 						slog.Int("status_code", ww.Status()),
-						slog.Duration("duration_ms", time.Since(start)),
+						logger.Duration(time.Since(start)),
 					),
 					logger.Err(err),
 				)
@@ -48,7 +48,7 @@ func Logger(log *slog.Logger) func(http.Handler) http.Handler {
 					slog.String("method", r.Method),
 					slog.String("path", r.URL.Path),
 					slog.Int("status_code", ww.Status()),
-					slog.Duration("duration_ms", time.Since(start)),
+					logger.Duration(time.Since(start)),
 				),
 			)
 		})
