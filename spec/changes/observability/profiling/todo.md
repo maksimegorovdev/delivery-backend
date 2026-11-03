@@ -238,13 +238,13 @@
 **Description:** Override-файл: `pyroscope` и `alloy` (те же теги, что в `compose.yaml`; конфиг `profiles.load.alloy` смонтирован). `profiles.load.alloy` — как dev, но цели по именам контейнеров (`order:6060`, …) и `external_labels = { env = "load" }`. `load-up`/`load-down` и `COMPOSE` в `load/Taskfile.yml` подключают override при `LOAD_PROFILING=1`. `images-check` проверяет набор файлов, включая override.
 
 **Acceptance criteria:**
-- [ ] `task load-up` — без Pyroscope и Alloy; `LOAD_PROFILING=1 task load-up` — с ними, профили `env=load` в Pyroscope
-- [ ] Неверный тег Pyroscope или Alloy в override → `images-check` падает
-- [ ] `task load-down` удаляет стек в обоих режимах
+- [x] `task load-up` — без Pyroscope и Alloy; `LOAD_PROFILING=1 task load-up` — с ними, профили `env=load` в Pyroscope
+- [x] Неверный тег Pyroscope или Alloy в override → `images-check` падает
+- [x] `task load-down` удаляет стек в обоих режимах
 
 **Verification:**
-- [ ] `task load-up && docker compose -p delivery-load ps` (нет pyroscope и alloy); `LOAD_PROFILING=1 task load-up` (есть)
-- [ ] Ручная порча тега в override → `task load-up` падает на `images-check`
+- [x] `task load-up && docker compose -p delivery-load ps` (нет pyroscope и alloy); `LOAD_PROFILING=1 task load-up` (есть)
+- [x] Ручная порча тега в override → `task load-up` падает на `images-check`
 
 **Dependencies:** Task 1, Task 7, Task 9
 

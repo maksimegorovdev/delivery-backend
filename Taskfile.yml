@@ -30,7 +30,7 @@ tasks:
       - docker compose down
 
   images-check:
-    desc: Infrastructure image versions in a stack compose file match compose.yaml (FILE=..., PREFIX=<service image prefix>)
+    desc: Infrastructure image versions in a stack compose file match compose.yaml (FILE=... one file or several space-separated, PREFIX=<service image prefix>)
     internal: true
     silent: true
     requires:
@@ -41,7 +41,9 @@ tasks:
         root=$(docker compose config --images | sort -u)
         # Образы сервисов ({{.PREFIX}}*), одноразовых контейнеров (migrate, curl) и генераторов нагрузки
         # (k6, ghz) в корневом файле не нужны.
-        stack=$(docker compose -f {{.FILE}} --profile '*' config --images | sort -u \
+        files=""
+        for f in {{.FILE}}; do files="$files -f $f"; done
+        stack=$(docker compose $files --profile '*' config --images | sort -u \
           | grep -v -e '^{{.PREFIX}}' -e '^migrate/migrate:' -e '^curlimages/curl:' -e '^grafana/k6:' -e '^obvionaoe/ghz:')
         status=0
         for img in $stack; do
@@ -93,7 +95,8 @@ tasks:
     desc: Start the isolated load stack (project delivery-load) and wait until it is ready
     cmds:
       - task: images-check
-        vars: { FILE: load/compose.yaml, PREFIX: delivery-load- }
+        # Override проверяется всегда, а не только при LOAD_PROFILING=1: дрейф тегов ловится до включения профилирования.
+        vars: { FILE: load/compose.yaml load/compose.profiling.yaml, PREFIX: delivery-load- }
       - task -d load up
 
   load-down:

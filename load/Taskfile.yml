@@ -3,7 +3,10 @@
 version: '3'
 
 vars:
-  COMPOSE: docker compose -f {{.TASKFILE_DIR}}/compose.yaml -p delivery-load
+  # LOAD_PROFILING=1 подключает override с Pyroscope и Alloy; без флага замеры идут без профилировщика.
+  COMPOSE: docker compose -f {{.TASKFILE_DIR}}/compose.yaml{{if eq (.LOAD_PROFILING | default "") "1"}} -f {{.TASKFILE_DIR}}/compose.profiling.yaml{{end}} -p delivery-load
+  # Для down override подключён всегда: иначе pyroscope и alloy остались бы сиротами после LOAD_PROFILING=1 task load-up.
+  COMPOSE_ALL: docker compose -f {{.TASKFILE_DIR}}/compose.yaml -f {{.TASKFILE_DIR}}/compose.profiling.yaml -p delivery-load
   # Совпадает с FAKE_AUTH_USER_ID gateway в compose.yaml и сидом миграций user: адрес берётся у этого пользователя.
   SEED_USER_ID: 01a0d1fa-a4e8-75a1-802d-d6e3c642b0f3
   # Модули с Go-бенчмарками (относительно корня репозитория); новые модули добавляются сюда.
@@ -20,7 +23,7 @@ tasks:
   down:
     desc: Remove the load stack with its volumes
     cmds:
-      - '{{.COMPOSE}} down -v'
+      - '{{.COMPOSE_ALL}} down -v'
 
   k6:
     desc: Run the k6 scenario with PROFILE against a running stack (LOAD_GATEWAY_URL overrides the target, only the stack or localhost unless LOAD_ALLOW_REMOTE=1; RUN_ID names the results dir)

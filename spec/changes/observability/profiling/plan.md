@@ -91,7 +91,7 @@ Spike не зависит от debugserver: для проверки достат
 
 ### Phase 3: Профилирование в load-стеке
 - [ ] Task 9: `load/compose.yaml`: debug-порты и mutex/block у сервисов
-- [ ] Task 10: `load/compose.profiling.yaml` (pyroscope + alloy) + `profiles.load.alloy` + `LOAD_PROFILING`, `images-check`
+- [x] Task 10: `load/compose.profiling.yaml` (pyroscope + alloy) + `profiles.load.alloy` + `LOAD_PROFILING`, `images-check`
 - [ ] Task 11: Сэмплер `pprof-snapshots.sh` в `load-stress`
 - [ ] Task 12: Снимки soak и `task load-soak-leaks`
 - [ ] Task 13: Эталонные профили и `task load-pprof-diff`
