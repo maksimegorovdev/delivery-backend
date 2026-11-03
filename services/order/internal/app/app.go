@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/maksimegorovdev/delivery-backend/platform/closer"
+	"github.com/maksimegorovdev/delivery-backend/platform/debugserver"
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcclient"
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/grpcserver"
 	"github.com/maksimegorovdev/delivery-backend/platform/grpc/interceptors"
@@ -38,6 +39,10 @@ type App struct {
 	grpcServer *grpcserver.Server
 	lis        net.Listener
 	closer     *closer.Closer
+
+	// debugServer и debugLis nil, если PPROF_ADDR не задан.
+	debugServer *debugserver.Server
+	debugLis    net.Listener
 }
 
 func New(ctx context.Context) (_ *App, err error) {
@@ -122,23 +127,8 @@ func New(ctx context.Context) (_ *App, err error) {
 		Products: productClient,
 	})
 
-	// gRPC Server
-	grpcServer := grpcserver.New(
-		grpcserver.WithReflection(cfg.GRPCServer.Reflection),
-		grpcserver.WithServerOptions(
-			grpc.ChainUnaryInterceptor(
-				interceptors.Error(),
-				interceptors.Logger(log),
-				interceptors.Validation(validator),
-			),
-		),
-	)
-
-	// Router
-	grpcrouter.NewRouter(grpcrouter.RouterDeps{
-		Server:       grpcServer.Server(),
-		OrderService: orderService,
-	})
+	// gRPC Server + Router
+	grpcServer := newGRPCServer(cfg, log, validator, orderService)
 
 	lis, err := listener.Listen(ctx, cl, cfg.GRPCServer.Addr)
 	if err != nil {
@@ -152,7 +142,58 @@ func New(ctx context.Context) (_ *App, err error) {
 		closer:     cl,
 	}
 
+	// Debug-сервер (pprof) — только при заданном адресе
+	if err = app.initDebugServer(ctx, cl, cfg.Debug); err != nil {
+		return nil, err
+	}
+
 	return app, nil
+}
+
+func newGRPCServer(
+	cfg *config.Config,
+	log *slog.Logger,
+	validator protovalidate.Validator,
+	orderService *service.OrderService,
+) *grpcserver.Server {
+	grpcServer := grpcserver.New(
+		grpcserver.WithReflection(cfg.GRPCServer.Reflection),
+		grpcserver.WithServerOptions(
+			grpc.ChainUnaryInterceptor(
+				interceptors.Error(),
+				interceptors.Logger(log),
+				interceptors.Validation(validator),
+			),
+		),
+	)
+
+	grpcrouter.NewRouter(grpcrouter.RouterDeps{
+		Server:       grpcServer.Server(),
+		OrderService: orderService,
+	})
+
+	return grpcServer
+}
+
+// initDebugServer создаёт debug-сервер, если в конфиге задан адрес; иначе ничего не делает.
+func (a *App) initDebugServer(ctx context.Context, cl *closer.Closer, cfg config.Debug) error {
+	if cfg.Addr == "" {
+		return nil
+	}
+
+	lis, err := listener.Listen(ctx, cl, cfg.Addr)
+	if err != nil {
+		return err
+	}
+
+	a.debugLis = lis
+	a.debugServer = debugserver.New(
+		debugserver.WithMutexProfileFraction(cfg.MutexFraction),
+		debugserver.WithBlockProfileRate(cfg.BlockRate),
+		debugserver.WithLogger(a.log),
+	)
+
+	return nil
 }
 
 func newTelemetry(ctx context.Context, cfg *config.Config) (*telemetry.Telemetry, error) {
@@ -178,6 +219,15 @@ func (a *App) Addr() net.Addr {
 	return a.lis.Addr()
 }
 
+// DebugAddr возвращает фактический адрес debug-сервера или nil, если он отключён.
+func (a *App) DebugAddr() net.Addr {
+	if a.debugLis == nil {
+		return nil
+	}
+
+	return a.debugLis.Addr()
+}
+
 func (a *App) Run(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -192,6 +242,20 @@ func (a *App) Run(ctx context.Context) error {
 		)
 		return a.grpcServer.Serve(ctx, a.lis)
 	})
+
+	if a.debugServer != nil {
+		g.Go(func() error {
+			a.log.InfoContext(ctx,
+				"debug server started",
+				slog.String("addr", a.debugLis.Addr().String()),
+			)
+			defer a.log.InfoContext(ctx,
+				"debug server stopped",
+				slog.String("addr", a.debugLis.Addr().String()),
+			)
+			return a.debugServer.Serve(ctx, a.debugLis)
+		})
+	}
 
 	return g.Wait()
 }

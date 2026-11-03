@@ -72,12 +72,12 @@
 **Description:** Эталонная интеграция. Секция `Debug{Addr, MutexFraction, BlockRate}` в конфиге (`PPROF_ADDR` необязательный, `PPROF_MUTEX_FRACTION`/`PPROF_BLOCK_RATE` `>= 0`, по умолчанию 0). В `App.New` — `listener.Listen` и `debugserver.New` только при непустом адресе; в `App.Run` — `Serve(ctx, lis)` в `errgroup` с логом адреса. `.env.example`: `PPROF_ADDR=127.0.0.1:6061`.
 
 **Acceptance criteria:**
-- [ ] Пустой `PPROF_ADDR` → сервер не создаётся, порт не слушается; отрицательные rate/fraction → ошибка валидации
+- [x] Пустой `PPROF_ADDR` → сервер не создаётся, порт не слушается; отрицательные rate/fraction → ошибка валидации
 - [ ] При заданном адресе `curl 127.0.0.1:6061/debug/pprof/` → 200 у сервиса, запущенного через Air
-- [ ] Остановка сервиса гасит debug-сервер без ошибок в логе
+- [x] Остановка сервиса гасит debug-сервер без ошибок в логе
 
 **Verification:**
-- [ ] `cd services/order && go test ./internal/config/...`; `task test-integration` (app_integration_test: эндпоинт отвечает / порт не слушается)
+- [x] `cd services/order && go test ./internal/config/...`; `task test-integration` (app_integration_test: эндпоинт отвечает / порт не слушается)
 - [ ] Ручная: `task svc-watch` для order + `curl -s 127.0.0.1:6061/debug/pprof/ | head`
 
 **Dependencies:** Task 2

@@ -15,6 +15,7 @@ type Config struct {
 	UserService    UserService
 	ProductService ProductService
 	Telemetry      Telemetry
+	Debug          Debug
 }
 
 func (c Config) Validate() error {
@@ -26,6 +27,7 @@ func (c Config) Validate() error {
 		validation.Field(&c.UserService, validation.Required),
 		validation.Field(&c.ProductService, validation.Required),
 		validation.Field(&c.Telemetry),
+		validation.Field(&c.Debug),
 	)
 }
 
@@ -102,6 +104,20 @@ type Telemetry struct {
 func (t Telemetry) Validate() error {
 	return validation.ValidateStruct(&t,
 		validation.Field(&t.Endpoint, validation.When(t.Enabled, validation.Required)),
+	)
+}
+
+// Debug — отладочный HTTP-сервер с pprof. Пустой Addr отключает сервер.
+type Debug struct {
+	Addr          string `env:"PPROF_ADDR"`
+	MutexFraction int    `env:"PPROF_MUTEX_FRACTION"`
+	BlockRate     int    `env:"PPROF_BLOCK_RATE"`
+}
+
+func (d Debug) Validate() error {
+	return validation.ValidateStruct(&d,
+		validation.Field(&d.MutexFraction, validation.Min(0)),
+		validation.Field(&d.BlockRate, validation.Min(0)),
 	)
 }
 
