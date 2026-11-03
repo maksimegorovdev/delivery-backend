@@ -298,9 +298,15 @@ tasks:
           *) echo "pprof: unknown TYPE '{{.TYPE}}' (profile|heap|allocs|goroutine|goroutineleak|mutex|block|trace)" >&2; exit 1 ;;
         esac
 
+        # Ноль сервер заменил бы на 30 с, а ведущий ноль sh читает как восьмеричное число.
+        # Потолок 60 с: debugserver отклоняет seconds >= WriteTimeout (65 с) с ответом 400.
         case "{{.SECONDS}}" in
-          ''|*[!0-9]*) echo "pprof: SECONDS must be a positive integer, got '{{.SECONDS}}'" >&2; exit 1 ;;
+          ''|*[!0-9]*|0*) echo "pprof: SECONDS must be an integer from 1 to 60, got '{{.SECONDS}}'" >&2; exit 1 ;;
         esac
+        if [ "{{.SECONDS}}" -gt 60 ]; then
+          echo "pprof: SECONDS must be an integer from 1 to 60, got '{{.SECONDS}}'" >&2
+          exit 1
+        fi
 
         ext=pb.gz
         [ "{{.TYPE}}" = trace ] && ext=trace
@@ -309,9 +315,10 @@ tasks:
         out="tmp/pprof/{{.SERVICE}}-{{.TYPE}}-$(date +%Y%m%d-%H%M%S).$ext"
 
         # Запас сверх SECONDS на сам ответ; при любой ошибке пустой файл не оставляем.
-        if ! curl -fsS --max-time $(( {{.SECONDS}} + 15 )) -o "$out" "http://127.0.0.1:$port/debug/pprof/$path"; then
+        # Текст ошибки curl отличает недоступный порт (connection refused) от отказа сервера (HTTP 4xx/5xx).
+        if ! msg=$(curl -fsS --max-time $(( {{.SECONDS}} + 15 )) -o "$out" "http://127.0.0.1:$port/debug/pprof/$path" 2>&1); then
           rm -f "$out"
-          echo "pprof: {{.SERVICE}} debug endpoint 127.0.0.1:$port is unavailable (is the service running with PPROF_ADDR set?)" >&2
+          echo "pprof: {{.SERVICE}} debug endpoint 127.0.0.1:$port failed: $msg (is the service running with PPROF_ADDR set?)" >&2
           exit 1
         fi
 
