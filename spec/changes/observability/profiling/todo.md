@@ -283,9 +283,9 @@
 **Description:** `load-soak` снимает `heap`, `goroutine?debug=1`, `goroutine` (pb) всех целевых сервисов в начале и в конце (`pprof/<service>/soak-{start,end}-<type>`) и запускает сэмплер с периодом 300 с. `task load-soak-leaks [RUN=<dir>]` (по умолчанию последний прогон) печатает по сервису число горутин start/end и `go tool pprof -top -diff_base=soak-start-heap soak-end-heap`.
 
 **Acceptance criteria:**
-- [ ] Снимок конца делается и при падении k6 (как `soak-snapshot`)
-- [ ] `load-soak-leaks` печатает таблицу по 5 сервисам; прогон без снимков → понятная ошибка
-- [ ] Сэмплер гасится через `defer`
+- [x] Снимок конца делается и при падении k6 (как `soak-snapshot`)
+- [x] `load-soak-leaks` печатает таблицу по 5 сервисам; прогон без снимков → понятная ошибка
+- [x] Сэмплер гасится через `defer`
 
 **Verification:**
 - [ ] Ручная: укороченный soak (переменная длительности профиля soak, если есть, иначе полный) + `task load-soak-leaks`

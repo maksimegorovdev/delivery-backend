@@ -5,19 +5,31 @@
 # Ошибка снимка пишется в <out-dir>/errors.log, сэмплер продолжает работу. Работает до kill; запускает и останавливает task load-stress.
 # Цели — PPROF_TARGETS (по умолчанию order,user,product,gateway,notification), адрес хоста — PPROF_HOST (по умолчанию 127.0.0.1).
 # Использование: pprof-snapshots.sh <out-dir> [interval-sec]
+# Одиночный снимок soak: pprof-snapshots.sh once <out-dir> <label> — heap, goroutine (pb) и goroutine?debug=1 (txt)
+# в <out-dir>/<service>/soak-<label>-<type>.{pb.gz,txt}; метки start и end читает task load-soak-leaks.
 set -eu
 
-out=$1
-interval=${2:-30}
+mode=loop
+if [ "${1:-}" = once ]; then
+  mode=once
+  shift
+fi
+
+out=${1:?"pprof-snapshots: не задан out-dir"}
 targets=${PPROF_TARGETS:-order,user,product,gateway,notification}
 host=${PPROF_HOST:-127.0.0.1}
 
-# CPU-профиль занимает interval-5 секунд: оставшиеся 5 секунд уходят на остальные профили и паузу.
-if [ "$interval" -le 5 ]; then
-  echo "pprof-snapshots: interval должен быть больше 5 секунд, получено $interval" >&2
-  exit 2
+if [ "$mode" = loop ]; then
+  interval=${2:-30}
+  # CPU-профиль занимает interval-5 секунд: оставшиеся 5 секунд уходят на остальные профили и паузу.
+  if [ "$interval" -le 5 ]; then
+    echo "pprof-snapshots: interval должен быть больше 5 секунд, получено $interval" >&2
+    exit 2
+  fi
+  cpu_seconds=$((interval - 5))
+else
+  label=${2:?"pprof-snapshots: не задана метка снимка (start или end)"}
 fi
-cpu_seconds=$((interval - 5))
 
 mkdir -p "$out"
 errors="$out/errors.log"
@@ -34,9 +46,9 @@ port_of() {
   esac
 }
 
-# fetch <service> <port> <ts> <type> <path> <max-time>: частичный файл не остаётся ни при ошибке, ни при kill.
+# fetch <service> <port> <ts> <type> <path> <max-time> [ext]: частичный файл не остаётся ни при ошибке, ни при kill.
 fetch() {
-  file="$out/$1/$3-$4.pb.gz"
+  file="$out/$1/$3-$4.${7:-pb.gz}"
   if ! msg=$(curl -fsS --max-time "$6" -o "$file.tmp" "http://$host:$2/debug/pprof/$5" 2>&1); then
     rm -f "$file.tmp"
     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $1 $4: $msg" >>"$errors"
@@ -58,6 +70,26 @@ sample() {
   done
   wait
 }
+
+# snapshot_once <service>: снимок soak без CPU; ошибка одного профиля не мешает остальным.
+snapshot_once() {
+  if ! port=$(port_of "$1"); then
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $1: неизвестный сервис в PPROF_TARGETS" >>"$errors"
+    return 0
+  fi
+  mkdir -p "$out/$1"
+  fetch "$1" "$port" "soak-$label" heap heap 10
+  fetch "$1" "$port" "soak-$label" goroutine goroutine 10
+  fetch "$1" "$port" "soak-$label" goroutine "goroutine?debug=1" 10 txt
+}
+
+if [ "$mode" = once ]; then
+  for svc in $(echo "$targets" | tr ',' ' '); do
+    snapshot_once "$svc" &
+  done
+  wait
+  exit 0
+fi
 
 # pkill из load-stress убивает процессы сэмплера, но не их curl: добиваем его (только запросы этого прогона по пути -o) и убираем недокачанное.
 trap 'pkill -f "curl .* -o $out/" 2>/dev/null || true; rm -f "$out"/*/*.tmp; exit 0' TERM INT

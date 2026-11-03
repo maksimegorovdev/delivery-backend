@@ -130,7 +130,7 @@ tasks:
           -f - <sql/soak-snapshot.sql | tee results/raw/{{.RUN_ID}}/soak-{{.LABEL}}.txt
 
   soak:
-    desc: k6 soak - the regression RPS for 30 min, SQL snapshots at start and end, docker stats and group lag samplers; results go to results/raw/<run>
+    desc: k6 soak - the regression RPS for 30 min, SQL and pprof snapshots (heap, goroutine) at start and end, docker stats, group lag and pprof (every 300 s) samplers; results go to results/raw/<run>
     vars:
       RUN_ID:
         sh: date +%Y%m%d-%H%M%S
@@ -138,15 +138,20 @@ tasks:
       - mkdir -p results/raw/{{.RUN_ID}}
       - task: soak-snapshot
         vars: { RUN_ID: '{{.RUN_ID}}', LABEL: start }
+      # Снимок начала до сэмплера и нагрузки: утечка считается как рост относительно него.
+      - sh scripts/pprof-snapshots.sh once results/raw/{{.RUN_ID}}/pprof start
       - cmd: |
           sh scripts/docker-stats.sh delivery-load results/raw/{{.RUN_ID}}/docker-stats.csv 10 >/dev/null 2>&1 &
       - cmd: |
           sh scripts/group-lag.sh delivery-load notification results/raw/{{.RUN_ID}}/group-lag.csv 10 >/dev/null 2>&1 &
-      - defer: pkill -f 'scripts/(docker-stats|group-lag).sh .*results/raw/{{.RUN_ID}}/' || true
+      - cmd: |
+          sh scripts/pprof-snapshots.sh results/raw/{{.RUN_ID}}/pprof 300 >/dev/null 2>&1 &
+      - defer: pkill -f 'scripts/(docker-stats|group-lag|pprof-snapshots).sh .*results/raw/{{.RUN_ID}}/' || true
       # Код k6 99 (порог нарушен) не прерывает задачу: снимок конца нужен и после падения. Исход решает вердикт в summary.json.
       - task: k6
         vars: { PROFILE: soak, RUN_ID: '{{.RUN_ID}}' }
         ignore_error: true
+      - sh scripts/pprof-snapshots.sh once results/raw/{{.RUN_ID}}/pprof end
       - task: soak-snapshot
         vars: { RUN_ID: '{{.RUN_ID}}', LABEL: end }
       - cmd: |
@@ -155,6 +160,34 @@ tasks:
           if grep -q '"verdict": "failed"' "$summary"; then echo "soak: вердикт failed, см. $summary" >&2; exit 1; fi
           if grep -q '"verdict": "drift"' "$summary"; then echo "soak: p99 последних 5 мин больше 1.5x первых, см. $summary"; fi
           echo "soak: результаты в load/results/raw/{{.RUN_ID}}"
+
+  soak-leaks:
+    desc: Goroutines and heap growth per service, soak start vs end, for the last run (RUN=<dir name> picks another)
+    silent: true
+    vars:
+      RUN:
+        sh: '{{if .RUN}}echo {{.RUN}}{{else}}ls -1 results/raw | tail -1{{end}}'
+    cmds:
+      - |
+        set -eu
+        dir=results/raw/{{.RUN}}/pprof
+        if [ -z "{{.RUN}}" ] || [ ! -d "$dir" ]; then echo "soak-leaks: прогон со снимками не найден (task load-soak)" >&2; exit 1; fi
+        found=0
+        for svc in order user product gateway notification; do
+          s="$dir/$svc/soak-start"
+          e="$dir/$svc/soak-end"
+          if [ ! -f "$s-heap.pb.gz" ] || [ ! -f "$e-heap.pb.gz" ] || [ ! -f "$s-goroutine.txt" ] || [ ! -f "$e-goroutine.txt" ]; then
+            echo "== $svc: нет снимков soak-start/soak-end в $dir/$svc (см. $dir/errors.log)" >&2
+            continue
+          fi
+          found=$((found + 1))
+          # Первая строка debug=1: «goroutine profile: total N».
+          gs=$(sed -n '1s/.*total //p' "$s-goroutine.txt")
+          ge=$(sed -n '1s/.*total //p' "$e-goroutine.txt")
+          echo "== $svc: горутины start=$gs end=$ge (рост $((ge - gs)))"
+          go tool pprof -top -nodecount=10 -sample_index=inuse_space -diff_base="$s-heap.pb.gz" "$e-heap.pb.gz" 2>&1 | sed 's/^/   /'
+        done
+        if [ "$found" -eq 0 ]; then echo "soak-leaks: в $dir нет ни одного набора снимков soak (task load-soak)" >&2; exit 1; fi
 
   lag:
     desc: Order -> notification lag by stage for the last run (RUN=<dir name> picks another), table goes to results/raw/<run>/lag.txt
