@@ -2,10 +2,12 @@ package interceptors_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"log/slog"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,6 +70,52 @@ func TestLogger_LogsSuccessfulRequestAtInfo(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, codes.OK.String(), grpcAttrs["code"])
 	assert.Equal(t, grpc_health_v1.Health_Check_FullMethodName, grpcAttrs["method"])
+}
+
+func TestLogger_DurationInMilliseconds(t *testing.T) {
+	t.Parallel()
+
+	const handlerTime = 20 * time.Millisecond
+
+	slow := func(check checkFunc) checkFunc {
+		return func(
+			ctx context.Context,
+			req *grpc_health_v1.HealthCheckRequest,
+		) (*grpc_health_v1.HealthCheckResponse, error) {
+			time.Sleep(handlerTime)
+
+			return check(ctx, req)
+		}
+	}
+
+	tests := []struct {
+		name  string
+		check checkFunc
+	}{
+		{name: "handled request", check: slow(okCheck)},
+		{name: "failed request", check: slow(failWith(apperr.Internal()))},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			log, buf := newJSONLogger()
+			client, _ := newHealthClient(t, tt.check, interceptors.Logger(log))
+
+			_, _ = client.Check(t.Context(), &grpc_health_v1.HealthCheckRequest{})
+
+			grpcAttrs, ok := decodeRecord(t, buf)["grpc"].(map[string]any)
+			require.True(t, ok)
+
+			// bufconn и gRPC держат фоновые горутины, поэтому synctest здесь не подходит и время реальное.
+			// Проверяется порядок величины: в наносекундах было бы 2e7, в микросекундах 2e4.
+			got, ok := grpcAttrs["duration_ms"].(float64)
+			require.True(t, ok, "duration_ms must be a number")
+			assert.GreaterOrEqual(t, got, 20.0)
+			assert.Less(t, got, 1000.0, "duration_ms must be in milliseconds")
+		})
+	}
 }
 
 func TestLogger_LogsFailureWithCodeAndLevel(t *testing.T) {

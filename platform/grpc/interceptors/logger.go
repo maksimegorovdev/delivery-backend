@@ -32,7 +32,7 @@ func Logger(log *slog.Logger) grpc.UnaryServerInterceptor {
 					"grpc",
 					slog.String("code", e.Code.GRPC().String()),
 					slog.String("method", info.FullMethod),
-					slog.Duration("duration_ms", time.Since(start)),
+					logger.Duration(time.Since(start)),
 				),
 				logger.Err(err),
 			)
@@ -47,7 +47,7 @@ func Logger(log *slog.Logger) grpc.UnaryServerInterceptor {
 				"grpc",
 				slog.String("code", codes.OK.String()),
 				slog.String("method", info.FullMethod),
-				slog.Duration("duration_ms", time.Since(start)),
+				logger.Duration(time.Since(start)),
 			),
 		)
 		return resp, nil
