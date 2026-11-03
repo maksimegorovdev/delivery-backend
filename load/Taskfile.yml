@@ -82,7 +82,12 @@ tasks:
         vars: { PROFILE: smoke, RUN_ID: '{{.RUN_ID}}' }
 
   stress:
-    desc: k6 stress - RPS steps until degradation, summary, docker-stats.csv and pprof snapshots (every 30 s) go to results/raw/<run> (STRESS_RATES overrides the steps)
+    desc: k6 stress - RPS steps until degradation, summary, docker-stats.csv and pprof snapshots (every 30 s) go to results/raw/<run> (STRESS_RATES overrides the steps); refuses to run while Alloy from LOAD_PROFILING=1 is up
+    preconditions:
+      # CPU-профайлер один на процесс: при работающем Alloy снимки CPU сэмплера получали бы 500,
+      # а сам скрейп искажал бы замеры.
+      - sh: 'test -z "$(docker ps -q --filter label=com.docker.compose.project=delivery-load --filter label=com.docker.compose.service=alloy)"'
+        msg: 'stress: в load-стеке работает Alloy (LOAD_PROFILING=1), он занимает CPU-профайлер сервисов; пересоздайте стек без флага: task load-down && task load-up'
     vars:
       RUN_ID:
         sh: date +%Y%m%d-%H%M%S
@@ -130,7 +135,12 @@ tasks:
           -f - <sql/soak-snapshot.sql | tee results/raw/{{.RUN_ID}}/soak-{{.LABEL}}.txt
 
   soak:
-    desc: k6 soak - the regression RPS for 30 min, SQL and pprof snapshots (heap, goroutine) at start and end, docker stats, group lag and pprof (every 300 s) samplers; results go to results/raw/<run>
+    desc: k6 soak - the regression RPS for 30 min, SQL and pprof snapshots (heap, goroutine) at start and end, docker stats, group lag and pprof (every 300 s) samplers; results go to results/raw/<run>; refuses to run while Alloy from LOAD_PROFILING=1 is up
+    preconditions:
+      # CPU-профайлер один на процесс: при работающем Alloy снимки CPU сэмплера получали бы 500,
+      # а сам скрейп искажал бы замеры.
+      - sh: 'test -z "$(docker ps -q --filter label=com.docker.compose.project=delivery-load --filter label=com.docker.compose.service=alloy)"'
+        msg: 'soak: в load-стеке работает Alloy (LOAD_PROFILING=1), он занимает CPU-профайлер сервисов; пересоздайте стек без флага: task load-down && task load-up'
     vars:
       RUN_ID:
         sh: date +%Y%m%d-%H%M%S

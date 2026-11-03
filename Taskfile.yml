@@ -272,7 +272,7 @@ tasks:
       Save a pprof snapshot of a running service into tmp/pprof (dev debug ports 6060-6064).
       SERVICE=gateway|order|user|product|notification,
       TYPE=profile|heap|allocs|goroutine|goroutineleak|mutex|block|trace (default profile),
-      SECONDS=30 for profile and trace
+      SECONDS=30 for profile and trace; TYPE=profile fails with HTTP 500 while Alloy (task compose-up) holds the CPU profiler
     silent: true
     requires:
       vars: [SERVICE]
@@ -319,6 +319,10 @@ tasks:
         if ! msg=$(curl -fsS --max-time $(( {{.SECONDS}} + 15 )) -o "$out" "http://127.0.0.1:$port/debug/pprof/$path" 2>&1); then
           rm -f "$out"
           echo "pprof: {{.SERVICE}} debug endpoint 127.0.0.1:$port failed: $msg (is the service running with PPROF_ADDR set?)" >&2
+          # CPU-профайлер один на процесс, а Alloy из compose-up снимает process_cpu почти непрерывно.
+          if [ "{{.TYPE}}" = profile ]; then
+            echo "pprof: HTTP 500 for profile means the CPU profiler is busy, e.g. by Alloy: docker compose stop alloy" >&2
+          fi
           exit 1
         fi
 

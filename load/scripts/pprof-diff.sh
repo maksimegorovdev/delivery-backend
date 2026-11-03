@@ -16,9 +16,10 @@ type=${3:?"pprof-diff: не задан TYPE"}
 baseline_dir=${PPROF_BASELINE_DIR:-results/baseline/pprof}
 
 case $type in
-  profile | heap | allocs | goroutine | mutex | block) ;;
+  # allocs нет: сэмплер его не снимает (alloc_space есть в heap), эталона тоже нет.
+  profile | heap | goroutine | mutex | block) ;;
   *)
-    echo "pprof-diff: неизвестный TYPE '$type' (profile, heap, allocs, goroutine, mutex, block)" >&2
+    echo "pprof-diff: неизвестный TYPE '$type' (profile, heap, goroutine, mutex, block)" >&2
     exit 1
     ;;
 esac
