@@ -189,13 +189,13 @@
 **Description:** Provisioning `deploy/grafana/provisioning/datasources/pyroscope.yaml` (`uid: pyroscope`, URL `http://pyroscope:4040`). Проверка Explore и Profiles Drilldown.
 
 **Acceptance criteria:**
-- [ ] Датасорс появляется после `task compose-up` без ручной настройки
-- [ ] В Profiles Drilldown видны 5 сервисов с CPU, памятью, горутинами (mutex/block — пустые в dev, это ожидаемо)
-- [ ] Flame graph CPU под нагрузкой (`ab` на gateway) и diff двух интервалов работают
+- [x] Датасорс появляется после `task compose-up` без ручной настройки
+- [x] В Profiles Drilldown видны 5 сервисов с CPU, памятью, горутинами (mutex/block — пустые в dev, это ожидаемо)
+- [x] Flame graph CPU под нагрузкой (`ab` на gateway) и diff двух интервалов работают
 
 **Verification:**
-- [ ] Ручная: `open http://localhost:3001/a/grafana-pyroscope-app`
-- [ ] `curl -s -u admin:… localhost:3001/api/datasources/uid/pyroscope` → 200
+- [x] Ручная: `open http://localhost:3001/a/grafana-pyroscope-app`
+- [x] `curl -s -u admin:… localhost:3001/api/datasources/uid/pyroscope` → 200
 
 **Dependencies:** Task 7
 
@@ -206,9 +206,9 @@
 **Estimated scope:** XS
 
 ### Checkpoint 2: Grafana
-- [ ] Profiles Drilldown: 5 сервисов, flame graph и diff работают
-- [ ] Traces/metrics/logs в ClickHouse не пострадали (дашборды `dashboards` открываются с данными)
-- [ ] Ревью пользователя перед фазой 3
+- [x] Profiles Drilldown: 5 сервисов, flame graph и diff работают
+- [x] Traces/metrics/logs в ClickHouse не пострадали (дашборды `dashboards` открываются с данными)
+- [x] Ревью пользователя перед фазой 3
 
 ---
 
