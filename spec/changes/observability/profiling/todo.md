@@ -166,14 +166,14 @@
 **Description:** Сервисы `pyroscope` (тег из spike, volume, `127.0.0.1:4040`) и `alloy` (`grafana/alloy:v1.21.3`, `extra_hosts: host.docker.internal:host-gateway`, UI `127.0.0.1:12345`, `depends_on: pyroscope`, монтирование конфига read-only). `deploy/alloy/profiles.dev.alloy` в полном виде: 5 блоков `pyroscope.scrape "<svc>"` (`host.docker.internal:606x`, `service_name`, `scrape_interval = "15s"`, 5 типов в `profiling_config`) и один `pyroscope.write` → `http://pyroscope:4040` с `external_labels = { env = "dev" }`. Collector не меняется.
 
 **Acceptance criteria:**
-- [ ] `task compose-up` поднимает Alloy и Pyroscope; `deploy/otel-collector/config.yaml` не изменён
-- [ ] Остановленный сервис даёт ошибки скрейпа в логах/UI Alloy, но остальные цели и traces/metrics/logs работают
-- [ ] В API Pyroscope есть `service_name` всех 5 запущенных сервисов, mutex и block — отдельные типы
+- [x] `task compose-up` поднимает Alloy и Pyroscope; `deploy/otel-collector/config.yaml` не изменён
+- [x] Остановленный сервис даёт ошибки скрейпа в логах/UI Alloy, но остальные цели и traces/metrics/logs работают
+- [x] В API Pyroscope есть `service_name` всех 5 запущенных сервисов, mutex и block — отдельные типы
 
 **Verification:**
-- [ ] `docker run --rm -v …/deploy/alloy:/cfg grafana/alloy:v1.21.3 validate /cfg/profiles.dev.alloy` (или `fmt --test`)
-- [ ] `docker logs alloy 2>&1 | tail`
-- [ ] `git diff --exit-code deploy/otel-collector/config.yaml`
+- [x] `docker run --rm -v …/deploy/alloy:/cfg grafana/alloy:v1.21.3 validate /cfg/profiles.dev.alloy` (или `fmt --test`)
+- [x] `docker logs alloy 2>&1 | tail`
+- [x] `git diff --exit-code deploy/otel-collector/config.yaml`
 
 **Dependencies:** Task 1, Tasks 3–5
 

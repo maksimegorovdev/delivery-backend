@@ -1,41 +1,178 @@
-// Конфиг Alloy для непрерывного профилирования в dev (черновик spike, один сервис).
+// Конфиг Alloy для непрерывного профилирования в dev.
 // Сервисы запущены через Air на хосте и доступны из контейнера как host.docker.internal:606x.
+// Остановленный сервис даёт ошибки скрейпа в логах Alloy, остальные цели не затрагиваются.
 
 pyroscope.write "pyroscope" {
-  endpoint {
-    url = "http://pyroscope:4040"
-  }
+	endpoint {
+		url = "http://pyroscope:4040"
+	}
 
-  external_labels = {
-    env = "dev",
-  }
+	external_labels = {
+		env = "dev",
+	}
+}
+
+pyroscope.scrape "gateway" {
+	targets = [
+		{
+			"__address__"  = "host.docker.internal:6060",
+			"service_name" = "gateway",
+		},
+	]
+	scrape_interval = "15s"
+	forward_to      = [pyroscope.write.pyroscope.receiver]
+
+	profiling_config {
+		profile.process_cpu {
+			enabled = true
+		}
+
+		profile.memory {
+			enabled = true
+		}
+
+		profile.goroutine {
+			enabled = true
+		}
+
+		profile.mutex {
+			enabled = true
+		}
+
+		profile.block {
+			enabled = true
+		}
+	}
 }
 
 pyroscope.scrape "order" {
-  targets = [
-    {
-      "__address__"  = "host.docker.internal:6061",
-      "service_name" = "order",
-    },
-  ]
-  scrape_interval = "15s"
-  forward_to      = [pyroscope.write.pyroscope.receiver]
+	targets = [
+		{
+			"__address__"  = "host.docker.internal:6061",
+			"service_name" = "order",
+		},
+	]
+	scrape_interval = "15s"
+	forward_to      = [pyroscope.write.pyroscope.receiver]
 
-  profiling_config {
-    profile.process_cpu {
-      enabled = true
-    }
-    profile.memory {
-      enabled = true
-    }
-    profile.goroutine {
-      enabled = true
-    }
-    profile.mutex {
-      enabled = true
-    }
-    profile.block {
-      enabled = true
-    }
-  }
+	profiling_config {
+		profile.process_cpu {
+			enabled = true
+		}
+
+		profile.memory {
+			enabled = true
+		}
+
+		profile.goroutine {
+			enabled = true
+		}
+
+		profile.mutex {
+			enabled = true
+		}
+
+		profile.block {
+			enabled = true
+		}
+	}
+}
+
+pyroscope.scrape "user" {
+	targets = [
+		{
+			"__address__"  = "host.docker.internal:6062",
+			"service_name" = "user",
+		},
+	]
+	scrape_interval = "15s"
+	forward_to      = [pyroscope.write.pyroscope.receiver]
+
+	profiling_config {
+		profile.process_cpu {
+			enabled = true
+		}
+
+		profile.memory {
+			enabled = true
+		}
+
+		profile.goroutine {
+			enabled = true
+		}
+
+		profile.mutex {
+			enabled = true
+		}
+
+		profile.block {
+			enabled = true
+		}
+	}
+}
+
+pyroscope.scrape "product" {
+	targets = [
+		{
+			"__address__"  = "host.docker.internal:6063",
+			"service_name" = "product",
+		},
+	]
+	scrape_interval = "15s"
+	forward_to      = [pyroscope.write.pyroscope.receiver]
+
+	profiling_config {
+		profile.process_cpu {
+			enabled = true
+		}
+
+		profile.memory {
+			enabled = true
+		}
+
+		profile.goroutine {
+			enabled = true
+		}
+
+		profile.mutex {
+			enabled = true
+		}
+
+		profile.block {
+			enabled = true
+		}
+	}
+}
+
+pyroscope.scrape "notification" {
+	targets = [
+		{
+			"__address__"  = "host.docker.internal:6064",
+			"service_name" = "notification",
+		},
+	]
+	scrape_interval = "15s"
+	forward_to      = [pyroscope.write.pyroscope.receiver]
+
+	profiling_config {
+		profile.process_cpu {
+			enabled = true
+		}
+
+		profile.memory {
+			enabled = true
+		}
+
+		profile.goroutine {
+			enabled = true
+		}
+
+		profile.mutex {
+			enabled = true
+		}
+
+		profile.block {
+			enabled = true
+		}
+	}
 }
