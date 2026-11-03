@@ -266,8 +266,12 @@ services:
       GRPC_SERVER_REFLECTION: "false"
       OTEL_ENABLED: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      PPROF_ADDR: ":6060"
+      PPROF_MUTEX_FRACTION: "5"
+      PPROF_BLOCK_RATE: "10000"
     ports:
       - "127.0.0.1:38091:8091"
+      - "127.0.0.1:36062:6060"
     depends_on:
       migrate-user:
         condition: service_completed_successfully
@@ -295,8 +299,12 @@ services:
       GRPC_SERVER_REFLECTION: "false"
       OTEL_ENABLED: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      PPROF_ADDR: ":6060"
+      PPROF_MUTEX_FRACTION: "5"
+      PPROF_BLOCK_RATE: "10000"
     ports:
       - "127.0.0.1:38092:8092"
+      - "127.0.0.1:36063:6060"
     depends_on:
       migrate-product:
         condition: service_completed_successfully
@@ -328,8 +336,12 @@ services:
       PRODUCT_SERVICE_GRPC_ADDR: product:8092
       OTEL_ENABLED: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      PPROF_ADDR: ":6060"
+      PPROF_MUTEX_FRACTION: "5"
+      PPROF_BLOCK_RATE: "10000"
     ports:
       - "127.0.0.1:38090:8090"
+      - "127.0.0.1:36061:6060"
     depends_on:
       migrate-order:
         condition: service_completed_successfully
@@ -360,8 +372,10 @@ services:
       FAKE_AUTH_USER_ID: 01a0d1fa-a4e8-75a1-802d-d6e3c642b0f3
       OTEL_ENABLED: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      PPROF_ADDR: ":6060"
     ports:
       - "127.0.0.1:38080:8080"
+      - "127.0.0.1:36060:6060"
     depends_on:
       order:
         condition: service_started
@@ -392,6 +406,9 @@ services:
       KAFKA_TOPICS: order.events.v1
       OTEL_ENABLED: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      PPROF_ADDR: ":6060"
+    ports:
+      - "127.0.0.1:36064:6060"
     depends_on:
       migrate-notification:
         condition: service_completed_successfully

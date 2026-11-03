@@ -178,6 +178,31 @@ services:
       clickhouse:
         condition: service_healthy
 
+  pyroscope:
+    container_name: pyroscope
+    image: grafana/pyroscope:2.4.2
+    ports:
+      - "127.0.0.1:4040:4040"
+    volumes:
+      - pyroscope-data:/data
+
+  alloy:
+    container_name: alloy
+    image: grafana/alloy:v1.21.3
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:12345:12345"
+    volumes:
+      - ./deploy/alloy/profiles.dev.alloy:/etc/alloy/config.alloy:ro
+    depends_on:
+      - pyroscope
+
 volumes:
   order-postgres-data:
   user-postgres-data:
@@ -186,3 +211,4 @@ volumes:
   redpanda-data:
   clickhouse-data:
   grafana-data:
+  pyroscope-data:

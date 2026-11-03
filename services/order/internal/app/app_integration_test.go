@@ -5,6 +5,7 @@ package app_test
 import (
 	"context"
 	"net"
+	"net/http"
 	"net/url"
 	"strconv"
 	"testing"
@@ -135,6 +136,10 @@ func setEnv(t *testing.T, dsn, grpcAddr, depsAddr string) {
 	t.Setenv("USER_SERVICE_GRPC_ADDR", depsAddr)
 	t.Setenv("PRODUCT_SERVICE_GRPC_ADDR", depsAddr)
 	t.Setenv("OTEL_ENABLED", "false")
+	// Debug-сервер по умолчанию выключен; тесты, которым он нужен, задают PPROF_ADDR сами.
+	t.Setenv("PPROF_ADDR", "")
+	t.Setenv("PPROF_MUTEX_FRACTION", "0")
+	t.Setenv("PPROF_BLOCK_RATE", "0")
 }
 
 //nolint:paralleltest // t.Setenv
@@ -187,7 +192,32 @@ func TestApp_New_AddrInUse(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, a)
 
-	// Ресурсы освобождены: пул приложения закрыт, его соединений в БД не осталось.
+	requireNoAppConns(t, pool)
+}
+
+func TestApp_New_DebugAddrInUse(t *testing.T) {
+	pool := pgtest.NewDB(t, migrationsDir)
+
+	var lc net.ListenConfig
+	busy, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = busy.Close() })
+
+	setEnv(t, dsnOf(pool), "127.0.0.1:0", startFakeDeps(t))
+	t.Setenv("PPROF_ADDR", busy.Addr().String())
+
+	a, err := app.New(t.Context())
+	require.ErrorContains(t, err, busy.Addr().String())
+	require.Nil(t, a)
+
+	// Debug-листенер открывается последним: всё, что создано до него, освобождено.
+	requireNoAppConns(t, pool)
+}
+
+// requireNoAppConns ждёт, пока в БД не останется соединений приложения: пул закрыт.
+func requireNoAppConns(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		var conns int
 		queryErr := pool.QueryRow(t.Context(),
@@ -196,4 +226,50 @@ func TestApp_New_AddrInUse(t *testing.T) {
 		assert.NoError(c, queryErr)
 		assert.Zero(c, conns)
 	}, eventuallyTimeout, eventuallyTick)
+}
+
+//nolint:paralleltest // t.Setenv
+func TestApp_DebugServer_Disabled(t *testing.T) {
+	pool := pgtest.NewDB(t, migrationsDir)
+	setEnv(t, dsnOf(pool), "127.0.0.1:0", startFakeDeps(t))
+
+	a, err := app.New(t.Context())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = a.Close(context.Background()) })
+
+	assert.Nil(t, a.DebugAddr(), "при пустом PPROF_ADDR debug-сервер не создаётся и порт не слушается")
+}
+
+func TestApp_DebugServer_ServesPprofAndStopsWithApp(t *testing.T) {
+	pool := pgtest.NewDB(t, migrationsDir)
+	setEnv(t, dsnOf(pool), "127.0.0.1:0", startFakeDeps(t))
+	t.Setenv("PPROF_ADDR", "127.0.0.1:0")
+
+	a, err := app.New(t.Context())
+	require.NoError(t, err)
+	require.NotNil(t, a.DebugAddr())
+
+	runCtx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	runDone := make(chan error, 1)
+	go func() { runDone <- a.Run(runCtx) }()
+
+	pprofURL := "http://" + a.DebugAddr().String() + "/debug/pprof/"
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		req, reqErr := http.NewRequestWithContext(t.Context(), http.MethodGet, pprofURL, http.NoBody)
+		require.NoError(c, reqErr)
+
+		resp, doErr := http.DefaultClient.Do(req)
+		if !assert.NoError(c, doErr) {
+			return
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.Equal(c, http.StatusOK, resp.StatusCode)
+	}, eventuallyTimeout, eventuallyTick)
+
+	cancel()
+	require.NoError(t, <-runDone, "остановка гасит и gRPC-, и debug-сервер без ошибок")
+	require.NoError(t, a.Close(t.Context()))
 }

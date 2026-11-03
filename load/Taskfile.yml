@@ -3,7 +3,10 @@
 version: '3'
 
 vars:
-  COMPOSE: docker compose -f {{.TASKFILE_DIR}}/compose.yaml -p delivery-load
+  # LOAD_PROFILING=1 подключает override с Pyroscope и Alloy; без флага замеры идут без профилировщика.
+  COMPOSE: docker compose -f {{.TASKFILE_DIR}}/compose.yaml{{if eq (.LOAD_PROFILING | default "") "1"}} -f {{.TASKFILE_DIR}}/compose.profiling.yaml{{end}} -p delivery-load
+  # Для down override подключён всегда: иначе pyroscope и alloy остались бы сиротами после LOAD_PROFILING=1 task load-up.
+  COMPOSE_ALL: docker compose -f {{.TASKFILE_DIR}}/compose.yaml -f {{.TASKFILE_DIR}}/compose.profiling.yaml -p delivery-load
   # Совпадает с FAKE_AUTH_USER_ID gateway в compose.yaml и сидом миграций user: адрес берётся у этого пользователя.
   SEED_USER_ID: 01a0d1fa-a4e8-75a1-802d-d6e3c642b0f3
   # Модули с Go-бенчмарками (относительно корня репозитория); новые модули добавляются сюда.
@@ -20,7 +23,7 @@ tasks:
   down:
     desc: Remove the load stack with its volumes
     cmds:
-      - '{{.COMPOSE}} down -v'
+      - '{{.COMPOSE_ALL}} down -v'
 
   k6:
     desc: Run the k6 scenario with PROFILE against a running stack (LOAD_GATEWAY_URL overrides the target, only the stack or localhost unless LOAD_ALLOW_REMOTE=1; RUN_ID names the results dir)
@@ -79,7 +82,12 @@ tasks:
         vars: { PROFILE: smoke, RUN_ID: '{{.RUN_ID}}' }
 
   stress:
-    desc: k6 stress - RPS steps until degradation, summary and docker-stats.csv go to results/raw/<run> (STRESS_RATES overrides the steps)
+    desc: k6 stress - RPS steps until degradation, summary, docker-stats.csv and pprof snapshots (every 30 s) go to results/raw/<run> (STRESS_RATES overrides the steps); refuses to run while Alloy from LOAD_PROFILING=1 is up
+    preconditions:
+      # CPU-профайлер один на процесс: при работающем Alloy снимки CPU сэмплера получали бы 500,
+      # а сам скрейп искажал бы замеры.
+      - sh: 'test -z "$(docker ps -q --filter label=com.docker.compose.project=delivery-load --filter label=com.docker.compose.service=alloy)"'
+        msg: 'stress: в load-стеке работает Alloy (LOAD_PROFILING=1), он занимает CPU-профайлер сервисов; пересоздайте стек без флага: task load-down && task load-up'
     vars:
       RUN_ID:
         sh: date +%Y%m%d-%H%M%S
@@ -89,7 +97,10 @@ tasks:
           sh scripts/docker-stats.sh delivery-load results/raw/{{.RUN_ID}}/docker-stats.csv 5 >/dev/null 2>&1 &
       - cmd: |
           sh scripts/group-lag.sh delivery-load notification results/raw/{{.RUN_ID}}/group-lag.csv 5 >/dev/null 2>&1 &
-      - defer: pkill -f 'scripts/(docker-stats|group-lag).sh .*results/raw/{{.RUN_ID}}/' || true
+      # Профили каждые 30 с (CPU — 25 с): на каждую ступень приходится хотя бы один CPU-профиль.
+      - cmd: |
+          sh scripts/pprof-snapshots.sh results/raw/{{.RUN_ID}}/pprof 30 >/dev/null 2>&1 &
+      - defer: pkill -f 'scripts/(docker-stats|group-lag|pprof-snapshots).sh .*results/raw/{{.RUN_ID}}/' || true
       # Код 99 у k6 — нарушены пороги: для stress штатный исход «предел найден». Исход решает вердикт в summary.json.
       - task: k6
         vars: { PROFILE: stress, RUN_ID: '{{.RUN_ID}}' }
@@ -124,7 +135,12 @@ tasks:
           -f - <sql/soak-snapshot.sql | tee results/raw/{{.RUN_ID}}/soak-{{.LABEL}}.txt
 
   soak:
-    desc: k6 soak - the regression RPS for 30 min, SQL snapshots at start and end, docker stats and group lag samplers; results go to results/raw/<run>
+    desc: k6 soak - the regression RPS for 30 min, SQL and pprof snapshots (heap, goroutine) at start and end, docker stats, group lag and pprof (every 300 s) samplers; results go to results/raw/<run>; refuses to run while Alloy from LOAD_PROFILING=1 is up
+    preconditions:
+      # CPU-профайлер один на процесс: при работающем Alloy снимки CPU сэмплера получали бы 500,
+      # а сам скрейп искажал бы замеры.
+      - sh: 'test -z "$(docker ps -q --filter label=com.docker.compose.project=delivery-load --filter label=com.docker.compose.service=alloy)"'
+        msg: 'soak: в load-стеке работает Alloy (LOAD_PROFILING=1), он занимает CPU-профайлер сервисов; пересоздайте стек без флага: task load-down && task load-up'
     vars:
       RUN_ID:
         sh: date +%Y%m%d-%H%M%S
@@ -132,15 +148,20 @@ tasks:
       - mkdir -p results/raw/{{.RUN_ID}}
       - task: soak-snapshot
         vars: { RUN_ID: '{{.RUN_ID}}', LABEL: start }
+      # Снимок начала до сэмплера и нагрузки: утечка считается как рост относительно него.
+      - sh scripts/pprof-snapshots.sh once results/raw/{{.RUN_ID}}/pprof start
       - cmd: |
           sh scripts/docker-stats.sh delivery-load results/raw/{{.RUN_ID}}/docker-stats.csv 10 >/dev/null 2>&1 &
       - cmd: |
           sh scripts/group-lag.sh delivery-load notification results/raw/{{.RUN_ID}}/group-lag.csv 10 >/dev/null 2>&1 &
-      - defer: pkill -f 'scripts/(docker-stats|group-lag).sh .*results/raw/{{.RUN_ID}}/' || true
+      - cmd: |
+          sh scripts/pprof-snapshots.sh results/raw/{{.RUN_ID}}/pprof 300 >/dev/null 2>&1 &
+      - defer: pkill -f 'scripts/(docker-stats|group-lag|pprof-snapshots).sh .*results/raw/{{.RUN_ID}}/' || true
       # Код k6 99 (порог нарушен) не прерывает задачу: снимок конца нужен и после падения. Исход решает вердикт в summary.json.
       - task: k6
         vars: { PROFILE: soak, RUN_ID: '{{.RUN_ID}}' }
         ignore_error: true
+      - sh scripts/pprof-snapshots.sh once results/raw/{{.RUN_ID}}/pprof end
       - task: soak-snapshot
         vars: { RUN_ID: '{{.RUN_ID}}', LABEL: end }
       - cmd: |
@@ -149,6 +170,49 @@ tasks:
           if grep -q '"verdict": "failed"' "$summary"; then echo "soak: вердикт failed, см. $summary" >&2; exit 1; fi
           if grep -q '"verdict": "drift"' "$summary"; then echo "soak: p99 последних 5 мин больше 1.5x первых, см. $summary"; fi
           echo "soak: результаты в load/results/raw/{{.RUN_ID}}"
+
+  soak-leaks:
+    desc: Goroutines and heap growth per service, soak start vs end, for the last run (RUN=<dir name> picks another)
+    silent: true
+    vars:
+      RUN:
+        sh: '{{if .RUN}}echo {{.RUN}}{{else}}ls -1 results/raw | tail -1{{end}}'
+    cmds:
+      - |
+        set -eu
+        dir=results/raw/{{.RUN}}/pprof
+        if [ -z "{{.RUN}}" ] || [ ! -d "$dir" ]; then echo "soak-leaks: прогон со снимками не найден (task load-soak)" >&2; exit 1; fi
+        found=0
+        for svc in order user product gateway notification; do
+          s="$dir/$svc/soak-start"
+          e="$dir/$svc/soak-end"
+          if [ ! -f "$s-heap.pb.gz" ] || [ ! -f "$e-heap.pb.gz" ] || [ ! -f "$s-goroutine.txt" ] || [ ! -f "$e-goroutine.txt" ]; then
+            echo "== $svc: нет снимков soak-start/soak-end в $dir/$svc (см. $dir/errors.log)" >&2
+            continue
+          fi
+          found=$((found + 1))
+          # Первая строка debug=1: «goroutine profile: total N».
+          gs=$(sed -n '1s/.*total //p' "$s-goroutine.txt")
+          ge=$(sed -n '1s/.*total //p' "$e-goroutine.txt")
+          echo "== $svc: горутины start=$gs end=$ge (рост $((ge - gs)))"
+          go tool pprof -top -nodecount=10 -sample_index=inuse_space -diff_base="$s-heap.pb.gz" "$e-heap.pb.gz" 2>&1 | sed 's/^/   /'
+        done
+        if [ "$found" -eq 0 ]; then echo "soak-leaks: в $dir нет ни одного набора снимков soak (task load-soak)" >&2; exit 1; fi
+
+  pprof-diff:
+    desc: pprof diff of a run profile against results/baseline/pprof (SERVICE, TYPE=profile by default, RUN=<dir name> picks another run, default the last); profile is the CPU snapshot last taken on the plateau of last_good_stage (the last stage if null)
+    silent: true
+    vars:
+      RUN:
+        sh: '{{if .RUN}}echo {{.RUN}}{{else}}ls -1 results/raw | tail -1{{end}}'
+      TYPE: '{{if .TYPE}}{{.TYPE}}{{else}}profile{{end}}'
+    preconditions:
+      - sh: test -n "{{.SERVICE}}"
+        msg: 'pprof-diff: не задан SERVICE (order, user, product, gateway, notification)'
+      - sh: test -n "{{.RUN}}" && test -d "results/raw/{{.RUN}}"
+        msg: 'pprof-diff: прогон не найден в load/results/raw (task load-stress)'
+    cmds:
+      - sh scripts/pprof-diff.sh results/raw/{{.RUN}} {{.SERVICE}} {{.TYPE}}
 
   lag:
     desc: Order -> notification lag by stage for the last run (RUN=<dir name> picks another), table goes to results/raw/<run>/lag.txt

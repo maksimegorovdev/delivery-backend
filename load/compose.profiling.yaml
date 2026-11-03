@@ -1,0 +1,27 @@
+# Override load-стека: непрерывное профилирование (Pyroscope + Alloy).
+# Подключается при LOAD_PROFILING=1 (task load-up); по умолчанию выключено, чтобы не искажать замеры.
+# Теги образов совпадают с корневым compose.yaml, это проверяет images-check.
+
+services:
+
+  pyroscope:
+    image: grafana/pyroscope:2.4.2
+    ports:
+      - "127.0.0.1:34040:4040"
+    volumes:
+      - pyroscope-data:/data
+
+  alloy:
+    image: grafana/alloy:v1.21.3
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    volumes:
+      - ../deploy/alloy/profiles.load.alloy:/etc/alloy/config.alloy:ro
+    depends_on:
+      - pyroscope
+
+volumes:
+  pyroscope-data:

@@ -155,3 +155,84 @@ func TestNew_Invalid(t *testing.T) {
 		})
 	}
 }
+
+// unsetDebugEnv удаляет PPROF_* из окружения: иначе экспортированные в shell значения подменят кейсы.
+func unsetDebugEnv(t *testing.T) {
+	t.Helper()
+
+	for _, key := range []string{"PPROF_ADDR", "PPROF_MUTEX_FRACTION", "PPROF_BLOCK_RATE"} {
+		t.Setenv(key, "") // восстанавливает исходное значение после теста
+		require.NoError(t, os.Unsetenv(key))
+	}
+}
+
+func TestNew_DebugValid(t *testing.T) {
+	tests := []struct {
+		name string
+		env  map[string]string
+		want config.Debug
+	}{
+		{
+			name: "unset disables debug server",
+			env:  map[string]string{},
+			want: config.Debug{},
+		},
+		{
+			name: "addr only",
+			env:  map[string]string{"PPROF_ADDR": "127.0.0.1:6061"},
+			want: config.Debug{Addr: "127.0.0.1:6061"},
+		},
+		{
+			name: "addr with mutex fraction and block rate",
+			env: map[string]string{
+				"PPROF_ADDR":           "127.0.0.1:6061",
+				"PPROF_MUTEX_FRACTION": "5",
+				"PPROF_BLOCK_RATE":     "10000",
+			},
+			want: config.Debug{Addr: "127.0.0.1:6061", MutexFraction: 5, BlockRate: 10000},
+		},
+		{
+			name: "zero rates are valid",
+			env:  map[string]string{"PPROF_MUTEX_FRACTION": "0", "PPROF_BLOCK_RATE": "0"},
+			want: config.Debug{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setBaseEnv(t)
+			unsetDebugEnv(t)
+			t.Setenv("OTEL_ENABLED", "false")
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+
+			cfg, err := config.New()
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, cfg.Debug)
+		})
+	}
+}
+
+func TestNew_DebugInvalid(t *testing.T) {
+	tests := []struct {
+		name  string
+		key   string
+		value string
+	}{
+		{name: "PPROF_MUTEX_FRACTION negative", key: "PPROF_MUTEX_FRACTION", value: "-1"},
+		{name: "PPROF_BLOCK_RATE negative", key: "PPROF_BLOCK_RATE", value: "-1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setBaseEnv(t)
+			unsetDebugEnv(t)
+			t.Setenv("OTEL_ENABLED", "false")
+			t.Setenv(tt.key, tt.value)
+
+			_, err := config.New()
+			require.Error(t, err)
+		})
+	}
+}

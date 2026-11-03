@@ -1,0 +1,178 @@
+// Конфиг Alloy для непрерывного профилирования в load-стеке (LOAD_PROFILING=1 task load-up).
+// Сервисы работают в контейнерах той же сети compose и доступны по имени сервиса на внутреннем порту 6060.
+// Остановленный сервис даёт ошибки скрейпа в логах Alloy, остальные цели не затрагиваются.
+
+pyroscope.write "pyroscope" {
+	endpoint {
+		url = "http://pyroscope:4040"
+	}
+
+	external_labels = {
+		env = "load",
+	}
+}
+
+pyroscope.scrape "gateway" {
+	targets = [
+		{
+			"__address__"  = "gateway:6060",
+			"service_name" = "gateway",
+		},
+	]
+	scrape_interval = "15s"
+	forward_to      = [pyroscope.write.pyroscope.receiver]
+
+	profiling_config {
+		profile.process_cpu {
+			enabled = true
+		}
+
+		profile.memory {
+			enabled = true
+		}
+
+		profile.goroutine {
+			enabled = true
+		}
+
+		profile.mutex {
+			enabled = true
+		}
+
+		profile.block {
+			enabled = true
+		}
+	}
+}
+
+pyroscope.scrape "order" {
+	targets = [
+		{
+			"__address__"  = "order:6060",
+			"service_name" = "order",
+		},
+	]
+	scrape_interval = "15s"
+	forward_to      = [pyroscope.write.pyroscope.receiver]
+
+	profiling_config {
+		profile.process_cpu {
+			enabled = true
+		}
+
+		profile.memory {
+			enabled = true
+		}
+
+		profile.goroutine {
+			enabled = true
+		}
+
+		profile.mutex {
+			enabled = true
+		}
+
+		profile.block {
+			enabled = true
+		}
+	}
+}
+
+pyroscope.scrape "user" {
+	targets = [
+		{
+			"__address__"  = "user:6060",
+			"service_name" = "user",
+		},
+	]
+	scrape_interval = "15s"
+	forward_to      = [pyroscope.write.pyroscope.receiver]
+
+	profiling_config {
+		profile.process_cpu {
+			enabled = true
+		}
+
+		profile.memory {
+			enabled = true
+		}
+
+		profile.goroutine {
+			enabled = true
+		}
+
+		profile.mutex {
+			enabled = true
+		}
+
+		profile.block {
+			enabled = true
+		}
+	}
+}
+
+pyroscope.scrape "product" {
+	targets = [
+		{
+			"__address__"  = "product:6060",
+			"service_name" = "product",
+		},
+	]
+	scrape_interval = "15s"
+	forward_to      = [pyroscope.write.pyroscope.receiver]
+
+	profiling_config {
+		profile.process_cpu {
+			enabled = true
+		}
+
+		profile.memory {
+			enabled = true
+		}
+
+		profile.goroutine {
+			enabled = true
+		}
+
+		profile.mutex {
+			enabled = true
+		}
+
+		profile.block {
+			enabled = true
+		}
+	}
+}
+
+pyroscope.scrape "notification" {
+	targets = [
+		{
+			"__address__"  = "notification:6060",
+			"service_name" = "notification",
+		},
+	]
+	scrape_interval = "15s"
+	forward_to      = [pyroscope.write.pyroscope.receiver]
+
+	profiling_config {
+		profile.process_cpu {
+			enabled = true
+		}
+
+		profile.memory {
+			enabled = true
+		}
+
+		profile.goroutine {
+			enabled = true
+		}
+
+		profile.mutex {
+			enabled = true
+		}
+
+		profile.block {
+			enabled = true
+		}
+	}
+}
