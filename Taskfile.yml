@@ -254,6 +254,61 @@ tasks:
       - task: svc-watch
         vars: { SVC: gateway }
 
+  pprof:
+    desc: >-
+      Save a pprof snapshot of a running service into tmp/pprof (dev debug ports 6060-6064).
+      SERVICE=gateway|order|user|product|notification,
+      TYPE=profile|heap|allocs|goroutine|goroutineleak|mutex|block|trace (default profile),
+      SECONDS=30 for profile and trace
+    silent: true
+    requires:
+      vars: [SERVICE]
+    vars:
+      TYPE: '{{.TYPE | default "profile"}}'
+      SECONDS: '{{.SECONDS | default "30"}}'
+    cmds:
+      - |
+        # Порт debug-сервера по имени сервиса (таблица портов в спеке profiling).
+        case "{{.SERVICE}}" in
+          gateway)      port=6060 ;;
+          order)        port=6061 ;;
+          user)         port=6062 ;;
+          product)      port=6063 ;;
+          notification) port=6064 ;;
+          *) echo "pprof: unknown SERVICE '{{.SERVICE}}' (gateway|order|user|product|notification)" >&2; exit 1 ;;
+        esac
+
+        # goroutineleak есть с Go 1.27: горутины, заблокированные навсегда на недостижимых примитивах.
+        case "{{.TYPE}}" in
+          profile|trace) path="{{.TYPE}}?seconds={{.SECONDS}}" ;;
+          heap|allocs|goroutine|goroutineleak|mutex|block) path="{{.TYPE}}" ;;
+          *) echo "pprof: unknown TYPE '{{.TYPE}}' (profile|heap|allocs|goroutine|goroutineleak|mutex|block|trace)" >&2; exit 1 ;;
+        esac
+
+        case "{{.SECONDS}}" in
+          ''|*[!0-9]*) echo "pprof: SECONDS must be a positive integer, got '{{.SECONDS}}'" >&2; exit 1 ;;
+        esac
+
+        ext=pb.gz
+        [ "{{.TYPE}}" = trace ] && ext=trace
+
+        mkdir -p tmp/pprof
+        out="tmp/pprof/{{.SERVICE}}-{{.TYPE}}-$(date +%Y%m%d-%H%M%S).$ext"
+
+        # Запас сверх SECONDS на сам ответ; при любой ошибке пустой файл не оставляем.
+        if ! curl -fsS --max-time $(( {{.SECONDS}} + 15 )) -o "$out" "http://127.0.0.1:$port/debug/pprof/$path"; then
+          rm -f "$out"
+          echo "pprof: {{.SERVICE}} debug endpoint 127.0.0.1:$port is unavailable (is the service running with PPROF_ADDR set?)" >&2
+          exit 1
+        fi
+
+        echo "$out"
+        if [ "{{.TYPE}}" = trace ]; then
+          echo "view: go tool trace $out"
+        else
+          echo "view: go tool pprof -http=:0 $out"
+        fi
+
   svc-watch:
     internal: true
     prefix: '{{.SVC}}'

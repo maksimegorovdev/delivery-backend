@@ -138,7 +138,7 @@ func TestServer_IndexListsProfiles(t *testing.T) {
 	resp := get(t, lis.url("/debug/pprof/"))
 
 	assert.Equal(t, http.StatusOK, resp.status)
-	for _, name := range []string{"goroutine", "heap", "allocs", "mutex", "block", "threadcreate"} {
+	for _, name := range []string{"goroutine", "heap", "allocs", "goroutineleak", "mutex", "block", "threadcreate"} {
 		assert.Contains(t, string(resp.body), name)
 	}
 }
@@ -158,6 +158,8 @@ func TestServer_NamedProfiles(t *testing.T) {
 		{name: "heap binary", path: "/debug/pprof/heap"},
 		{name: "heap with gc", path: "/debug/pprof/heap?gc=1"},
 		{name: "allocs binary", path: "/debug/pprof/allocs"},
+		// Профиль goroutineleak появился в Go 1.27; pprof.Lookup отдаёт его без отдельного хендлера.
+		{name: "goroutineleak binary", path: "/debug/pprof/goroutineleak"},
 		{name: "mutex text", path: "/debug/pprof/mutex?debug=1", wantText: "mutex"},
 		{name: "block text", path: "/debug/pprof/block?debug=1", wantText: "contention"},
 		{name: "threadcreate text", path: "/debug/pprof/threadcreate?debug=1", wantText: "threadcreate profile:"},

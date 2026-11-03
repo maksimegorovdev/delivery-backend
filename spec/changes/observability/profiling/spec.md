@@ -52,7 +52,7 @@
      | product | `127.0.0.1:6063` | `:6060` → `127.0.0.1:36063` |
      | notification | `127.0.0.1:6064` | `:6060` → `127.0.0.1:36064` |
    - debug-порт не совпадает с портом публичного API и не публикуется наружу шире `127.0.0.1`.
-3. **Снимки по запросу:** корневая задача `task pprof SERVICE=<svc> [TYPE=profile|heap|allocs|goroutine|mutex|block|trace] [SECONDS=30]`
+3. **Снимки по запросу:** корневая задача `task pprof SERVICE=<svc> [TYPE=profile|heap|allocs|goroutine|goroutineleak|mutex|block|trace] [SECONDS=30]`
    сохраняет профиль в `tmp/pprof/<service>-<type>-<ts>.pb.gz` (для `trace` — `.trace`) и печатает команду
    `go tool pprof -http=:0 <файл>` для просмотра. Неизвестный сервис или тип → понятная ошибка, ненулевой код.
 4. **Автоснимки в load-стеке.**

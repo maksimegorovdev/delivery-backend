@@ -133,15 +133,15 @@
 
 ## Task 6: task pprof
 
-**Description:** Корневая задача `task pprof SERVICE=<svc> [TYPE=profile|heap|allocs|goroutine|mutex|block|trace] [SECONDS=30]`: сервис → порт из таблицы AC2, снимок в `tmp/pprof/<service>-<type>-<ts>.pb.gz` (`trace` → `.trace`), печать `go tool pprof -http=:0 <файл>` (для trace — `go tool trace`).
+**Description:** Корневая задача `task pprof SERVICE=<svc> [TYPE=profile|heap|allocs|goroutine|goroutineleak|mutex|block|trace] [SECONDS=30]`: сервис → порт из таблицы AC2, снимок в `tmp/pprof/<service>-<type>-<ts>.pb.gz` (`trace` → `.trace`), печать `go tool pprof -http=:0 <файл>` (для trace — `go tool trace`).
 
 **Acceptance criteria:**
-- [ ] `task pprof SERVICE=order` создаёт профиль, который открывает `go tool pprof -top`
-- [ ] Неизвестный `SERVICE` или `TYPE`, недоступный эндпоинт → понятная ошибка, ненулевой код, пустой файл не остаётся
-- [ ] `tmp/` в `.gitignore`
+- [x] `task pprof SERVICE=order` создаёт профиль, который открывает `go tool pprof -top`
+- [x] Неизвестный `SERVICE` или `TYPE`, недоступный эндпоинт → понятная ошибка, ненулевой код, пустой файл не остаётся
+- [x] `tmp/` в `.gitignore`
 
 **Verification:**
-- [ ] Ручная: `task pprof SERVICE=order TYPE=heap`, `task pprof SERVICE=foo; echo $?`, `go tool pprof -top <файл>`
+- [x] Ручная: `task pprof SERVICE=order TYPE=heap`, `task pprof SERVICE=foo; echo $?`, `go tool pprof -top <файл>`
 
 **Dependencies:** Task 3 (полностью — Tasks 4, 5)
 
