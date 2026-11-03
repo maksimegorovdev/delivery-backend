@@ -26,8 +26,10 @@
 ### Acceptance criteria
 
 1. **Пакет `platform/debugserver`.**
-   - Отдельный `http.Server` с собственным `http.ServeMux` (не `http.DefaultServeMux`): регистрирует
-     `net/http/pprof` (`/debug/pprof/`, `cmdline`, `profile`, `symbol`, `trace` и именованные профили через `Index`).
+   - Отдельный `http.Server` с собственным `http.ServeMux` (не `http.DefaultServeMux`): отдаёт
+     маршруты, как у `net/http/pprof` (`/debug/pprof/`, `cmdline`, `profile`, `symbol`, `trace` и именованные профили),
+     но хендлеры написаны поверх `runtime/pprof` и `runtime/trace`. Пакет `net/http/pprof` не импортируется:
+     его `init()` безусловно регистрирует профили на `http.DefaultServeMux`.
    - Создаётся только при непустом адресе; пустой `PPROF_ADDR` → сервер не стартует, сервис работает как раньше.
    - Таймауты: `ReadHeaderTimeout` задан; `WriteTimeout` больше максимальной длительности CPU-профиля и trace
      (обработчик pprof отклоняет `seconds`, превышающие `WriteTimeout`); `IdleTimeout` задан.
@@ -123,7 +125,7 @@
 
 ## Tech Stack
 
-- Go (версия из `go.work`), stdlib `net/http/pprof`, `runtime`. **Без новых Go-зависимостей.**
+- Go (версия из `go.work`), stdlib `runtime/pprof`, `runtime/trace`, `runtime`. **Без новых Go-зависимостей.**
 - Grafana Alloy `v1.21.3` (новый контейнер): компоненты `pyroscope.scrape`, `pyroscope.write`.
 - Grafana Pyroscope `2.4.2` (single binary) — новый контейнер, порт `127.0.0.1:4040`.
 - OTel Collector contrib `0.163.2` — без изменений, профили не обрабатывает.
@@ -188,8 +190,8 @@ README.md                                 → раздел Observability: про
 
 ```go
 // Server — HTTP-сервер отладочных эндпоинтов (pprof) на отдельном порту.
-// Использует собственный ServeMux: импорт net/http/pprof в других пакетах
-// не публикует профили на публичных серверах.
+// Использует собственный ServeMux и не импортирует net/http/pprof: его init()
+// регистрирует профили на http.DefaultServeMux, который можно отдать наружу по ошибке.
 type Server struct {
 	srv *http.Server
 	log *slog.Logger

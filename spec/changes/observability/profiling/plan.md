@@ -62,7 +62,7 @@ Spike не зависит от debugserver: для проверки достат
   сверялись с `compose.yaml`.
 - **Сэмплер — POSIX sh в стиле `docker-stats.sh`**, сопоставление снимков со ступенями — по времени файла и
   `summary.json` (в момент снимка ступень ещё неизвестна, поэтому имя файла — время `HHMMSS`, без номера ступени).
-- **Новых Go-зависимостей нет**: только stdlib `net/http/pprof`, `runtime`.
+- **Новых Go-зависимостей нет**: только stdlib `runtime/pprof`, `runtime/trace`, `runtime`.
 
 ## Task List
 
