@@ -132,7 +132,32 @@ func TestApp_New_AddrInUse(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, a)
 
-	// Ресурсы освобождены: пул приложения закрыт, его соединений в БД не осталось.
+	requireNoAppConns(t, pool)
+}
+
+func TestApp_New_DebugAddrInUse(t *testing.T) {
+	pool := pgtest.NewDB(t, migrationsDir)
+
+	var lc net.ListenConfig
+	busy, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = busy.Close() })
+
+	setEnv(t, dsnOf(pool), "127.0.0.1:0")
+	t.Setenv("PPROF_ADDR", busy.Addr().String())
+
+	a, err := app.New(t.Context())
+	require.ErrorContains(t, err, busy.Addr().String())
+	require.Nil(t, a)
+
+	// Debug-листенер открывается последним: всё, что создано до него, освобождено.
+	requireNoAppConns(t, pool)
+}
+
+// requireNoAppConns ждёт, пока в БД не останется соединений приложения: пул закрыт.
+func requireNoAppConns(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		var conns int
 		queryErr := pool.QueryRow(t.Context(),

@@ -209,6 +209,21 @@ func TestApp_New_AddrInUse(t *testing.T) {
 	require.Nil(t, a)
 }
 
+func TestApp_New_DebugAddrInUse(t *testing.T) {
+	var lc net.ListenConfig
+	busy, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = busy.Close() })
+
+	orderAddr, _ := startFakeOrder(t)
+	setEnv(t, "127.0.0.1:0", orderAddr)
+	t.Setenv("PPROF_ADDR", busy.Addr().String())
+
+	a, err := app.New(t.Context())
+	require.ErrorContains(t, err, busy.Addr().String())
+	require.Nil(t, a)
+}
+
 //nolint:paralleltest // t.Setenv
 func TestApp_DebugServer_Disabled(t *testing.T) {
 	orderAddr, _ := startFakeOrder(t)

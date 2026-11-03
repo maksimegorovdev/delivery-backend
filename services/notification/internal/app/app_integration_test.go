@@ -73,9 +73,9 @@ func goldenRecord(t *testing.T) *kgo.Record {
 	return rec
 }
 
-// createExactTopic создаёт топик с точным именем topic: kafkatest.CreateTopic добавляет суффикс,
+// createExactTopic создаёт топик с точным именем order.Topic: kafkatest.CreateTopic добавляет суффикс,
 // а роутер приложения привязан к константе order.Topic. Автосоздание топиков в Redpanda выключено.
-func createExactTopic(t *testing.T, brokers []string, topic string) {
+func createExactTopic(t *testing.T, brokers []string) {
 	t.Helper()
 
 	client, err := kgo.NewClient(kgo.SeedBrokers(brokers...))
@@ -83,7 +83,7 @@ func createExactTopic(t *testing.T, brokers []string, topic string) {
 	t.Cleanup(client.Close)
 
 	topicReq := kmsg.NewCreateTopicsRequestTopic()
-	topicReq.Topic = topic
+	topicReq.Topic = order.Topic
 	topicReq.NumPartitions = 1
 	topicReq.ReplicationFactor = 1
 
@@ -116,7 +116,7 @@ func dsnOf(pool *pgxpool.Pool) string {
 }
 
 // setEnv задаёт окружение приложения; телеметрия выключена.
-func setEnv(t *testing.T, dsn string, brokers []string, topic string) {
+func setEnv(t *testing.T, dsn string, brokers []string) {
 	t.Helper()
 
 	t.Setenv("APP_NAME", "notification")
@@ -126,7 +126,7 @@ func setEnv(t *testing.T, dsn string, brokers []string, topic string) {
 	t.Setenv("PG_MAX_CONNS", "4")
 	t.Setenv("KAFKA_BROKERS", strings.Join(brokers, ","))
 	t.Setenv("KAFKA_CONSUMER_GROUP", consumerGroup)
-	t.Setenv("KAFKA_TOPICS", topic)
+	t.Setenv("KAFKA_TOPICS", order.Topic)
 	t.Setenv("OTEL_ENABLED", "false")
 	// Debug-сервер по умолчанию выключен; тесты, которым он нужен, задают PPROF_ADDR сами.
 	t.Setenv("PPROF_ADDR", "")
@@ -141,8 +141,8 @@ func TestApp_Smoke(t *testing.T) {
 	// Роутер приложения привязан к order.Topic, поэтому топик нельзя заменить уникальным:
 	// изоляция обеспечивается тем, что брокер принадлежит тестовому бинарю пакета.
 	brokers := kafkatest.Brokers(t)
-	createExactTopic(t, brokers, order.Topic)
-	setEnv(t, dsnOf(pool), brokers, order.Topic)
+	createExactTopic(t, brokers)
+	setEnv(t, dsnOf(pool), brokers)
 
 	a, err := app.New(t.Context())
 	require.NoError(t, err)
@@ -175,12 +175,40 @@ func TestApp_Smoke(t *testing.T) {
 	require.NoError(t, a.Close(t.Context()))
 }
 
+func TestApp_New_DebugAddrInUse(t *testing.T) {
+	pool := pgtest.NewDB(t, migrationsDir)
+	brokers := kafkatest.Brokers(t)
+	createExactTopic(t, brokers)
+
+	var lc net.ListenConfig
+	busy, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = busy.Close() })
+
+	setEnv(t, dsnOf(pool), brokers)
+	t.Setenv("PPROF_ADDR", busy.Addr().String())
+
+	a, err := app.New(t.Context())
+	require.ErrorContains(t, err, busy.Addr().String())
+	require.Nil(t, a)
+
+	// Debug-листенер открывается последним: пул, созданный до него, закрыт.
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		var conns int
+		queryErr := pool.QueryRow(t.Context(),
+			`SELECT count(*) FROM pg_stat_activity WHERE application_name = $1`, appName,
+		).Scan(&conns)
+		assert.NoError(c, queryErr)
+		assert.Zero(c, conns)
+	}, eventuallyTimeout, eventuallyTick)
+}
+
 //nolint:paralleltest // t.Setenv
 func TestApp_DebugServer_Disabled(t *testing.T) {
 	pool := pgtest.NewDB(t, migrationsDir)
 	brokers := kafkatest.Brokers(t)
-	createExactTopic(t, brokers, order.Topic)
-	setEnv(t, dsnOf(pool), brokers, order.Topic)
+	createExactTopic(t, brokers)
+	setEnv(t, dsnOf(pool), brokers)
 
 	a, err := app.New(t.Context())
 	require.NoError(t, err)
@@ -192,8 +220,8 @@ func TestApp_DebugServer_Disabled(t *testing.T) {
 func TestApp_DebugServer_ServesPprofAndStopsWithApp(t *testing.T) {
 	pool := pgtest.NewDB(t, migrationsDir)
 	brokers := kafkatest.Brokers(t)
-	createExactTopic(t, brokers, order.Topic)
-	setEnv(t, dsnOf(pool), brokers, order.Topic)
+	createExactTopic(t, brokers)
+	setEnv(t, dsnOf(pool), brokers)
 	t.Setenv("PPROF_ADDR", "127.0.0.1:0")
 
 	a, err := app.New(t.Context())
