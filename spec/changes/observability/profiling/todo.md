@@ -219,12 +219,12 @@
 **Description:** У всех пяти сервисов `PPROF_ADDR=:6060` и порт `127.0.0.1:3606x:6060` по таблице AC2; у `order`, `user`, `product` — `PPROF_MUTEX_FRACTION=5`, `PPROF_BLOCK_RATE=10000`.
 
 **Acceptance criteria:**
-- [ ] После `task load-up` `curl 127.0.0.1:36060..36064/debug/pprof/` → 200
-- [ ] Порты опубликованы только на `127.0.0.1`
-- [ ] `mutex`/`block` у `order`/`user`/`product` непустые под нагрузкой
+- [x] После `task load-up` `curl 127.0.0.1:36060..36064/debug/pprof/` → 200
+- [x] Порты опубликованы только на `127.0.0.1`
+- [x] `mutex`/`block` у `order`/`user`/`product` непустые под нагрузкой
 
 **Verification:**
-- [ ] `task load-up`, `curl`, `task load-smoke`, `go tool pprof -top http://127.0.0.1:36061/debug/pprof/mutex`
+- [x] `task load-up`, `curl`, `task load-smoke`, `go tool pprof -top http://127.0.0.1:36061/debug/pprof/mutex`
 
 **Dependencies:** Tasks 3–5
 
