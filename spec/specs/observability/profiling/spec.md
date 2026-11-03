@@ -299,7 +299,7 @@ pyroscope.scrape "order" {
 - [x] После `task compose-up` + `task watch-all` в Grafana (датасорс Pyroscope) видны профили всех 5 сервисов, diff двух интервалов работает.
 - [x] `LOAD_PROFILING=1 task load-up` поднимает Pyroscope и Alloy в load-стеке; без флага их нет; `images-check` проходит.
 - [x] В `baseline.md` записан разбор узкого места `order` (пул pgx, CPU `user`/`product`) со ссылками на профили.
-- [x] `map.md`: решение о Pyroscope в «Принятых решениях», модуль `profiling` — `done`; README обновлён (`platform/README.md`).
+- [x] `map.md`: решение о Pyroscope в «Принятых решениях», модуль `profiling` — `done`. README не обновлялся: по решению пользователя раздел о debugserver в `platform/README.md` не ведётся.
 
 ## Assumptions
 
