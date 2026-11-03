@@ -73,12 +73,12 @@
 
 **Acceptance criteria:**
 - [x] Пустой `PPROF_ADDR` → сервер не создаётся, порт не слушается; отрицательные rate/fraction → ошибка валидации
-- [ ] При заданном адресе `curl 127.0.0.1:6061/debug/pprof/` → 200 у сервиса, запущенного через Air
+- [x] При заданном адресе `curl 127.0.0.1:6061/debug/pprof/` → 200 у сервиса, запущенного через Air
 - [x] Остановка сервиса гасит debug-сервер без ошибок в логе
 
 **Verification:**
 - [x] `cd services/order && go test ./internal/config/...`; `task test-integration` (app_integration_test: эндпоинт отвечает / порт не слушается)
-- [ ] Ручная: `task svc-watch` для order + `curl -s 127.0.0.1:6061/debug/pprof/ | head`
+- [x] Ручная: `task svc-watch` для order + `curl -s 127.0.0.1:6061/debug/pprof/ | head`
 
 **Dependencies:** Task 2
 
@@ -94,12 +94,12 @@
 **Description:** То же, что Task 3, по шаблону `order`. Порты: `user` — `127.0.0.1:6062`, `product` — `127.0.0.1:6063`.
 
 **Acceptance criteria:**
-- [ ] Конфиг, валидация и тесты как в Task 3 для обоих сервисов
-- [ ] `curl 127.0.0.1:6062/debug/pprof/` и `:6063` → 200; без `PPROF_ADDR` порты не слушаются
+- [x] Конфиг, валидация и тесты как в Task 3 для обоих сервисов
+- [x] `curl 127.0.0.1:6062/debug/pprof/` и `:6063` → 200; без `PPROF_ADDR` порты не слушаются
 
 **Verification:**
-- [ ] `task test`, `task test-integration`
-- [ ] Ручная: `task watch-all` + `curl`
+- [x] `task test`, `task test-integration`
+- [x] Ручная: `task watch-all` + `curl`
 
 **Dependencies:** Task 3
 
