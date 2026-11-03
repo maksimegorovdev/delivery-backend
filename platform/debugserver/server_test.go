@@ -5,9 +5,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"runtime"
 	"runtime/debug"
@@ -216,6 +218,8 @@ func TestServer_GCOnlyForHeap(t *testing.T) {
 		wantGC bool
 	}{
 		{name: "heap", path: "/debug/pprof/heap?gc=1", wantGC: true},
+		{name: "heap gc=0", path: "/debug/pprof/heap?gc=0", wantGC: false},
+		{name: "heap gc not a number", path: "/debug/pprof/heap?gc=yes", wantGC: false},
 		{name: "allocs", path: "/debug/pprof/allocs?gc=1", wantGC: false},
 		{name: "goroutine", path: "/debug/pprof/goroutine?gc=1", wantGC: false},
 	}
@@ -355,6 +359,46 @@ func TestServer_SecondsExceedsWriteTimeout(t *testing.T) {
 	}
 }
 
+// Пустой, нечисловой и неположительный seconds заменяется значением по умолчанию (30 с у профиля,
+// 1 с у трассировки). Подстановку видно по отказу: значение по умолчанию не укладывается в WriteTimeout,
+// тогда как переданное как есть (0, -1) уложилось бы и запустило профилирование.
+func TestServer_SecondsDefault(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		path  string
+		write time.Duration
+	}{
+		{name: "profile without seconds", path: "/debug/pprof/profile", write: 2 * time.Second},
+		{name: "profile empty", path: "/debug/pprof/profile?seconds=", write: 2 * time.Second},
+		{name: "profile zero", path: "/debug/pprof/profile?seconds=0", write: 2 * time.Second},
+		{name: "profile negative", path: "/debug/pprof/profile?seconds=-1", write: 2 * time.Second},
+		{name: "profile not a number", path: "/debug/pprof/profile?seconds=abc", write: 2 * time.Second},
+		{
+			name:  "profile overflows int",
+			path:  "/debug/pprof/profile?seconds=99999999999999999999",
+			write: 2 * time.Second,
+		},
+		{name: "trace without seconds", path: "/debug/pprof/trace", write: time.Second},
+		{name: "trace zero", path: "/debug/pprof/trace?seconds=0", write: time.Second},
+		{name: "trace not a number", path: "/debug/pprof/trace?seconds=abc", write: time.Second},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			lis := start(t, debugserver.WithTimeouts(debugserver.Timeouts{Write: tt.write}))
+
+			resp := get(t, lis.url(tt.path))
+
+			assert.Equal(t, http.StatusBadRequest, resp.status)
+			assert.Contains(t, string(resp.body), "WriteTimeout")
+		})
+	}
+}
+
 //nolint:paralleltest // профилирование глобально для процесса
 func TestServer_ProfileAlreadyRunning(t *testing.T) {
 	lis := start(t)
@@ -367,6 +411,27 @@ func TestServer_ProfileAlreadyRunning(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, resp.status)
 	assert.Contains(t, string(resp.body), "could not enable CPU profiling")
+}
+
+// Клиент, оборвавший запрос, освобождает трассировку сразу, а не через seconds:
+// иначе она занимала бы процесс и другие клиенты получали бы 500.
+//
+//nolint:paralleltest // профилирование глобально для процесса
+func TestServer_ClientDisconnectStopsTrace(t *testing.T) {
+	lis := start(t)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	inFlight := make(chan response, 1)
+	go func() { inFlight <- do(ctx, http.MethodGet, lis.url("/debug/pprof/trace?seconds=30"), nil) }()
+
+	require.Eventually(t, trace.IsEnabled, waitTimeout, 10*time.Millisecond, "трассировка не стартовала")
+
+	cancel()
+
+	require.ErrorIs(t, receive(t, inFlight, "aborted request").err, context.Canceled)
+	assert.Eventually(t, func() bool { return !trace.IsEnabled() }, waitTimeout, 10*time.Millisecond,
+		"трассировка остановлена после отключения клиента")
 }
 
 func TestServe_StopsOnContextCancel(t *testing.T) {
@@ -389,10 +454,90 @@ func TestServe_StopsOnContextCancel(t *testing.T) {
 	assert.Error(t, do(t.Context(), http.MethodGet, lis.url("/debug/pprof/"), nil).err, "порт больше не слушается")
 }
 
-//nolint:paralleltest // профилирование глобально для процесса
-func TestServe_ShutdownTimeoutAbortsRunningProfile(t *testing.T) {
+// publicAddrListener сообщает не-loopback адрес, оставаясь на loopback: тест не открывает порт наружу.
+type publicAddrListener struct {
+	net.Listener
+}
+
+func (publicAddrListener) Addr() net.Addr {
+	return &net.TCPAddr{IP: net.IPv4zero, Port: 6060}
+}
+
+// На не-loopback адресе Serve предупреждает, что pprof доступен без аутентификации; на loopback молчит.
+func TestServe_WarnsOnNonLoopbackAddr(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		wrap     func(net.Listener) net.Listener
+		wantWarn bool
+	}{
+		{
+			name:     "loopback",
+			wrap:     func(l net.Listener) net.Listener { return l },
+			wantWarn: false,
+		},
+		{
+			name:     "all interfaces",
+			wrap:     func(l net.Listener) net.Listener { return publicAddrListener{l} },
+			wantWarn: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var logs bytes.Buffer
+			srv := debugserver.New(debugserver.WithLogger(slog.New(slog.NewTextHandler(&logs, nil))))
+
+			lis := tt.wrap(listen(t))
+
+			ctx, cancel := context.WithCancel(t.Context())
+			result := make(chan error, 1)
+			go func() { result <- srv.Serve(ctx, lis) }()
+
+			cancel()
+			require.NoError(t, receive(t, result, "Serve result"))
+
+			// Запись в logs произошла в Serve до отправки результата в канал.
+			if tt.wantWarn {
+				assert.Contains(t, logs.String(), "non-loopback address")
+				assert.Contains(t, logs.String(), "0.0.0.0:6060")
+				return
+			}
+			assert.NotContains(t, logs.String(), "non-loopback")
+		})
+	}
+}
+
+// Ошибка Accept завершает Serve без отмены ctx, а доли профилей всё равно восстанавливаются.
+//
+//nolint:paralleltest // доля mutex-профиля глобальна для процесса
+func TestServe_ReturnsAcceptError(t *testing.T) {
+	before := runtime.SetMutexProfileFraction(-1)
+
 	lis := listen(t)
-	srv := debugserver.New(debugserver.WithTimeouts(debugserver.Timeouts{Shutdown: 50 * time.Millisecond}))
+	require.NoError(t, lis.Close())
+	srv := debugserver.New(debugserver.WithMutexProfileFraction(7))
+
+	result := make(chan error, 1)
+	go func() { result <- srv.Serve(t.Context(), lis) }()
+
+	err := receive(t, result, "Serve result")
+	require.ErrorIs(t, err, net.ErrClosed)
+	require.ErrorContains(t, err, "debugserver: serve:")
+	assert.Equal(t, before, runtime.SetMutexProfileFraction(-1), "прежняя доля восстановлена")
+}
+
+// Остановка не ждёт конца seconds: идущая трассировка завершается досрочно, клиент получает
+// снятые данные, а Serve завершается без ошибки. Иначе постоянный скрейп превращал бы каждую
+// остановку сервиса в таймаут.
+//
+//nolint:paralleltest // профилирование глобально для процесса
+func TestServe_StopEndsRunningTrace(t *testing.T) {
+	lis := listen(t)
+	srv := debugserver.New()
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -406,13 +551,53 @@ func TestServe_ShutdownTimeoutAbortsRunningProfile(t *testing.T) {
 
 	cancel()
 
-	err := receive(t, result, "Serve result")
-	require.Error(t, err)
+	// waitTimeout (10 с) меньше seconds=30: Serve дождался бы конца трассировки только с ошибкой теста.
+	require.NoError(t, receive(t, result, "Serve result"))
+
+	resp := receive(t, inFlight, "trace response")
+	require.NoError(t, resp.err)
+	assert.Equal(t, http.StatusOK, resp.status)
+	assert.NotEmpty(t, resp.body, "клиент получает трассировку за прошедшее время")
+	assert.False(t, trace.IsEnabled(), "трассировка остановлена")
+}
+
+// Хендлер, не реагирующий на отмену контекста (здесь — чтение тела POST /symbol, которое клиент
+// не досылает), не должен держать остановку бесконечно: по истечении Shutdown соединение закрывается.
+func TestServe_ShutdownTimeoutForcesClose(t *testing.T) {
+	t.Parallel()
+
+	lis := listen(t)
+	srv := debugserver.New(debugserver.WithTimeouts(debugserver.Timeouts{Shutdown: 50 * time.Millisecond}))
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	result := make(chan error, 1)
+	go func() { result <- srv.Serve(ctx, lis) }()
+
+	var d net.Dialer
+	conn, err := d.DialContext(t.Context(), "tcp", lis.Addr().String())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	require.NoError(t, conn.SetDeadline(time.Now().Add(waitTimeout)))
+
+	// 100 Continue сервер шлёт, когда хендлер начинает читать тело: запрос точно активен.
+	_, err = io.WriteString(conn, "POST /debug/pprof/symbol HTTP/1.1\r\nHost: test\r\n"+
+		"Content-Length: 16\r\nExpect: 100-continue\r\n\r\n")
+	require.NoError(t, err)
+	status := make([]byte, len("HTTP/1.1 100"))
+	_, err = io.ReadFull(conn, status)
+	require.NoError(t, err)
+	require.Equal(t, "HTTP/1.1 100", string(status))
+
+	cancel()
+
+	err = receive(t, result, "Serve result")
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.ErrorContains(t, err, "graceful stop timed out after 50ms")
 
-	// Принудительное закрытие прерывает хендлер, иначе трассировка держалась бы 30 с.
-	receive(t, inFlight, "aborted request")
+	// Соединение закрыто сервером, а не истёк дедлайн клиента.
+	_, err = io.ReadAll(conn)
+	assert.NotErrorIs(t, err, os.ErrDeadlineExceeded)
 }
 
 //nolint:paralleltest // профилирование глобально для процесса

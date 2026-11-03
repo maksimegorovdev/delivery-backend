@@ -69,10 +69,22 @@ func New(opts ...Option) *Server {
 // Листенер создаёт вызывающий (обычно через listener.Listen); Serve закрывает lis.
 //
 // Доли mutex- и block-профилей включаются на время работы и сбрасываются при выходе.
-// Если запросы не завершились за Shutdown, соединения закрываются принудительно,
-// а идущий профиль или трассировка прерываются.
+// Если lis слушает не loopback, Serve предупреждает об этом в лог: у эндпоинтов нет аутентификации.
+//
+// Контексты запросов производны от ctx: при его отмене идущий CPU-профиль или трассировка
+// завершаются досрочно, и клиент получает данные за прошедшее время. Иначе [http.Server.Shutdown]
+// ждал бы конца seconds, а постоянный скрейп (Alloy) превращал бы каждую остановку в таймаут.
+// Если запросы всё же не завершились за Shutdown (например, клиент не читает ответ),
+// соединения закрываются принудительно, и Serve возвращает ошибку.
 func (s *Server) Serve(ctx context.Context, lis net.Listener) error {
 	defer s.applyProfileRates()()
+
+	if addr, ok := lis.Addr().(*net.TCPAddr); ok && !addr.IP.IsLoopback() {
+		s.logger.WarnContext(ctx, "debugserver: listening on a non-loopback address, pprof has no authentication",
+			slog.String("addr", addr.String()))
+	}
+
+	s.server.BaseContext = func(net.Listener) context.Context { return ctx }
 
 	serveErr := make(chan error, 1)
 	go func() {
@@ -98,7 +110,7 @@ func (s *Server) shutdown() error {
 		return nil
 	}
 
-	// Shutdown не прерывает активные запросы: без Close профиль держался бы до конца seconds.
+	// Запрос не завершился даже после отмены его контекста: соединение закрывается принудительно.
 	if cerr := s.server.Close(); cerr != nil {
 		s.logger.Warn("debugserver: force close", slog.Any("error", cerr))
 	}

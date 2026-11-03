@@ -75,7 +75,7 @@ var indexTemplate = template.Must(template.New("index").Parse(`<!doctype html>
 `))
 
 // handleNamedProfile отдаёт профиль из [pprof.Lookup] (goroutine, heap, allocs, mutex, block, threadcreate).
-// debug=0 — бинарный pprof, debug=1 и 2 — текст; gc=1 запускает сборку мусора перед heap.
+// debug=0 — бинарный pprof, debug=1 и 2 — текст; gc>0 запускает сборку мусора перед heap.
 func handleNamedProfile(w http.ResponseWriter, r *http.Request) {
 	p := pprof.Lookup(r.PathValue("name"))
 	if p == nil {
@@ -89,7 +89,8 @@ func handleNamedProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.FormValue("gc") != "" && p.Name() == "heap" {
+	// Как в net/http/pprof: сборку запускает только положительное число, gc=0 и мусор её не запускают.
+	if gc, _ := strconv.Atoi(r.FormValue("gc")); gc > 0 && p.Name() == "heap" {
 		runtime.GC()
 	}
 
