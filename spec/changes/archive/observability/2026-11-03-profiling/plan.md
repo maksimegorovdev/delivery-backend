@@ -1,6 +1,6 @@
 # Implementation Plan: profiling
 
-> Spec: [spec.md](spec.md) · Tasks: [todo.md](todo.md) · Map: [observability](../../../specs/observability/map.md)
+> Spec: [spec.md](spec.md) · Tasks: [todo.md](todo.md) · Map: [observability](../../../../specs/observability/map.md)
 
 ## Overview
 
@@ -67,44 +67,44 @@ Spike не зависит от debugserver: для проверки достат
 ## Task List
 
 ### Phase 0: Spike
-- [ ] Task 1: Spike — Alloy `pyroscope.scrape` → Pyroscope → Grafana
+- [x] Task 1: Spike — Alloy `pyroscope.scrape` → Pyroscope → Grafana
 
 ### Checkpoint 0: go/no-go continuous profiling
-- [ ] Пункты (a)–(d) AC6 подтверждены на Alloy (или работа по AC6 остановлена и вынесена на согласование)
+- [x] Пункты (a)–(d) AC6 подтверждены на Alloy (или работа по AC6 остановлена и вынесена на согласование)
 
 ### Phase 1: pprof по запросу
-- [ ] Task 2: Пакет `platform/debugserver` с тестами
-- [ ] Task 3: debugserver в `order` (config, app, `.env.example`, тесты)
-- [ ] Task 4: debugserver в `user` и `product`
-- [ ] Task 5: debugserver в `gateway` и `notification`
-- [ ] Task 6: Задача `task pprof`
+- [x] Task 2: Пакет `platform/debugserver` с тестами
+- [x] Task 3: debugserver в `order` (config, app, `.env.example`, тесты)
+- [x] Task 4: debugserver в `user` и `product`
+- [x] Task 5: debugserver в `gateway` и `notification`
+- [x] Task 6: Задача `task pprof`
 
 ### Checkpoint 1: pprof во всех сервисах
-- [ ] `task test`, `task test-integration`, `task lint` зелёные; 5 эндпоинтов отвечают 200; `task pprof` работает
+- [x] `task test`, `task test-integration`, `task lint` зелёные; 5 эндпоинтов отвечают 200; `task pprof` работает
 
 ### Phase 2: Continuous profiling в dev
-- [ ] Task 7: Pyroscope и Alloy в `compose.yaml`
-- [ ] Task 8: Датасорс Pyroscope в Grafana
+- [x] Task 7: Pyroscope и Alloy в `compose.yaml`
+- [x] Task 8: Датасорс Pyroscope в Grafana
 
 ### Checkpoint 2: Grafana
-- [ ] В Profiles Drilldown 5 сервисов × 5 типов (mutex и block раздельно), diff двух интервалов работает; конфиг Collector не изменён
+- [x] В Profiles Drilldown 5 сервисов × 5 типов (mutex и block раздельно), diff двух интервалов работает; конфиг Collector не изменён
 
 ### Phase 3: Профилирование в load-стеке
-- [ ] Task 9: `load/compose.yaml`: debug-порты и mutex/block у сервисов
+- [x] Task 9: `load/compose.yaml`: debug-порты и mutex/block у сервисов
 - [x] Task 10: `load/compose.profiling.yaml` (pyroscope + alloy) + `profiles.load.alloy` + `LOAD_PROFILING`, `images-check`
-- [ ] Task 11: Сэмплер `pprof-snapshots.sh` в `load-stress`
-- [ ] Task 12: Снимки soak и `task load-soak-leaks`
+- [x] Task 11: Сэмплер `pprof-snapshots.sh` в `load-stress`
+- [x] Task 12: Снимки soak и `task load-soak-leaks`
 - [x] Task 13: Эталонные профили и `task load-pprof-diff`
 
 ### Checkpoint 3: load
-- [ ] stress/soak кладут профили; diff и leaks работают; `load-regression` без профилирования в пределах эталона
+- [x] stress/soak кладут профили; diff и leaks работают; `load-regression` без профилирования в пределах эталона
 
 ### Phase 4: Результат и документация
-- [ ] Task 14: Разбор узкого места `order` в `baseline.md`
-- [ ] Task 15: `map.md`, README, версии в спеке
+- [x] Task 14: Разбор узкого места `order` в `baseline.md`
+- [x] Task 15: `map.md`, README, версии в спеке
 
 ### Checkpoint: Complete
-- [ ] Все Success Criteria спеки выполнены; ревью пользователя; затем завершение по `spec-workflow`
+- [x] Все Success Criteria спеки выполнены; ревью пользователя; затем завершение по `spec-workflow`
 
 ## Risks and Mitigations
 

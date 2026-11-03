@@ -1,6 +1,6 @@
 # Spec: profiling
 
-> Status: **approved** · Depends on: [dashboards](../../../specs/observability/dashboards/spec.md), [testing/load](../../../specs/testing/map.md)
+> Status: **done** · Depends on: [dashboards](../dashboards/spec.md), [testing/load](../../testing/map.md)
 
 ## Objective
 
@@ -16,7 +16,7 @@
 Практические цели первой итерации:
 
 - разобрать узкое место `order` под stress: гипотеза о нехватке пула pgx (`PG_MAX_CONNS`), CPU-throttling
-  `user`/`product` на gRPC (открытые вопросы из [testing/map.md](../../../specs/testing/map.md));
+  `user`/`product` на gRPC (открытые вопросы из [testing/map.md](../../testing/map.md));
 - сравнивать профили «до/после» изменения (`go tool pprof -diff_base`) по сохранённому эталону;
 - находить утечки горутин и памяти в soak: снимки `goroutine`/`heap` в начале и в конце прогона.
 
@@ -115,7 +115,7 @@
      Pyroscope оба попадают в тип `contentions:*`; (2) из resource-атрибутов label'ами становятся только dotless-ключи
      (`env` да, `deployment.environment.name`, `service.namespace`, `service.version` нет); (3) heap даёт label
      `bytes` (серия на размер аллокации). Пользователь выбрал Alloy.
-7. **Отступление от «только ClickHouse» фиксируется** в разделе «Принятые решения» [map.md](../../../specs/observability/map.md):
+7. **Отступление от «только ClickHouse» фиксируется** в разделе «Принятые решения» [map.md](../map.md):
    профили хранятся в Pyroscope, потому что в ClickHouse-экспортёре OTel Collector нет сигнала profiles,
    а сам сигнал в OTel ещё не стабилен (Alpha). Логи, метрики, трейсы остаются в ClickHouse. Там же — второе решение:
    профили собирает Grafana Alloy (`pyroscope.scrape`), а не OTel Collector, по итогам spike (см. AC6).
@@ -299,17 +299,28 @@ pyroscope.scrape "order" {
 - [x] После `task compose-up` + `task watch-all` в Grafana (датасорс Pyroscope) видны профили всех 5 сервисов, diff двух интервалов работает.
 - [x] `LOAD_PROFILING=1 task load-up` поднимает Pyroscope и Alloy в load-стеке; без флага их нет; `images-check` проходит.
 - [x] В `baseline.md` записан разбор узкого места `order` (пул pgx, CPU `user`/`product`) со ссылками на профили.
-- [ ] `map.md`: решение о Pyroscope в «Принятых решениях», модуль `profiling` — `done`; README обновлён.
+- [x] `map.md`: решение о Pyroscope в «Принятых решениях», модуль `profiling` — `done`; README обновлён (`platform/README.md`).
 
 ## Assumptions
 
 1. Сервисы в dev запускаются через Air на хосте; Alloy в Docker достаёт их через `host.docker.internal`
    (Docker Desktop на macOS). На Linux нужен `extra_hosts: host.docker.internal:host-gateway` — добавляется сразу.
+   Но на Linux `host-gateway` — это IP моста `docker0` (обычно `172.17.0.1`), а не loopback хоста: сервис на
+   `127.0.0.1:606x` оттуда недоступен. Рабочий вариант — `PPROF_ADDR=172.17.0.1:606x` (мост видят только хост и
+   контейнеры), а не `:606x`: последний открывает pprof без аутентификации во все сети, включая LAN. На любом
+   не-loopback адресе debugserver пишет предупреждение в лог при старте.
 2. Pull-режим (Alloy опрашивает pprof) выбран, чтобы в коде сервисов не было ничего, кроме debug-сервера.
 3. Отдельный агент (Alloy) принят как цена за раздельные типы профилей и зрелый путь в Pyroscope; OTel Collector
    и его основной конфиг профилями не затрагиваются. При поломке профилирование отключается удалением сервиса `alloy`.
 4. Профили — локальное средство разработки; аутентификации на debug-порту нет, защита — привязка к `127.0.0.1`.
 5. Ретенция Pyroscope — дефолтная; данные теряются с `docker compose down -v`.
+6. CPU-профайлер один на процесс, а Alloy снимает `process_cpu` почти непрерывно. Поэтому при работающем Alloy
+   ручной `task pprof TYPE=profile` получает HTTP 500 (подсказка в тексте ошибки: `docker compose stop alloy`), а
+   `task load-stress` и `task load-soak` отказываются стартовать, пока в load-стеке поднят Alloy (`LOAD_PROFILING=1`):
+   снимки CPU сэмплера получали бы 500, а скрейп искажал бы замеры. Непрерывное профилирование и снимки сэмплера —
+   разные режимы, их не совмещают.
+7. При остановке сервиса идущий CPU-профиль или трассировка завершаются досрочно: клиент получает данные за
+   прошедшее время, а остановка не ждёт конца `seconds`.
 
 ## Open Questions
 

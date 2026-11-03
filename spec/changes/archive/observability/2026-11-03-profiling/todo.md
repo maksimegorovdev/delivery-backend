@@ -27,7 +27,7 @@
 **Verification:**
 - [x] `docker run --rm … grafana/alloy:v1.21.3 validate <конфиг>` (или `fmt --test`)
 - [x] API Pyroscope: `LabelValues(service_name)`, `ProfileTypes`, `Series` с `__profile_type__` и `env`
-- [ ] Ручная: в Grafana Explore (Pyroscope) виден `service_name` тестового процесса с 5 типами профилей
+- [x] Ручная: в Grafana Explore (Pyroscope) виден `service_name` тестового процесса с 5 типами профилей (подтверждено в Task 8: Profiles Drilldown)
 
 **Dependencies:** None
 
@@ -38,7 +38,7 @@
 **Estimated scope:** S
 
 ### Checkpoint 0
-- [ ] Go/no-go по continuous profiling принят; при no-go — согласован запасной вариант
+- [x] Go/no-go по continuous profiling принят; при no-go — согласован запасной вариант (go через Alloy, решение пользователя 2026-11-03)
 
 ---
 
@@ -152,10 +152,10 @@
 **Estimated scope:** S
 
 ### Checkpoint 1: pprof во всех сервисах
-- [ ] `task test`, `task test-integration`, `task lint` зелёные
-- [ ] `task watch-all`: `curl 127.0.0.1:6060..6064/debug/pprof/` → 200
-- [ ] `task pprof` работает для каждого сервиса
-- [ ] Ревью пользователя перед фазой 2
+- [x] `task test`, `task test-integration`, `task lint` зелёные
+- [x] `task watch-all`: `curl 127.0.0.1:6060..6064/debug/pprof/` → 200
+- [x] `task pprof` работает для каждого сервиса
+- [x] Ревью пользователя перед фазой 2 (закрыто итоговым ревью `/ship` 2026-11-03)
 
 ---
 
@@ -320,10 +320,10 @@
 **Estimated scope:** S
 
 ### Checkpoint 3: load
-- [ ] stress и soak кладут профили; `load-soak-leaks`, `load-pprof-diff` работают
-- [ ] `task load-regression` без сэмплера и без `LOAD_PROFILING` — p95 в пределах эталона
-- [ ] `task load-js-test`, `task lint` зелёные
-- [ ] Ревью пользователя перед фазой 4
+- [x] stress и soak кладут профили; `load-soak-leaks`, `load-pprof-diff` работают
+- [x] `task load-regression` без сэмплера и без `LOAD_PROFILING` — p95 в пределах эталона (2026-11-03: p95 3 мс при пороге 6 мс, checks 100%, dropped 0)
+- [x] `task load-js-test`, `task lint` зелёные
+- [x] Ревью пользователя перед фазой 4 (закрыто итоговым ревью `/ship` 2026-11-03)
 
 ---
 
@@ -356,7 +356,7 @@
 
 **Acceptance criteria:**
 - [x] Два решения записаны в `map.md`
-- [ ] Все Success Criteria спеки отмечены
+- [x] Все Success Criteria спеки отмечены
 
 **Verification:**
 - [x] Ссылки в `spec/` резолвятся
@@ -370,6 +370,6 @@
 **Estimated scope:** S
 
 ### Checkpoint: Complete
-- [ ] Все Success Criteria спеки выполнены, тесты и линтер зелёные
-- [ ] Ревью пользователя
-- [ ] Завершение по `spec-workflow`: статус `done`, публикация в `spec/specs/observability/profiling/`, архив `spec/changes/archive/observability/<YYYY-MM-DD>-profiling/`, `map.md` → `done`
+- [x] Все Success Criteria спеки выполнены, тесты и линтер зелёные
+- [x] Ревью пользователя (`/ship` 2026-11-03: блокер и важные замечания исправлены)
+- [x] Завершение по `spec-workflow`: статус `done`, публикация в `spec/specs/observability/profiling/`, архив `spec/changes/archive/observability/<YYYY-MM-DD>-profiling/`, `map.md` → `done`
